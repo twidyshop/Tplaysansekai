@@ -1,11 +1,11 @@
-# SekaiDrama
+# TPLAY+
 
-[![License](https://img.shields.io/github/license/Sansekai/SekaiDrama)](https://github.com/Sansekai/SekaiDrama/blob/main/LICENSE)
-[![Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/Sansekai/SekaiDrama)
+[![License](https://img.shields.io/github/license/twidyshop/Tplaysansekai)](https://github.com/twidyshop/Tplaysansekai/blob/main/LICENSE)
+[![Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/twidyshop/Tplaysansekai)
 
 ![Preview](public/preview.png)
 
-SekaiDrama adalah platform streaming drama pendek (vertical drama) modern yang menampilkan konten dari bebebrapa platform populer. Dibangun dengan teknologi web terkini untuk performa maksimal dan pengalaman pengguna yang premium.
+TPLAY+ adalah platform streaming drama pendek (vertical drama) modern yang menampilkan konten dari berbagai platform populer. Dibangun dengan teknologi web terkini untuk performa maksimal dan pengalaman menonton yang nyaman.
 
 ## Persyaratan Sistem
 Sebelum memulai, pastikan komputer Anda sudah terinstall:
@@ -17,15 +17,15 @@ Sebelum memulai, pastikan komputer Anda sudah terinstall:
 Ikuti langkah-langkah berikut untuk menjalankan project ini di komputer Anda:
 
 ### 1. Clone Repository
-1.  Buka terminal (Command Prompt/PowerShell).
-2.  Clone repository ini ke komputer Anda:
-    ```bash
-    git clone https://github.com/Sansekai/SekaiDrama.git
-    ```
-3.  Masuk ke folder project:
-    ```bash
-    cd SekaiDrama
-    ```
+1. Buka terminal (Command Prompt/PowerShell).
+2. Clone repository ini ke komputer Anda:
+   ```bash
+   git clone https://github.com/twidyshop/Tplaysansekai.git
+   ```
+3. Masuk ke folder project:
+   ```bash
+   cd Tplaysansekai
+   ```
 
 ### 2. Install Dependencies
 Install semua library yang dibutuhkan project ini:
@@ -60,21 +60,18 @@ Buka browser dan kunjungi [http://localhost:3000](http://localhost:3000).
 ```text
 src/
 ├── app/                    # Halaman & Routing (Next.js App Router)
-│   ├── (auth)/             # Route Group untuk fitur Login/Register
-│   ├── (main)/             # Route Group untuk konten utama (Home, Search)
 │   ├── api/                # API Routes untuk integrasi backend
-│   ├── drama/              # Halaman detail & Video player
+│   ├── detail/             # Halaman detail konten
+│   ├── watch/              # Halaman player video
 │   └── layout.tsx          # Root layout aplikasi
 ├── components/             # Reusable UI Components
 │   ├── ui/                 # Base components (Shadcn UI)
-│   ├── player/             # Komponen khusus video player
-│   ├── cards/              # Komponen card drama/koleksi
-│   └── layouts/            # Navbar, Sidebar, Footer
-├── hooks/                  # Custom React Hooks (useAuth, usePlayer, dll)
-├── lib/                    # Helper functions & konfigurasi library (Prisma, Axios)
-├── services/               # Logic fetching data & business logic
+│   └── layouts/            # Navbar, Footer
+├── hooks/                  # Custom React Hooks
+├── lib/                    # Helper functions & konfigurasi library
 ├── types/                  # TypeScript interfaces & types definitions
-└── styles/                 # Global CSS & Tailwind configuration
+├── styles/                 # Global CSS & Tailwind configuration
+└── app/page.tsx            # Halaman utama
 ```
 
 ## Kustomisasi

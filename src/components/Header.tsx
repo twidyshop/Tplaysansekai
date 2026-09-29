@@ -28,96 +28,27 @@ export function Header() {
   const debouncedQuery = useDebounce(searchQuery, 300);
   const normalizedQuery = debouncedQuery.trim();
 
-  // Platform context
   const { isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort, isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels, platformInfo, platforms, setPlatform } = usePlatform();
 
-  // Search based on platform
-  const { data: dramaBoxResults, isLoading: isSearchingDramaBox } = useSearchDramas(
-    isDramaBox ? normalizedQuery : ""
-  );
-  const { data: reelShortResults, isLoading: isSearchingReelShort } = useReelShortSearch(
-    isReelShort ? normalizedQuery : ""
-  );
-  const { data: netShortResults, isLoading: isSearchingNetShort } = useNetShortSearch(
-    isNetShort ? normalizedQuery : ""
-  );
-  const { data: shortMaxResults, isLoading: isSearchingShortMax } = useShortMaxSearch(
-    isShortMax ? normalizedQuery : ""
-  );
-  const { data: meloloResults, isLoading: isSearchingMelolo } = useMeloloSearch(
-    isMelolo ? normalizedQuery : ""
-  );
+  const { data: dramaBoxResults, isLoading: isSearchingDramaBox } = useSearchDramas(isDramaBox ? normalizedQuery : "");
+  const { data: reelShortResults, isLoading: isSearchingReelShort } = useReelShortSearch(isReelShort ? normalizedQuery : "");
+  const { data: netShortResults, isLoading: isSearchingNetShort } = useNetShortSearch(isNetShort ? normalizedQuery : "");
+  const { data: shortMaxResults, isLoading: isSearchingShortMax } = useShortMaxSearch(isShortMax ? normalizedQuery : "");
+  const { data: meloloResults, isLoading: isSearchingMelolo } = useMeloloSearch(isMelolo ? normalizedQuery : "");
+  const { data: freeReelsResults, isLoading: isSearchingFreeReels } = useFreeReelsSearch(isFreeReels ? normalizedQuery : "");
+  const { data: dramaNovaResults, isLoading: isSearchingDramaNova } = useDramaNovaSearch(isDramaNova ? normalizedQuery : "");
+  const { data: goodShortResults, isLoading: isSearchingGoodShort } = useGoodShortSearch(isGoodShort ? normalizedQuery : "");
+  const { data: pineDramaResults, isLoading: isSearchingPineDrama } = usePineDramaSearch(isPineDrama ? normalizedQuery : "");
+  const { data: flickReelsResults, isLoading: isSearchingFlickReels } = useFlickReelsSearch(isFlickReels ? normalizedQuery : "");
 
-  const { data: freeReelsResults, isLoading: isSearchingFreeReels } = useFreeReelsSearch(
-    isFreeReels ? normalizedQuery : ""
-  );
-
-  const { data: dramaNovaResults, isLoading: isSearchingDramaNova } = useDramaNovaSearch(
-    isDramaNova ? normalizedQuery : ""
-  );
-
-  const { data: goodShortResults, isLoading: isSearchingGoodShort } = useGoodShortSearch(
-    isGoodShort ? normalizedQuery : ""
-  );
-
-  const { data: pineDramaResults, isLoading: isSearchingPineDrama } = usePineDramaSearch(
-    isPineDrama ? normalizedQuery : ""
-  );
-
-  const { data: flickReelsResults, isLoading: isSearchingFlickReels } = useFlickReelsSearch(
-    isFlickReels ? normalizedQuery : ""
-  );
-
-  const isSearching = isPineDrama
-    ? isSearchingPineDrama
-    : isDramaBox 
-      ? isSearchingDramaBox 
-      : isReelShort 
-        ? isSearchingReelShort 
-        : isShortMax
-          ? isSearchingShortMax
-          : isNetShort 
-            ? isSearchingNetShort
-              : isMelolo
-                ? isSearchingMelolo
-                : isFreeReels
-                  ? isSearchingFreeReels
-                  : isDramaNova
-                    ? isSearchingDramaNova
-                    : isGoodShort
-                      ? isSearchingGoodShort
-                      : isSearchingFlickReels;
-
-  // Search results processing
-  const searchResults = isPineDrama
-    ? pineDramaResults
-    : isDramaBox 
-      ? dramaBoxResults 
-      : isReelShort 
-        ? reelShortResults?.data 
-        : isShortMax
-          ? shortMaxResults?.data
-          : isNetShort
-            ? netShortResults?.data
-            : isMelolo
-              ? meloloResults?.data?.search_data?.flatMap((item: any) => item.books || [])
-                  .filter((book: any) => book.thumb_url && book.thumb_url !== "") || []
-              : isFreeReels
-                ? freeReelsResults
-                : isDramaNova
-                  ? dramaNovaResults
-                   : isGoodShort
-                    ? goodShortResults
-                    : isFlickReels
-                      ? flickReelsResults?.data
-                      : [];
+  const isSearching = isPineDrama ? isSearchingPineDrama : isDramaBox ? isSearchingDramaBox : isReelShort ? isSearchingReelShort : isShortMax ? isSearchingShortMax : isNetShort ? isSearchingNetShort : isMelolo ? isSearchingMelolo : isFreeReels ? isSearchingFreeReels : isDramaNova ? isSearchingDramaNova : isGoodShort ? isSearchingGoodShort : isSearchingFlickReels;
+  const searchResults = isPineDrama ? pineDramaResults : isDramaBox ? dramaBoxResults : isReelShort ? reelShortResults?.data : isShortMax ? shortMaxResults?.data : isNetShort ? netShortResults?.data : isMelolo ? meloloResults?.data?.search_data?.flatMap((item: any) => item.books || []).filter((book: any) => book.thumb_url && book.thumb_url !== "") || [] : isFreeReels ? freeReelsResults : isDramaNova ? dramaNovaResults : isGoodShort ? goodShortResults : isFlickReels ? flickReelsResults?.data : [];
 
   const handleSearchClose = () => {
     setSearchOpen(false);
     setSearchQuery("");
   };
 
-  // Hide header on watch pages for immersive video experience
   if (pathname?.startsWith("/watch")) {
     return null;
   }
@@ -126,19 +57,16 @@ export function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 glass-strong">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
               <Play className="w-5 h-5 text-white fill-white" />
             </div>
             <span className="font-display font-bold text-xl gradient-text">
-              SekaiDrama
+              TPLAY+
             </span>
           </Link>
 
-          {/* Search Button Only - No Nav Links */}
           <div className="flex items-center gap-2">
-            {/* Platform Selector Button */}
             <button
               onClick={() => setPlatformModalOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted/80 transition-colors border border-border/50"
@@ -168,7 +96,6 @@ export function Header() {
         </div>
       </div>
 
-      {/* Search Overlay (Portal) */}
       {searchOpen &&
         typeof document !== "undefined" &&
         createPortal(
@@ -194,7 +121,6 @@ export function Header() {
                 </button>
               </div>
 
-              {/* Platform indicator */}
               <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Mencari di:</span>
                 <span className="px-2 py-1 rounded-full bg-primary/20 text-primary font-medium">
@@ -202,434 +128,10 @@ export function Header() {
                 </span>
               </div>
 
-              {/* Search Results */}
               <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                 {isSearching && normalizedQuery && (
                   <div className="flex items-center justify-center py-12">
                     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-
-                {/* DramaBox Results */}
-                {isDramaBox && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((drama: any, index: number) => (
-                      <Link
-                        key={drama.bookId}
-                        href={`/detail/dramabox/${drama.bookId}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(drama.cover)}
-                          alt={drama.bookName}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{drama.bookName}</h3>
-                          {drama.protagonist && (
-                            <p className="text-sm text-muted-foreground mt-1 truncate">{drama.protagonist}</p>
-                          )}
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                            {drama.introduction}
-                          </p>
-                          {drama.tagNames && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {drama.tagNames.slice(0, 3).map((tag: string) => (
-                                <span key={tag} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* ReelShort Results */}
-                {isReelShort && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((book: any, index: number) => (
-                      <Link
-                        key={book.book_id}
-                        href={`/detail/reelshort/${book.book_id}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(book.book_pic)}
-                          alt={book.book_title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{book.book_title}</h3>
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                            {book.special_desc}
-                          </p>
-                          {book.theme && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {book.theme.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {book.book_mark?.text && (
-                            <span
-                              className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold"
-                              style={{
-                                backgroundColor: book.book_mark.color || "#E52E2E",
-                                color: book.book_mark.text_color || "#FFFFFF",
-                              }}
-                            >
-                              {book.book_mark.text}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* NetShort Results */}
-                {isNetShort && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((drama: any, index: number) => (
-                      <Link
-                        key={drama.shortPlayId}
-                        href={`/detail/netshort/${drama.shortPlayId}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(drama.cover)}
-                          alt={drama.title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{drama.title}</h3>
-                          {drama.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {drama.description}
-                            </p>
-                          )}
-                          {drama.labels && drama.labels.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {drama.labels.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {drama.heatScore && (
-                            <span className="inline-block mt-2 text-[10px] text-muted-foreground">
-                              {drama.heatScore}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* ShortMax Results */}
-                {isShortMax && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((drama: any, index: number) => (
-                      <Link
-                        key={`${drama.shortPlayId}-${index}`}
-                        href={`/detail/shortmax/${drama.shortPlayId}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(drama.cover)}
-                          alt={drama.title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{drama.title}</h3>
-                          {drama.genre && drama.genre.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {drama.genre.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* Melolo Results */}
-                {isMelolo && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((book: any, index: number) => (
-                      <Link
-                        key={book.book_id}
-                        href={`/detail/melolo/${book.book_id}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <div className="w-16 h-24 bg-muted rounded-xl flex-shrink-0 overflow-hidden">
-                          {book.thumb_url ? (
-                            <img
-                              src={optimizeThumb(book.thumb_url)}
-                              alt={book.book_name}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted">
-                              <span className="text-xs text-muted-foreground">No Img</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{book.book_name}</h3>
-                          {book.abstract && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {book.abstract}
-                            </p>
-                          )}
-                          {book.stat_infos && book.stat_infos.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                               <span className="tag-pill text-[10px]">
-                                  {book.stat_infos[0]}
-                               </span>
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-
-
-                {/* FreeReels Results */}
-                {isFreeReels && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((book: any, index: number) => (
-                      <Link
-                        key={book.key}
-                        href={`/detail/freereels/${book.key}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(book.cover)}
-                          alt={book.title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{book.title}</h3>
-                          {book.desc && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {book.desc}
-                            </p>
-                          )}
-                          {book.content_tags && book.content_tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {book.content_tags.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* DramaNova Results */}
-                {isDramaNova && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((drama: any, index: number) => (
-                      <Link
-                        key={drama.dramaId}
-                        href={`/detail/dramanova/${drama.dramaId}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(drama.posterImgUrl)}
-                          alt={drama.title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{drama.title}</h3>
-                          {drama.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {drama.description}
-                            </p>
-                          )}
-                          {drama.categoryNames && drama.categoryNames.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {drama.categoryNames.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* GoodShort Results */}
-                {isGoodShort && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((book: any, index: number) => (
-                      <Link
-                        key={book.bookId}
-                        href={`/detail/goodshort/${book.bookId}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(book.cover)}
-                          alt={book.bookName}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{book.bookName}</h3>
-                          {book.introduction && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {book.introduction}
-                            </p>
-                          )}
-                          {book.labels && book.labels.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {book.labels.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {book.viewCountDisplay && (
-                            <span className="inline-block mt-2 text-[10px] text-muted-foreground">
-                              👁 {book.viewCountDisplay}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* PineDrama Results */}
-                {isPineDrama && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((drama: any, index: number) => (
-                      <Link
-                        key={drama.collection_id}
-                        href={`/detail/pinedrama/${drama.collection_id}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(drama.cover)}
-                          alt={drama.title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{drama.title}</h3>
-                          {drama.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {drama.description}
-                            </p>
-                          )}
-                          {drama.tags && drama.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {drama.tags.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag.replace(/<\/?em>/g, "")}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {/* FlickReels Results */}
-                {isFlickReels && searchResults && searchResults.length > 0 && (
-                  <div className="grid gap-3">
-                    {searchResults.map((drama: any, index: number) => (
-                      <Link
-                        key={`${drama.playletId}-${index}`}
-                        href={`/detail/flickreels/${drama.playletId}`}
-                        onClick={handleSearchClose}
-                        className="flex gap-4 p-4 rounded-2xl bg-card hover:bg-muted transition-all text-left animate-fade-up overflow-hidden"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <img
-                          src={optimizeThumb(drama.cover)}
-                          alt={drama.title}
-                          className="w-16 h-24 object-cover rounded-xl flex-shrink-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-display font-semibold text-foreground truncate">{drama.title}</h3>
-                          {drama.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                              {drama.description}
-                            </p>
-                          )}
-                          {drama.tags && drama.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {drama.tags.slice(0, 3).map((tag: string, idx: number) => (
-                                <span key={idx} className="tag-pill text-[10px]">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
                   </div>
                 )}
 
@@ -650,7 +152,7 @@ export function Header() {
           </div>,
           document.body
         )}
-      {/* Platform Selector Modal (Portal) */}
+
       {platformModalOpen &&
         typeof document !== "undefined" &&
         createPortal(
@@ -659,7 +161,6 @@ export function Header() {
               className="bg-card rounded-2xl shadow-2xl border border-border w-full max-w-lg max-h-[80vh] overflow-y-auto animate-fade-up"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card rounded-t-2xl z-10">
                 <h2 className="font-display font-bold text-lg text-foreground">Pilih Platform</h2>
                 <button
@@ -670,7 +171,6 @@ export function Header() {
                 </button>
               </div>
 
-              {/* Platform Grid */}
               <div className="p-4">
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {platforms.map((platform) => (
@@ -707,7 +207,6 @@ export function Header() {
                 </div>
               </div>
 
-              {/* Footer — current platform */}
               <div className="p-4 border-t border-border flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{platforms.length} platform tersedia</span>
                 <div className="flex items-center gap-2">
