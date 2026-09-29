@@ -21,7 +21,7 @@ export function WatchHistory() {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return "Baru saja";
-    if (diffMins < 60) return `${diffMins}m lalu";
+    if (diffMins < 60) return `${diffMins}m lalu`;
     if (diffHours < 24) return `${diffHours}h lalu`;
     if (diffDays < 7) return `${diffDays}d lalu`;
 
