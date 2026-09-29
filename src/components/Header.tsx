@@ -19,6 +19,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePathname } from "next/navigation";
 import { optimizeThumb } from "@/lib/image-utils";
+import { WatchHistory } from "./WatchHistory";
 
 export function Header() {
   const pathname = usePathname();
@@ -41,8 +42,8 @@ export function Header() {
   const { data: pineDramaResults, isLoading: isSearchingPineDrama } = usePineDramaSearch(isPineDrama ? normalizedQuery : "");
   const { data: flickReelsResults, isLoading: isSearchingFlickReels } = useFlickReelsSearch(isFlickReels ? normalizedQuery : "");
 
-  const isSearching = isPineDrama ? isSearchingPineDrama : isDramaBox ? isSearchingDramaBox : isReelShort ? isSearchingReelShort : isShortMax ? isSearchingShortMax : isNetShort ? isSearchingNetShort : isMelolo ? isSearchingMelolo : isFreeReels ? isSearchingFreeReels : isDramaNova ? isSearchingDramaNova : isGoodShort ? isSearchingGoodShort : isSearchingFlickReels;
-  const searchResults = isPineDrama ? pineDramaResults : isDramaBox ? dramaBoxResults : isReelShort ? reelShortResults?.data : isShortMax ? shortMaxResults?.data : isNetShort ? netShortResults?.data : isMelolo ? meloloResults?.data?.search_data?.flatMap((item: any) => item.books || []).filter((book: any) => book.thumb_url && book.thumb_url !== "") || [] : isFreeReels ? freeReelsResults : isDramaNova ? dramaNovaResults : isGoodShort ? goodShortResults : isFlickReels ? flickReelsResults?.data : [];
+  const isSearching = isPineDrama ? isSearchingPineDrama : isDramaBox ? isSearchingDramaBox : isReelShort ? isSearchingReelShort : isShortMax ? isSearchingShortMax : isNetShort ? isSearchingNetShort : isMelolo ? isSearchingMelolo : isFreeReels ? isSearchingFreeReels : isDramaNova ? isSearchingDramaNova : isGoodShort ? isSearchingGoodShort : isFlickReels ? isSearchingFlickReels : false;
+  const searchResults = isPineDrama ? pineDramaResults : isDramaBox ? dramaBoxResults : isReelShort ? reelShortResults?.data : isShortMax ? shortMaxResults?.data : isNetShort ? netShortResults?.data : isMelolo ? meloloResults?.data : isFreeReels ? freeReelsResults?.data : isDramaNova ? dramaNovaResults?.data : isGoodShort ? goodShortResults?.data : isFlickReels ? flickReelsResults?.data : [];
 
   const handleSearchClose = () => {
     setSearchOpen(false);
@@ -67,6 +68,8 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-2">
+            <WatchHistory />
+
             <button
               onClick={() => setPlatformModalOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted/80 transition-colors border border-border/50"
