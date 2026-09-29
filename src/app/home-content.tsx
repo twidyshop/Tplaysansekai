@@ -20,13 +20,11 @@ import type { TrendingBannerItem } from "@/components/TrendingBanner";
 export default function HomeContent() {
   const { isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort, isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels } = usePlatform();
 
-  // Fetch data for all DramaBox sections
   const { data: latestDramas, isLoading: loadingLatest, error: errorLatest, refetch: refetchLatest } = useLatestDramas();
   const { data: trendingDramas, isLoading: loadingTrending, error: errorTrending, refetch: refetchTrending } = useTrendingDramas();
   const { data: dubindoDramas, isLoading: loadingDubindo, error: errorDubindo, refetch: refetchDubindo } = useDubindoDramas();
 
-  // Convert trending dramas to banner format
-  const trendingBanners: TrendingBannerItem[] = trendingDramas?.slice(0, 5).map((drama) => ({
+  const trendingBanners: TrendingBannerItem[] = trendingDramas?.slice(0, 1).map((drama) => ({
     id: drama.book_id,
     title: drama.book_name,
     image: drama.cover_pic,
