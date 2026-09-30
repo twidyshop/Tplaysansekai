@@ -54,7 +54,6 @@ export function DramaSection({
             <DramaCard
               key={drama.bookId}
               drama={drama}
-              platform="dramabox"
             />
           ))
         ) : (
