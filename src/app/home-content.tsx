@@ -26,8 +26,8 @@ export default function HomeContent() {
 
   const trendingBanners: TrendingBannerItem[] =
     trendingDramas?.slice(0, 5).map((drama) => ({
-      id: drama.bookId,
-      title: drama.bookName,
+      id: drama.book_id,
+      title: drama.book_name,
       image: drama.cover,
       description: drama.introduction,
       tags: drama.book_theme?.slice(0, 3),
