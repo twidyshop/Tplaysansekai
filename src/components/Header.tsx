@@ -15,7 +15,7 @@ export function Header() {
   // Memanggil store riwayat tontonan
   const addItem = useWatchHistoryStore((state) => state.addItem);
 
-  // Efek pintar: Merekam riwayat otomatis dan mengambil judul/poster asli dari halaman
+  // Efek pintar: Merekam riwayat otomatis, judul, poster, hingga nomor episode secara global
   useEffect(() => {
     if (pathname?.includes("/detail/") || pathname?.includes("/watch/")) {
       const segments = pathname.split("/");
@@ -23,12 +23,27 @@ export function Header() {
       const id = segments[3];       // Mendapatkan ID drama
 
       if (id && platform) {
-        // Beri sedikit jeda waktu (setTimeout) agar DOM halaman sempat merender elemen h1 & gambar posternya
+        // Beri sedikit jeda waktu (setTimeout) agar DOM halaman sempat merender elemen
         const timer = setTimeout(() => {
           const titleElement = document.querySelector("h1");
           const imageElement = document.querySelector("img[alt]") as HTMLImageElement;
 
-          const dramaTitle = titleElement ? titleElement.innerText : "Drama Pilihan";
+          let dramaTitle = titleElement ? titleElement.innerText : "Drama Pilihan";
+          
+          // Deteksi nomor episode dari URL atau teks aktif di halaman (jika ada di halaman watch)
+          const urlParams = new URLSearchParams(window.location.search);
+          const epParam = urlParams.get("ep") || urlParams.get("episode") || segments[4];
+          
+          if (epParam) {
+            dramaTitle += ` - Episode ${epParam}`;
+          } else if (pathname.includes("/watch/")) {
+            // Cek elemen teks episode di halaman watch jika menggunakan format teks
+            const activeEpElement = document.querySelector(".episode-active, [data-active=true], .bg-primary");
+            if (activeEpElement && activeEpElement.textContent) {
+              dramaTitle += ` - Ep. ${activeEpElement.textContent.trim()}`;
+            }
+          }
+
           const dramaImage = imageElement ? imageElement.src : "";
 
           addItem({
@@ -37,9 +52,9 @@ export function Header() {
             image: dramaImage,
             platform: platform.charAt(0).toUpperCase() + platform.slice(1),
             timestamp: Date.now(),
-            url: pathname
+            url: pathname + window.location.search
           });
-        }, 500);
+        }, 600);
 
         return () => clearTimeout(timer);
       }
