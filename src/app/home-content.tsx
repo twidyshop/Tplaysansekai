@@ -26,12 +26,12 @@ export default function HomeContent() {
 
   const trendingBanners: TrendingBannerItem[] =
     trendingDramas?.slice(0, 5).map((drama) => ({
-      id: drama.book_id,
+      id: drama.bookId,
       title: drama.book_name,
       image: drama.cover_pic,
       description: drama.introduction,
       tags: drama.book_theme?.slice(0, 3),
-      url: `/detail/dramabox/${drama.book_id}`,
+      url: `/detail/dramabox/${drama.bookId}`,
       badge: "#1 Trending",
       playable: true,
     })) || [];
