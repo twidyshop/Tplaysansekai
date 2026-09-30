@@ -15,7 +15,7 @@ export function Header() {
   // Memanggil store riwayat tontonan
   const addItem = useWatchHistoryStore((state) => state.addItem);
 
-  // Efek pintar: Merekam riwayat otomatis setiap kali berpindah URL ke detail/watch
+  // Efek pintar: Merekam riwayat otomatis dan mengambil judul/poster asli dari halaman
   useEffect(() => {
     if (pathname?.includes("/detail/") || pathname?.includes("/watch/")) {
       const segments = pathname.split("/");
@@ -23,19 +23,25 @@ export function Header() {
       const id = segments[3];       // Mendapatkan ID drama
 
       if (id && platform) {
-        // Mengambil judul dari title tab browser
-        const pageTitle = document.title && document.title !== "TPLAY+" 
-          ? document.title.split("|")[0].trim() 
-          : "Melanjutkan Nonton...";
+        // Beri sedikit jeda waktu (setTimeout) agar DOM halaman sempat merender elemen h1 & gambar posternya
+        const timer = setTimeout(() => {
+          const titleElement = document.querySelector("h1");
+          const imageElement = document.querySelector("img[alt]") as HTMLImageElement;
 
-        addItem({
-          id: id,
-          title: pageTitle,
-          image: "", // Cover dikosongkan sementara karena di level ini belum termuat
-          platform: platform.charAt(0).toUpperCase() + platform.slice(1), // Kapitalisasi huruf pertama
-          timestamp: Date.now(),
-          url: pathname
-        });
+          const dramaTitle = titleElement ? titleElement.innerText : "Drama Pilihan";
+          const dramaImage = imageElement ? imageElement.src : "";
+
+          addItem({
+            id: id,
+            title: dramaTitle,
+            image: dramaImage,
+            platform: platform.charAt(0).toUpperCase() + platform.slice(1),
+            timestamp: Date.now(),
+            url: pathname
+          });
+        }, 500);
+
+        return () => clearTimeout(timer);
       }
     }
   }, [pathname, addItem]);
