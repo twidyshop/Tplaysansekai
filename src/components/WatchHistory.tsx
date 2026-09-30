@@ -10,7 +10,7 @@ export function WatchHistory() {
   const { items, removeItem, clearHistory, mounted } = useWatchHistory();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!mounted || items.length === 0) return null;
+  if (!mounted) return null;
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
