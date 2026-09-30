@@ -52,7 +52,7 @@ export function DramaSection({
         ) : dramas && dramas.length > 0 ? (
           dramas.map((drama) => (
             <DramaCard
-              key={drama.book_id}
+              key={drama.bookId}
               drama={drama}
               platform="dramabox"
             />
