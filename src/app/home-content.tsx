@@ -28,7 +28,7 @@ export default function HomeContent() {
     trendingDramas?.slice(0, 5).map((drama) => ({
       id: drama.bookId,
       title: drama.bookName,
-      image: drama.cover_pic,
+      image: drama.coverPic,
       description: drama.introduction,
       tags: drama.book_theme?.slice(0, 3),
       url: `/detail/dramabox/${drama.bookId}`,
