@@ -3,14 +3,44 @@
 import Link from "next/link";
 import { Play, Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WatchHistory } from "@/components/WatchHistory";
+import { useWatchHistoryStore } from "@/hooks/useWatchHistory";
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Memanggil store riwayat tontonan
+  const addItem = useWatchHistoryStore((state) => state.addItem);
 
+  // Efek pintar: Merekam riwayat otomatis setiap kali berpindah URL ke detail/watch
+  useEffect(() => {
+    if (pathname?.includes("/detail/") || pathname?.includes("/watch/")) {
+      const segments = pathname.split("/");
+      const platform = segments[2]; // Mendapatkan nama platform
+      const id = segments[3];       // Mendapatkan ID drama
+
+      if (id && platform) {
+        // Mengambil judul dari title tab browser
+        const pageTitle = document.title && document.title !== "TPLAY+" 
+          ? document.title.split("|")[0].trim() 
+          : "Melanjutkan Nonton...";
+
+        addItem({
+          id: id,
+          title: pageTitle,
+          image: "", // Cover dikosongkan sementara karena di level ini belum termuat
+          platform: platform.charAt(0).toUpperCase() + platform.slice(1), // Kapitalisasi huruf pertama
+          timestamp: Date.now(),
+          url: pathname
+        });
+      }
+    }
+  }, [pathname, addItem]);
+
+  // Hook harus dipanggil sebelum return. Baris ini menyembunyikan header di halaman watch.
   if (pathname?.startsWith("/watch")) {
     return null;
   }
@@ -18,7 +48,6 @@ export function Header() {
   // Fungsi untuk menangani pencarian saat Enter ditekan
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim()) {
-      // Mengarahkan ke rute pencarian bawaan aplikasi
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
