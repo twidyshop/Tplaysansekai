@@ -1,41 +1,146 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import { Play } from "lucide-react";
 
 import { DramaSection } from "@/components/DramaSection";
 import { ReelShortSection } from "@/components/ReelShortSection";
 import { ShortMaxHome } from "@/components/ShortMaxHome";
 import { NetShortHome } from "@/components/NetShortHome";
 import { MeloloHome } from "@/components/MeloloHome";
-
 import { FreeReelsHome } from "@/components/FreeReelsHome";
 import { DramaNovaHome } from "@/components/DramaNovaHome";
 import { GoodShortHome } from "@/components/GoodShortHome";
 import { FlickReelsHome } from "@/components/FlickReelsHome";
 import { PineDramaHome } from "@/components/PineDramaHome";
+import { InfiniteDramaSection } from "@/components/InfiniteDramaSection";
+import { PlatformSelector } from "@/components/PlatformSelector";
+
 import { useLatestDramas, useTrendingDramas, useDubindoDramas } from "@/hooks/useDramas";
 import { usePlatform } from "@/hooks/usePlatform";
-import { InfiniteDramaSection } from "@/components/InfiniteDramaSection";
+
+// Interface untuk memastikan TypeScript bahagia dan tidak error
+interface TrendingBannerItem {
+  id: string;
+  title: string;
+  image: string;
+  description: string;
+  tags: string[];
+  url: string;
+  badge: string;
+  playable: boolean;
+}
 
 export default function HomeContent() {
-  const { isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort, isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels } = usePlatform();
+  const { 
+    isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort, 
+    isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels 
+  } = usePlatform();
 
-  // Fetch data for all DramaBox sections
-  // const { data: popularDramas, isLoading: loadingPopular, error: errorPopular, refetch: refetchPopular } = useForYouDramas(); // REMOVED as requested (replaced by infinite scroll)
   const { data: latestDramas, isLoading: loadingLatest, error: errorLatest, refetch: refetchLatest } = useLatestDramas();
   const { data: trendingDramas, isLoading: loadingTrending, error: errorTrending, refetch: refetchTrending } = useTrendingDramas();
   const { data: dubindoDramas, isLoading: loadingDubindo, error: errorDubindo, refetch: refetchDubindo } = useDubindoDramas();
 
-  return (
-    <main className="min-h-screen pt-16">
+  // MAPPING DATA SUPER AMAN: 
+  // Menggunakan 'any' pada argumen agar TypeScript tidak protes soal snake_case vs camelCase.
+  // Semua nilai diakhiri dengan '|| ""' agar dipastikan selalu string dan bukan undefined.
+  const trendingBanners: TrendingBannerItem[] = (trendingDramas || [])
+    .slice(0, 5)
+    .map((drama: any) => ({
+      id: String(drama.bookId || drama.book_id || ''),
+      title: drama.bookName || drama.book_name || drama.book_title || 'Untitled',
+      image: drama.coverWap || drama.cover || drama.book_pic || drama.cover_pic || '',
+      description: drama.introduction || '',
+      tags: drama.tags || drama.tagNames || drama.book_theme || [],
+      url: `/detail/dramabox/${drama.bookId || drama.book_id || ''}`,
+      badge: 'Trending',
+      playable: true,
+    }));
 
-      {/* PineDrama Content */}
+  // Mengambil 1 drama paling trending untuk dijadikan Banner Hero Utama
+  const heroBanner = trendingBanners.length > 0 ? trendingBanners[0] : null;
+
+  return (
+    <main className="min-h-screen pt-16 pb-20">
+      
+      {/* === HERO BANNER SECTION === */}
+      {!loadingTrending && heroBanner && heroBanner.image && (
+        <div className="w-full relative h-[50vh] md:h-[60vh] lg:h-[70vh] bg-black">
+          {/* Background Image Banner */}
+          <div className="absolute inset-0">
+            <Image
+              src={heroBanner.image}
+              alt={heroBanner.title}
+              fill
+              className="object-cover opacity-60"
+              priority
+            />
+            {/* Efek gradien agar teks tetap terbaca */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/40 to-transparent" />
+          </div>
+
+          {/* Konten Teks Banner */}
+          <div className="container mx-auto px-4 h-full relative flex items-end pb-12">
+            <div className="max-w-2xl space-y-4">
+              {heroBanner.badge && (
+                <span className="px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-full">
+                  {heroBanner.badge}
+                </span>
+              )}
+              <h1 className="text-3xl md:text-5xl font-bold text-white drop-shadow-lg line-clamp-2">
+                {heroBanner.title}
+              </h1>
+              <p className="text-sm md:text-base text-gray-200 line-clamp-3 drop-shadow-md">
+                {heroBanner.description}
+              </p>
+              
+              {/* Tags/Genre Banner */}
+              {heroBanner.tags && heroBanner.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {heroBanner.tags.slice(0, 3).map((tag: any, idx: number) => {
+                    const tagText = typeof tag === 'string' ? tag : tag.tagName || '';
+                    if (!tagText) return null;
+                    return (
+                      <span key={idx} className="px-2 py-1 text-xs bg-white/20 backdrop-blur-sm rounded-md text-white">
+                        {tagText}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Tombol Nonton Banner */}
+              <div className="pt-4">
+                <Link
+                  href={heroBanner.url}
+                  className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-full font-medium transition-all"
+                >
+                  <Play className="w-5 h-5 fill-current" />
+                  Mulai Nonton
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === PLATFORM SELECTOR SECTION === */}
+      {/* Efek sticky top-16 menyesuaikan tinggi header Anda agar menempel rapi saat discroll */}
+      <div className="sticky top-16 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+        <div className="container mx-auto">
+          <PlatformSelector />
+        </div>
+      </div>
+
+      {/* === KONTEN DINAMIS BERDASARKAN PLATFORM === */}
       {isPineDrama && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <PineDramaHome />
         </div>
       )}
 
-      {/* DramaBox Content - Multiple Sections */}
       {isDramaBox && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <DramaSection
@@ -59,64 +164,52 @@ export default function HomeContent() {
             error={!!errorDubindo}
             onRetry={() => refetchDubindo()}
           />
-
-          {/* Infinite Scroll Section */}
           <InfiniteDramaSection title="Lainnya" />
         </div>
       )}
 
-      {/* ReelShort Content - Multiple Sections */}
       {isReelShort && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <ReelShortSection />
         </div>
       )}
 
-      {/* ShortMax Content */}
       {isShortMax && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <ShortMaxHome />
         </div>
       )}
 
-      {/* NetShort Content */}
       {isNetShort && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <NetShortHome />
         </div>
       )}
 
-      {/* Melolo Content */}
       {isMelolo && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <MeloloHome />
         </div>
       )}
 
-
-
-      {/* FreeReels Content */}
       {isFreeReels && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <FreeReelsHome />
         </div>
       )}
 
-      {/* DramaNova Content */}
       {isDramaNova && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <DramaNovaHome />
         </div>
       )}
 
-      {/* GoodShort Content */}
       {isGoodShort && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <GoodShortHome />
         </div>
       )}
 
-      {/* FlickReels Content */}
       {isFlickReels && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <FlickReelsHome />
