@@ -64,46 +64,46 @@ export default function HomeContent() {
   return (
     <main className="min-h-screen pt-16 pb-20">
       
-      {/* === HERO BANNER SECTION === */}
+      {/* === HERO BANNER SECTION (Diperbaiki agar rapi & tidak kepotong di HP) === */}
       {!loadingTrending && heroBanner && heroBanner.image && (
-        <div className="w-full relative h-[50vh] md:h-[60vh] lg:h-[70vh] bg-black">
+        <div className="w-full relative h-[55vh] md:h-[65vh] lg:h-[70vh] bg-black overflow-hidden">
           {/* Background Image Banner */}
           <div className="absolute inset-0">
             <Image
               src={heroBanner.image}
               alt={heroBanner.title}
               fill
-              className="object-cover opacity-60"
+              className="object-cover object-top opacity-55 scale-105 transform transition-transform duration-1000"
               priority
             />
-            {/* Efek gradien agar teks tetap terbaca */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/40 to-transparent" />
+            {/* Efek gradien berlapis agar teks sangat kontras dan bersih */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e27] via-[#0a0e27]/50 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0e27] via-[#0a0e27]/40 to-transparent" />
           </div>
 
           {/* Konten Teks Banner */}
-          <div className="container mx-auto px-4 h-full relative flex items-end pb-12">
-            <div className="max-w-2xl space-y-4">
+          <div className="container mx-auto px-4 h-full relative flex items-end pb-8 md:pb-12">
+            <div className="max-w-2xl space-y-2 md:space-y-4">
               {heroBanner.badge && (
-                <span className="px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-full">
+                <span className="inline-block px-3 py-0.5 md:py-1 text-[10px] md:text-xs font-semibold bg-primary text-primary-foreground rounded-full shadow-md">
                   {heroBanner.badge}
                 </span>
               )}
-              <h1 className="text-3xl md:text-5xl font-bold text-white drop-shadow-lg line-clamp-2">
+              <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-white drop-shadow-md line-clamp-2 leading-tight">
                 {heroBanner.title}
               </h1>
-              <p className="text-sm md:text-base text-gray-200 line-clamp-3 drop-shadow-md">
+              <p className="text-xs sm:text-sm md:text-base text-gray-200 line-clamp-2 md:line-clamp-3 drop-shadow-sm font-normal">
                 {heroBanner.description}
               </p>
               
               {/* Tags/Genre Banner */}
               {heroBanner.tags && heroBanner.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2">
+                <div className="flex flex-wrap gap-1.5 pt-1">
                   {heroBanner.tags.slice(0, 3).map((tag: any, idx: number) => {
                     const tagText = typeof tag === 'string' ? tag : tag.tagName || '';
                     if (!tagText) return null;
                     return (
-                      <span key={idx} className="px-2 py-1 text-xs bg-white/20 backdrop-blur-sm rounded-md text-white">
+                      <span key={idx} className="px-2 py-0.5 text-[10px] md:text-xs bg-white/15 backdrop-blur-md rounded-md text-white/90 border border-white/10">
                         {tagText}
                       </span>
                     );
@@ -112,12 +112,12 @@ export default function HomeContent() {
               )}
 
               {/* Tombol Nonton Banner */}
-              <div className="pt-4">
+              <div className="pt-2 md:pt-3">
                 <Link
                   href={heroBanner.url}
-                  className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-full font-medium transition-all"
+                  className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-semibold shadow-lg transition-all transform active:scale-95"
                 >
-                  <Play className="w-5 h-5 fill-current" />
+                  <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
                   Mulai Nonton
                 </Link>
               </div>
@@ -128,7 +128,7 @@ export default function HomeContent() {
 
       {/* === PLATFORM SELECTOR SECTION === */}
       {/* Efek sticky top-16 menyesuaikan tinggi header Anda agar menempel rapi saat discroll */}
-      <div className="sticky top-16 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+      <div className="sticky top-16 z-40 bg-[#0a0e27]/90 backdrop-blur-xl border-b border-white/10 shadow-lg">
         <div className="container mx-auto">
           <PlatformSelector />
         </div>
