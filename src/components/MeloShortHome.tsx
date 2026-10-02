@@ -8,7 +8,7 @@ export function MeloShortHome() {
 
   return (
     <DramaSection
-      title="MeloShort (Quickplay)"
+      title="MeloShort"
       dramas={dramas}
       isLoading={isLoading}
       error={!!error}
