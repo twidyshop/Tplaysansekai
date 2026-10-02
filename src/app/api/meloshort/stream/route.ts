@@ -2,18 +2,121 @@ import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
+function buildProxyUrl(
+  url: string,
+  headers: Record<string, string>
+) {
+  return (
+    `/api/meloshort/stream?url=` +
+    `${encodeURIComponent(url)}` +
+    `&headers=` +
+    `${encodeURIComponent(
+      JSON.stringify(headers)
+    )}`
+  );
+}
 
-    const streamUrl = searchParams.get("url");
-    const headersRaw = searchParams.get("headers");
+function rewritePlaylist(
+  playlist: string,
+  baseUrl: string,
+  headers: Record<string, string>
+) {
+  /*
+   * Rewrite URI="..." di:
+   *
+   * #EXT-X-KEY
+   * #EXT-X-MAP
+   * #EXT-X-MEDIA
+   * #EXT-X-I-FRAME-STREAM-INF
+   * dll.
+   */
+  let result = playlist.replace(
+    /URI="([^"]+)"/g,
+    (_match, uri) => {
+      try {
+        const absolute = new URL(
+          uri,
+          baseUrl
+        ).toString();
+
+        return `URI="${buildProxyUrl(
+          absolute,
+          headers
+        )}"`;
+      } catch {
+        return `URI="${uri}"`;
+      }
+    }
+  );
+
+  /*
+   * Rewrite URL segment / child playlist
+   * yang berdiri sendiri di setiap baris.
+   */
+  result = result
+    .split("\n")
+    .map((line) => {
+      const trimmed =
+        line.trim();
+
+      if (!trimmed) {
+        return line;
+      }
+
+      // Jangan ubah directive HLS
+      if (trimmed.startsWith("#")) {
+        return line;
+      }
+
+      try {
+        const absolute =
+          new URL(
+            trimmed,
+            baseUrl
+          ).toString();
+
+        return buildProxyUrl(
+          absolute,
+          headers
+        );
+      } catch {
+        return line;
+      }
+    })
+    .join("\n");
+
+  return result;
+}
+
+export async function GET(
+  req: NextRequest
+) {
+  try {
+    const {
+      searchParams,
+    } = new URL(req.url);
+
+    const streamUrl =
+      searchParams.get("url");
+
+    const headersRaw =
+      searchParams.get(
+        "headers"
+      );
 
     if (!streamUrl) {
-      return new Response("Missing stream URL", { status: 400 });
+      return new Response(
+        "Missing stream URL",
+        {
+          status: 400,
+        }
+      );
     }
 
-    const headers: Record<string, string> = {
+    const headers: Record<
+      string,
+      string
+    > = {
       Accept: "*/*",
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
@@ -21,107 +124,241 @@ export async function GET(req: NextRequest) {
 
     if (headersRaw) {
       try {
-        const parsed = JSON.parse(headersRaw);
+        const parsed =
+          JSON.parse(
+            headersRaw
+          );
 
-        for (const [key, value] of Object.entries(parsed)) {
-          if (typeof value === "string") {
-            headers[key] = value;
+        if (
+          parsed &&
+          typeof parsed ===
+            "object"
+        ) {
+          for (const [
+            key,
+            value,
+          ] of Object.entries(
+            parsed
+          )) {
+            if (
+              typeof value ===
+              "string"
+            ) {
+              headers[key] =
+                value;
+            }
           }
         }
       } catch {
-        // abaikan jika headers bukan JSON valid
+        // Ignore invalid custom headers
       }
     }
 
-    const upstream = await fetch(streamUrl, {
-      headers,
-      cache: "no-store",
-    });
+    /*
+     * Forward Range request.
+     * Ini penting untuk MP4/video tertentu.
+     */
+    const range =
+      req.headers.get(
+        "range"
+      );
+
+    if (range) {
+      headers.Range = range;
+    }
+
+    const upstream =
+      await fetch(
+        streamUrl,
+        {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        }
+      );
 
     if (!upstream.ok) {
       return new Response(
         `Stream upstream error: ${upstream.status}`,
-        { status: upstream.status }
+        {
+          status:
+            upstream.status,
+        }
       );
     }
 
     const contentType =
-      upstream.headers.get("content-type") ||
-      (streamUrl.includes(".m3u8")
-        ? "application/vnd.apple.mpegurl"
-        : "video/mp4");
+      upstream.headers.get(
+        "content-type"
+      ) || "";
+
+    const isHls =
+      contentType.includes(
+        "mpegurl"
+      ) ||
+      contentType.includes(
+        "m3u8"
+      ) ||
+      streamUrl
+        .toLowerCase()
+        .includes(".m3u8");
 
     /*
-     * Untuk playlist HLS, rewrite URL segment supaya
-     * browser juga mengambil segment melalui proxy kita.
+     * ======================================
+     * HLS
+     * ======================================
      */
-    if (
-      contentType.includes("mpegurl") ||
-      streamUrl.includes(".m3u8")
-    ) {
-      const playlist = await upstream.text();
 
-      const baseUrl = new URL(streamUrl);
+    if (isHls) {
+      const playlist =
+        await upstream.text();
 
-      const rewritten = playlist
-        .split("\n")
-        .map((line) => {
-          const trimmed = line.trim();
+      const rewritten =
+        rewritePlaylist(
+          playlist,
+          streamUrl,
+          headers
+        );
 
-          if (
-            !trimmed ||
-            trimmed.startsWith("#")
-          ) {
-            return line;
-          }
+      return new Response(
+        rewritten,
+        {
+          status: 200,
 
-          try {
-            const absolute = new URL(trimmed, baseUrl).toString();
+          headers: {
+            "Content-Type":
+              "application/vnd.apple.mpegurl",
 
-            const encodedHeaders = encodeURIComponent(
-              JSON.stringify(headers)
-            );
+            "Cache-Control":
+              "no-store, no-cache, must-revalidate",
 
-            return `/api/meloshort/stream?url=${encodeURIComponent(
-              absolute
-            )}&headers=${encodedHeaders}`;
-          } catch {
-            return line;
-          }
-        })
-        .join("\n");
+            "Access-Control-Allow-Origin":
+              "*",
 
-      return new Response(rewritten, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/vnd.apple.mpegurl",
-          "Cache-Control": "no-store",
-          "Access-Control-Allow-Origin": "*",
-        },
-      });
+            "Access-Control-Allow-Headers":
+              "*",
+
+            "Access-Control-Allow-Methods":
+              "GET, HEAD, OPTIONS",
+          },
+        }
+      );
     }
 
     /*
-     * Untuk MP4 / file video biasa.
+     * ======================================
+     * DIRECT VIDEO / MP4
+     * ======================================
      */
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        ...(upstream.headers.get("content-length")
-          ? {
-              "Content-Length":
-                upstream.headers.get("content-length")!,
-            }
-          : {}),
-      },
-    });
-  } catch (error: any) {
+
+    const responseHeaders =
+      new Headers();
+
+    responseHeaders.set(
+      "Content-Type",
+      contentType ||
+        "video/mp4"
+    );
+
+    responseHeaders.set(
+      "Cache-Control",
+      "no-store"
+    );
+
+    responseHeaders.set(
+      "Access-Control-Allow-Origin",
+      "*"
+    );
+
+    responseHeaders.set(
+      "Access-Control-Allow-Headers",
+      "*"
+    );
+
+    responseHeaders.set(
+      "Access-Control-Allow-Methods",
+      "GET, HEAD, OPTIONS"
+    );
+
+    const contentLength =
+      upstream.headers.get(
+        "content-length"
+      );
+
+    if (contentLength) {
+      responseHeaders.set(
+        "Content-Length",
+        contentLength
+      );
+    }
+
+    const contentRange =
+      upstream.headers.get(
+        "content-range"
+      );
+
+    if (contentRange) {
+      responseHeaders.set(
+        "Content-Range",
+        contentRange
+      );
+    }
+
+    const acceptRanges =
+      upstream.headers.get(
+        "accept-ranges"
+      );
+
+    if (acceptRanges) {
+      responseHeaders.set(
+        "Accept-Ranges",
+        acceptRanges
+      );
+    } else {
+      responseHeaders.set(
+        "Accept-Ranges",
+        "bytes"
+      );
+    }
+
     return new Response(
-      error?.message || "Gagal mengambil stream",
-      { status: 500 }
+      upstream.body,
+      {
+        status:
+          upstream.status,
+        headers:
+          responseHeaders,
+      }
+    );
+  } catch (error: any) {
+    console.error(
+      "MELOSHORT STREAM PROXY ERROR:",
+      error
+    );
+
+    return new Response(
+      error?.message ||
+        "Gagal mengambil stream",
+      {
+        status: 500,
+      }
     );
   }
+}
+
+export async function OPTIONS() {
+  return new Response(
+    null,
+    {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin":
+          "*",
+        "Access-Control-Allow-Headers":
+          "*",
+        "Access-Control-Allow-Methods":
+          "GET, HEAD, OPTIONS",
+      },
+    }
+  );
 }
