@@ -14,8 +14,6 @@ export function useInfiniteForYouDramas() {
     queryFn: ({ pageParam = 1 }) => fetchJson<Drama[]>(`${API_BASE}/foryou?page=${pageParam}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Drama[], allPages: Drama[][]) => {
-        // Stop if we received no data or less than expected
-        // Also limit to 100 pages as requested
         if (!lastPage || lastPage.length === 0 || allPages.length >= 100) return undefined;
         return allPages.length + 1;
     },
@@ -36,8 +34,6 @@ export function useInfiniteReelShortDramas() {
     staleTime: 1000 * 60 * 5,
   });
 }
-
-// ... existing imports
 
 export function useForYouDramas() {
   return useQuery({
@@ -86,18 +82,18 @@ export function useDubindoDramas() {
 }
 
 // ==========================================
-// HOOK MELOSHORT (QUICKPLAY) - DIPERBARUI KE PROXY UNIVERSAL
+// HOOK MELOSHORT (QUICKPLAY) - SUDAH DISESUAIKAN KE PROXY CATCH-ALL
 // ==========================================
 export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // Menggunakan proxy catch-all [..path] dengan parameter bahasa Indonesia
-      const res = await fetch("/api/meloshort/api/v2/discover?lang=id");
+      // PERHATIKAN DI SINI: Menembak proxy universal ke endpoint v2/home dengan bahasa Indonesia
+      const res = await fetch("/api/meloshort/v2/home?lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
-      // Mapping super aman menyesuaikan tipe data di komponen Home
+      // Mapping data agar aman dan langsung tampil di UI TPLAY+
       return (json.data || []).map((item: any) => ({
         id: String(item.id || item.bookId || item.quickplay_id || ''),
         title: item.title || item.name || item.bookName || 'Untitled',
