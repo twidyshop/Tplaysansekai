@@ -86,13 +86,14 @@ export function useDubindoDramas() {
 }
 
 // ==========================================
-// HOOK MELOSHORT (QUICKPLAY)
+// HOOK MELOSHORT (QUICKPLAY) - DIPERBARUI KE PROXY UNIVERSAL
 // ==========================================
 export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      const res = await fetch("/api/meloshort/discover");
+      // Menggunakan proxy catch-all [..path] dengan parameter bahasa Indonesia
+      const res = await fetch("/api/meloshort/api/v2/discover?lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
