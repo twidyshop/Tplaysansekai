@@ -12,7 +12,7 @@ export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      const res = await fetch("/api/meloshort/trending"); // Sesuaikan endpoint API Quickplay Anda
+      const res = await fetch("/api/meloshort/discover"); // Sesuaikan endpoint API Quickplay Anda
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
