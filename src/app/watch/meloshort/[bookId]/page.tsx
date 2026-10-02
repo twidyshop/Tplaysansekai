@@ -11,7 +11,7 @@ export default function MeloShortWatchPage() {
 
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
 
-  // 1. Ambil detail drama untuk mendapatkan daftar/jumlah episode asli
+  // 1. Ambil detail drama untuk mendapatkan daftar objek episode asli (beserta chapterId-nya)
   const { data: detailData, isLoading: loadingDetail } = useQuery({
     queryKey: ["meloshort-watch-detail", bookId],
     queryFn: async () => {
@@ -23,21 +23,16 @@ export default function MeloShortWatchPage() {
     enabled: !!bookId,
   });
 
-  // Ekstrak daftar episode asli dari respons API detail
+  // Ekstrak daftar episode asli
   const rawEpisodes = detailData?.episodes || detailData?.chapterList || detailData?.videoList || detailData?.list || [];
-  
-  // Tentukan total episode dinamis (jika array kosong, cek total/episodesCount, minimal 1)
-  const totalEpisodes = rawEpisodes.length > 0 
-    ? rawEpisodes.length 
-    : (detailData?.totalEpisodes || detailData?.episodeCount || detailData?.total || 30);
-
-  // Tentukan chapter_id yang dikirim ke API /api/v2/video (biasanya urutan 1, 2, 3... atau ID khusus chapter)
   const currentEpItem = rawEpisodes[currentEpisodeIndex];
+
+  // Ambil chapterId string asli dari API (fallback ke index + 1 jika berupa angka)
   const chapterId = currentEpItem 
-    ? (currentEpItem.id || currentEpItem.chapterId || currentEpItem.episodeId || currentEpisodeIndex + 1) 
+    ? (currentEpItem.chapterId || currentEpItem.id || currentEpItem.episodeId || currentEpisodeIndex + 1) 
     : currentEpisodeIndex + 1;
 
-  // 2. Ambil URL video streaming dari endpoint /api/v2/video
+  // 2. Ambil URL video streaming dari endpoint /api/v2/video menggunakan chapterId yang benar
   const { data: videoData, isLoading: loadingVideo } = useQuery({
     queryKey: ["meloshort-watch-video", bookId, chapterId],
     queryFn: async () => {
@@ -49,8 +44,9 @@ export default function MeloShortWatchPage() {
     enabled: !!bookId && !!chapterId,
   });
 
+  // Ambil URL dari berbagai struktur respons Quickplay
   const streams = videoData?.streams || videoData?.videoList || [];
-  const videoUrl = videoData?.url || streams[0]?.url || videoData?.videoUrl || "";
+  const videoUrl = videoData?.url || streams[0]?.url || videoData?.videoUrl || currentEpItem?.videoUrl || "";
 
   if (loadingDetail) {
     return (
@@ -84,8 +80,9 @@ export default function MeloShortWatchPage() {
               className="w-full h-full object-contain"
             />
           ) : (
-            <div className="text-zinc-500 text-center p-6">
+            <div className="text-zinc-500 text-center p-6 flex flex-col items-center justify-center">
               <p>URL video tidak tersedia untuk episode ini.</p>
+              <p className="text-xs text-zinc-600 mt-2">Chapter ID: {String(chapterId)}</p>
             </div>
           )}
         </div>
@@ -98,9 +95,9 @@ export default function MeloShortWatchPage() {
 
       {/* Sidebar Daftar Episode Dinamis */}
       <div className="w-full md:w-80 bg-zinc-900 border-t md:border-t-0 md:border-l border-zinc-800 p-4 flex flex-col max-h-screen overflow-y-auto">
-        <h2 className="font-semibold text-lg mb-4">Daftar Episode ({totalEpisodes})</h2>
+        <h2 className="font-semibold text-lg mb-4">Daftar Episode ({rawEpisodes.length || 30})</h2>
         <div className="grid grid-cols-5 md:grid-cols-3 gap-2">
-          {Array.from({ length: totalEpisodes }).map((_, idx) => (
+          {(rawEpisodes.length > 0 ? rawEpisodes : Array.from({ length: 30 })).map((_: any, idx: number) => (
             <button
               key={idx}
               onClick={() => setCurrentEpisodeIndex(idx)}
