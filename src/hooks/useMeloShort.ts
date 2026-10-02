@@ -8,7 +8,7 @@ export function useMeloShortDramas() {
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
       // Menembak proxy universal yang diteruskan ke peladen Quickplay dengan HMAC-SHA256
-      const res = await fetch("/api/meloshort/v2/home?lang=id");
+      const res = await fetch("/api/meloshort/proxy?path=/api/v2/home&lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
