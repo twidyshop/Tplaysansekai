@@ -5,11 +5,10 @@ const BASE = "https://api.quickplay.my.id";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams, pathname } = req.nextUrl;
+    const { searchParams } = req.nextUrl;
     
-    // Mengekstrak path asli setelah /api/meloshort/
-    // Contoh: /api/meloshort/api/v2/discover -> /api/v2/discover
-    const subPath = pathname.replace(/^\/api\/meloshort/, "");
+    // Mengambil path dari query parameter ?path=... sesuai contoh quickplay.js
+    const path = searchParams.get("path");
 
     const allowed = [
       "/api/v2/discover",
@@ -21,21 +20,23 @@ export async function GET(req: NextRequest) {
       "/api/v2/categories"
     ];
 
-    if (!allowed.includes(subPath)) {
+    if (!path || !allowed.includes(path)) {
       return NextResponse.json({
         success: false,
-        error: "Invalid API path: " + subPath
+        error: "Invalid or missing API path: " + path
       }, { status: 400 });
     }
 
-    const upstream = new URL(BASE + subPath);
+    const upstream = new URL(BASE + path);
 
-    // Memindahkan semua query parameter yang dikirim frontend (termasuk lang=id, category_p, dll)
+    // Memasukkan semua parameter lain kecuali 'path' ke upstream
     for (const [k, v] of searchParams.entries()) {
-      upstream.searchParams.set(k, v);
+      if (k !== "path") {
+        upstream.searchParams.set(k, v);
+      }
     }
 
-    // Default paksa ke bahasa Indonesia jika belum ada parameter lang
+    // Default paksa bahasa Indonesia jika belum ada
     if (!upstream.searchParams.has("lang")) {
       upstream.searchParams.set("lang", "id");
     }
@@ -45,14 +46,13 @@ export async function GET(req: NextRequest) {
     if (!key) {
       return NextResponse.json({
         success: false,
-        error: "QUICKPLAY_API_KEY belum dikonfigurasi di Vercel"
+        error: "QUICKPLAY_API_KEY belum dikonfigurasi"
       }, { status: 500 });
     }
 
     const ts = Date.now().toString();
     const fullPath = upstream.pathname + upstream.search;
 
-    // Membuat signature HMAC-SHA256 sesuai standar referensi
     const signature = crypto
       .createHmac("sha256", key)
       .update(`GET:${fullPath}:${ts}`)
