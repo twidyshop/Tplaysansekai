@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const BASE_URL = "https://api.quickplay.my.id";
     
-    // GANTI KE /api/v2/home SESUAI DOKUMENTASI UNTUK HALAMAN UTAMA
+    // KITA PINDAH KE /api/v2/home KARENA DISCOVER BUTUH PARAMETER KHUSUS
     const path = "/api/v2/home";
     const params = { lang: "id" };
     
