@@ -11,9 +11,9 @@ export default function MeloShortWatchPage() {
 
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
 
-  // 1. Ambil detail drama & daftar episode (Endpoint /api/v2/detail)
+  // 1. Ambil detail drama untuk mendapatkan daftar/jumlah episode asli
   const { data: detailData, isLoading: loadingDetail } = useQuery({
-    queryKey: ["meloshort-detail", bookId],
+    queryKey: ["meloshort-watch-detail", bookId],
     queryFn: async () => {
       const res = await fetch(`/api/meloshort?path=/api/v2/detail&id=${bookId}`);
       if (!res.ok) throw new Error("Gagal mengambil detail drama");
@@ -23,35 +23,39 @@ export default function MeloShortWatchPage() {
     enabled: !!bookId,
   });
 
-  // Ekstrak daftar episode (biasanya berupa array angka atau objek chapter)
-  const episodes = detailData?.episodes || detailData?.chapterList || detailData?.videoList || detailData?.list || [];
+  // Ekstrak daftar episode asli dari respons API detail
+  const rawEpisodes = detailData?.episodes || detailData?.chapterList || detailData?.videoList || detailData?.list || [];
   
-  // Tentukan chapter_id berdasarkan index atau data episode (jika bentuknya angka langsung, atau objek)
-  const currentEpItem = episodes[currentEpisodeIndex];
-  const chapterId = typeof currentEpItem === "object" 
-    ? (currentEpItem?.id || currentEpItem?.chapterId || currentEpisodeIndex + 1) 
-    : (currentEpItem || currentEpisodeIndex + 1);
+  // Tentukan total episode dinamis (jika array kosong, cek total/episodesCount, minimal 1)
+  const totalEpisodes = rawEpisodes.length > 0 
+    ? rawEpisodes.length 
+    : (detailData?.totalEpisodes || detailData?.episodeCount || detailData?.total || 30);
 
-  // 2. Ambil URL video streaming (Endpoint /api/v2/video?id=...&chapter_id=...)
+  // Tentukan chapter_id yang dikirim ke API /api/v2/video (biasanya urutan 1, 2, 3... atau ID khusus chapter)
+  const currentEpItem = rawEpisodes[currentEpisodeIndex];
+  const chapterId = currentEpItem 
+    ? (currentEpItem.id || currentEpItem.chapterId || currentEpItem.episodeId || currentEpisodeIndex + 1) 
+    : currentEpisodeIndex + 1;
+
+  // 2. Ambil URL video streaming dari endpoint /api/v2/video
   const { data: videoData, isLoading: loadingVideo } = useQuery({
-    queryKey: ["meloshort-video", bookId, chapterId],
+    queryKey: ["meloshort-watch-video", bookId, chapterId],
     queryFn: async () => {
       const res = await fetch(`/api/meloshort?path=/api/v2/video&id=${bookId}&chapter_id=${chapterId}`);
       if (!res.ok) throw new Error("Gagal mengambil stream video");
       const json = await res.json();
       return json.data || json;
     },
-    enabled: !!bookId && chapterId !== undefined,
+    enabled: !!bookId && !!chapterId,
   });
 
-  // Ambil URL stream dari respons (biasanya streams[0].url atau url langsung)
   const streams = videoData?.streams || videoData?.videoList || [];
   const videoUrl = videoData?.url || streams[0]?.url || videoData?.videoUrl || "";
 
   if (loadingDetail) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p className="animate-pulse text-lg">Memuat detail MeloShort...</p>
+        <p className="animate-pulse text-lg">Memuat pemutar video MeloShort...</p>
       </div>
     );
   }
@@ -92,40 +96,23 @@ export default function MeloShortWatchPage() {
         </div>
       </div>
 
-      {/* Sidebar Daftar Episode (Tombol 1, 2, 3...) */}
+      {/* Sidebar Daftar Episode Dinamis */}
       <div className="w-full md:w-80 bg-zinc-900 border-t md:border-t-0 md:border-l border-zinc-800 p-4 flex flex-col max-h-screen overflow-y-auto">
-        <h2 className="font-semibold text-lg mb-4">Daftar Episode</h2>
+        <h2 className="font-semibold text-lg mb-4">Daftar Episode ({totalEpisodes})</h2>
         <div className="grid grid-cols-5 md:grid-cols-3 gap-2">
-          {episodes.length > 0 ? (
-            episodes.map((ep: any, idx: number) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentEpisodeIndex(idx)}
-                className={`py-2.5 rounded-xl text-sm font-semibold transition ${
-                  currentEpisodeIndex === idx
-                    ? "bg-purple-600 text-white shadow-lg shadow-purple-900/50"
-                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                }`}
-              >
-                {idx + 1}
-              </button>
-            ))
-          ) : (
-            // Fallback jika list episode berupa angka total saja
-            Array.from({ length: detailData?.totalEpisodes || 50 }).map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentEpisodeIndex(idx)}
-                className={`py-2.5 rounded-xl text-sm font-semibold transition ${
-                  currentEpisodeIndex === idx
-                    ? "bg-purple-600 text-white shadow-lg shadow-purple-900/50"
-                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                }`}
-              >
-                {idx + 1}
-              </button>
-            ))
-          )}
+          {Array.from({ length: totalEpisodes }).map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentEpisodeIndex(idx)}
+              className={`py-2.5 rounded-xl text-sm font-semibold transition ${
+                currentEpisodeIndex === idx
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-900/50"
+                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+              }`}
+            >
+              {idx + 1}
+            </button>
+          ))}
         </div>
       </div>
     </div>
