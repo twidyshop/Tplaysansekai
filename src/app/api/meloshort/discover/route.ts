@@ -1,29 +1,48 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
+
+// Fungsi pembantu untuk membuat HMAC-SHA256 menggunakan Web Crypto API standar
+async function generateSignature(secret: string, payload: string) {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const data = encoder.encode(payload);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
+  const signatureArray = Array.from(new Uint8Array(signatureBuffer));
+  const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+  return signatureHex;
+}
 
 export async function GET(request: Request) {
   try {
     const API_KEY = process.env.QUICKPLAY_API_KEY;
     
     if (!API_KEY) {
+      console.error("MeloShort API Error: QUICKPLAY_API_KEY belum di-set di Vercel");
       return NextResponse.json({ error: "API Key Quickplay belum di-setting" }, { status: 500 });
     }
 
     const BASE_URL = "https://api.quickplay.my.id";
-    
-    // Kita gunakan /api/v2/discover karena trending tidak ada!
     const path = "/api/v2/discover";
-    const params = { lang: "id" }; // Sesuai permintaan bos: hanya bahasa Indonesia
+    const params = { lang: "id" };
     
     const qs = new URLSearchParams(params).toString();
     const full = qs ? `${path}?${qs}` : path;
     const ts = Date.now().toString(); 
     
-    // Pembuatan Signature dengan HMAC-SHA256
-    const sig = crypto
-      .createHmac("sha256", API_KEY)
-      .update(`GET:${full}:${ts}`)
-      .digest("hex");
+    // Gunakan fungsi Web Crypto API yang aman di Vercel
+    const payload = `GET:${full}:${ts}`;
+    const sig = await generateSignature(API_KEY, payload);
+
+    console.log("Mencoba fetch Quickplay:", `${BASE_URL}${full}`); // Untuk log di Vercel
 
     const res = await fetch(`${BASE_URL}${full}`, {
       headers: {
@@ -34,15 +53,16 @@ export async function GET(request: Request) {
     });
 
     if (!res.ok) {
-      console.error("Gagal dari Quickplay:", res.status, await res.text());
-      throw new Error(`Gagal fetch dari sumber Quickplay: ${res.status}`);
+      const errorText = await res.text();
+      console.error("Gagal dari Quickplay:", res.status, errorText);
+      throw new Error(`Gagal fetch dari sumber Quickplay: ${res.status} - ${errorText}`);
     }
 
     const json = await res.json();
     return NextResponse.json(json);
     
-  } catch (error) {
-    console.error("MeloShort API Error:", error);
-    return NextResponse.json({ error: "Gagal memuat data MeloShort" }, { status: 500 });
+  } catch (error: any) {
+    console.error("MeloShort API Error (Catch):", error.message || error);
+    return NextResponse.json({ error: "Gagal memuat data MeloShort dari API" }, { status: 500 });
   }
 }
