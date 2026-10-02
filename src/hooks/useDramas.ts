@@ -1,16 +1,21 @@
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import type { Drama, SearchResult } from "@/types/drama";
-import { fetchJson } from "@/lib/fetcher";
 
 const API_BASE = "/api/dramabox";
+
+import { fetchJson } from "@/lib/fetcher";
+
 const REC_API_BASE = "/api/reelshort";
 
+// Infinite Scroll Hook for DramaBox "Lainnya"
 export function useInfiniteForYouDramas() {
   return useInfiniteQuery({
     queryKey: ["dramas", "foryou", "infinite"],
     queryFn: ({ pageParam = 1 }) => fetchJson<Drama[]>(`${API_BASE}/foryou?page=${pageParam}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Drama[], allPages: Drama[][]) => {
+        // Stop if we received no data or less than expected
+        // Also limit to 100 pages as requested
         if (!lastPage || lastPage.length === 0 || allPages.length >= 100) return undefined;
         return allPages.length + 1;
     },
@@ -18,6 +23,7 @@ export function useInfiniteForYouDramas() {
   });
 }
 
+// Infinite Scroll Hook for ReelShort "Lainnya"
 export function useInfiniteReelShortDramas() {
   return useInfiniteQuery({
     queryKey: ["reels", "foryou", "infinite"],
@@ -30,6 +36,8 @@ export function useInfiniteReelShortDramas() {
     staleTime: 1000 * 60 * 5,
   });
 }
+
+// ... existing imports
 
 export function useForYouDramas() {
   return useQuery({
@@ -57,6 +65,7 @@ export function useTrendingDramas() {
 
 export function useSearchDramas(query: string) {
   const normalizedQuery = query.trim();
+
   return useQuery({
     queryKey: ["dramas", "search", normalizedQuery],
     queryFn: async () => {
@@ -77,17 +86,17 @@ export function useDubindoDramas() {
 }
 
 // ==========================================
-// HOOK MELOSHORT (QUICKPLAY) - DIPERBAIKI!
+// HOOK MELOSHORT (QUICKPLAY)
 // ==========================================
 export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // PENTING: URL HARUS /api/meloshort/discover
-      const res = await fetch("/api/meloshort/discover"); 
+      const res = await fetch("/api/meloshort/discover");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
+      // Mapping super aman menyesuaikan tipe data di komponen Home
       return (json.data || []).map((item: any) => ({
         id: String(item.id || item.bookId || item.quickplay_id || ''),
         title: item.title || item.name || item.bookName || 'Untitled',
