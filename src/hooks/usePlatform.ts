@@ -1,71 +1,72 @@
-"use client";
-
 import { create } from "zustand";
 
-export type Platform = "pinedrama" | "dramabox" | "reelshort" | "shortmax" | "netshort" | "melolo" | "freereels" | "dramanova" | "goodshort" | "flickreels";
+export type Platform =
+  | "meloshort"
+  | "pinedrama"
+  | "dramabox"
+  | "reelshort"
+  | "shortmax"
+  | "netshort"
+  | "melolo"
+  | "freereels"
+  | "flickreels"
+  | "dramanova"
+  | "goodshort"
+  | string;
 
-export interface PlatformInfo {
-  id: Platform;
-  name: string;
-  logo: string;
-  apiBase: string;
-}
-
-export const PLATFORMS: PlatformInfo[] = [
+export const PLATFORMS = [
+  {
+    id: "meloshort",
+    name: "MeloShort",
+    logo: "/logos/meloshort.png", // Sesuaikan jika path/nama file logo berbeda
+    apiBase: "/api/meloshort",
+  },
   {
     id: "pinedrama",
     name: "PineDrama",
-    logo: "/pinedrama.png",
+    logo: "/logos/pinedrama.png",
     apiBase: "/api/pinedrama",
   },
   {
     id: "dramabox",
     name: "DramaBox",
-    logo: "/dramabox.webp",
+    logo: "/logos/dramabox.png",
     apiBase: "/api/dramabox",
   },
   {
     id: "reelshort",
     name: "ReelShort",
-    logo: "/reelshort.webp",
+    logo: "/logos/reelshort.png",
     apiBase: "/api/reelshort",
   },
   {
     id: "shortmax",
     name: "ShortMax",
-    logo: "/shortmax.webp",
+    logo: "/logos/shortmax.png",
     apiBase: "/api/shortmax",
-  },
-  {
-    id: "goodshort",
-    name: "GoodShort",
-    logo: "/goodshort.jpg",
-    apiBase: "/api/goodshort",
   },
   {
     id: "netshort",
     name: "NetShort",
-    logo: "/netshort.webp",
+    logo: "/logos/netshort.png",
     apiBase: "/api/netshort",
   },
-
   {
     id: "melolo",
     name: "Melolo",
-    logo: "/melolo.webp",
+    logo: "/logos/melolo.png",
     apiBase: "/api/melolo",
   },
-
   {
     id: "freereels",
     name: "FreeReels",
-    logo: "/freereels.webp",
+    logo: "/logos/freereels.png",
     apiBase: "/api/freereels",
   },
   {
     id: "flickreels",
     name: "FlickReels",
-    logo: "/flickreels.webp",
+    logo: "/logos/flickreels.png",
     apiBase: "/api/flickreels",
   },
   // api lagi error - 12-09-2026
@@ -90,7 +91,7 @@ interface PlatformState {
 }
 
 export const usePlatformStore = create<PlatformState>((set) => ({
-  currentPlatform: "pinedrama",
+  currentPlatform: "meloshort", // Diubah defaultnya agar langsung buka MeloShort di awal
   setPlatform: (platform) => set({ currentPlatform: platform }),
 }));
 
@@ -108,6 +109,7 @@ export function usePlatform() {
     setPlatform,
     platforms: PLATFORMS,
     getPlatformInfo,
+    isMeloShort: currentPlatform === "meloshort",
     isPineDrama: currentPlatform === "pinedrama",
     isDramaBox: currentPlatform === "dramabox",
     isReelShort: currentPlatform === "reelshort",
