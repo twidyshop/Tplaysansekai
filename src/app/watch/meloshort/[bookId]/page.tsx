@@ -8,31 +8,119 @@ type Episode = {
   id?: string | number;
   chapterId?: string | number;
   episodeId?: string | number;
-  chapterName?: string;
-  episodeName?: string;
-  title?: string;
   name?: string;
+  title?: string;
+  episodeName?: string;
+  episode?: number | string;
+  chapterName?: string;
   [key: string]: any;
 };
+
+type Stream = {
+  url?: string;
+  src?: string;
+  streamUrl?: string;
+  videoUrl?: string;
+  playUrl?: string;
+  type?: string;
+  mimeType?: string;
+  contentType?: string;
+  quality?: string;
+  name?: string;
+  label?: string;
+  headers?: Record<string, string>;
+  streamHeaders?: Record<string, string>;
+  [key: string]: any;
+};
+
+function getEpisodeId(ep: Episode) {
+  return String(
+    ep.chapterId ??
+      ep.episodeId ??
+      ep.id ??
+      ""
+  );
+}
+
+function getEpisodeTitle(ep: Episode, index: number) {
+  return (
+    ep.name ||
+    ep.title ||
+    ep.episodeName ||
+    ep.chapterName ||
+    ep.episode ||
+    `Episode ${index + 1}`
+  );
+}
+
+function getStreamUrl(stream: Stream) {
+  return (
+    stream.url ||
+    stream.src ||
+    stream.streamUrl ||
+    stream.videoUrl ||
+    stream.playUrl ||
+    ""
+  );
+}
+
+function isVideoStream(stream: Stream) {
+  const url = getStreamUrl(stream).toLowerCase();
+
+  const type = String(
+    stream.type ||
+      stream.mimeType ||
+      stream.contentType ||
+      ""
+  ).toLowerCase();
+
+  const combined = `${url} ${type}`;
+
+  // Hindari stream audio-only
+  if (
+    combined.includes("audio/mp4") ||
+    combined.includes("audio/mpeg") ||
+    combined.includes("audio/aac") ||
+    combined.includes("audio-only")
+  ) {
+    return false;
+  }
+
+  // Prioritaskan HLS / video
+  if (
+    combined.includes(".m3u8") ||
+    combined.includes("application/vnd.apple.mpegurl") ||
+    combined.includes("video/")
+  ) {
+    return true;
+  }
+
+  // Kalau API tidak memberi MIME type,
+  // anggap URL stream sebagai kandidat video.
+  return !!url;
+}
 
 export default function MeloShortWatchPage() {
   const params = useParams();
   const router = useRouter();
 
   const bookId = String(params.bookId || "");
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hlsRef = useRef<any>(null);
 
-  const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
-  const [episodeMenuOpen, setEpisodeMenuOpen] = useState(false);
-  const [videoError, setVideoError] = useState(false);
+  const [selectedEpisode, setSelectedEpisode] =
+    useState<number>(0);
 
-  /* =========================
-     DETAIL DRAMA
-  ========================= */
+  const [episodeDrawer, setEpisodeDrawer] =
+    useState(false);
+
+  const [playerError, setPlayerError] =
+    useState("");
 
   const {
-    data: detailData,
-    isLoading: loadingDetail,
+    data: detail,
+    isLoading: detailLoading,
     error: detailError,
   } = useQuery({
     queryKey: ["meloshort-watch-detail", bookId],
@@ -41,7 +129,10 @@ export default function MeloShortWatchPage() {
       const res = await fetch(
         `/api/meloshort?path=/api/v2/detail&id=${encodeURIComponent(
           bookId
-        )}&lang=id`
+        )}&lang=id`,
+        {
+          cache: "no-store",
+        }
       );
 
       if (!res.ok) {
@@ -50,7 +141,10 @@ export default function MeloShortWatchPage() {
 
       const json = await res.json();
 
-      console.log("MELOSHORT DETAIL:", json);
+      console.log(
+        "========== MELOSHORT DETAIL ==========",
+        json
+      );
 
       return json.data || json;
     },
@@ -58,62 +152,52 @@ export default function MeloShortWatchPage() {
     enabled: !!bookId,
   });
 
-  /* =========================
-     DAFTAR EPISODE
-  ========================= */
-
   const episodes: Episode[] = useMemo(() => {
-    if (!detailData) return [];
+    if (!detail) return [];
 
     const list =
-      detailData.episodes ||
-      detailData.chapters ||
-      detailData.chapterList ||
-      detailData.videoList ||
-      detailData.list ||
+      detail.episodes ||
+      detail.chapters ||
+      detail.chapterList ||
+      detail.videoList ||
+      detail.list ||
       [];
 
     return Array.isArray(list) ? list : [];
-  }, [detailData]);
+  }, [detail]);
 
-  const currentEpisode = episodes[currentEpisodeIndex];
+  const currentEpisode =
+    episodes[selectedEpisode] || null;
 
-  /* =========================
-     CHAPTER ID
-  ========================= */
-
-  const chapterId = currentEpisode
-    ? String(
-        currentEpisode.chapterId ??
-          currentEpisode.id ??
-          currentEpisode.episodeId ??
-          ""
-      )
+  const currentEpisodeId = currentEpisode
+    ? getEpisodeId(currentEpisode)
     : "";
-
-  /* =========================
-     VIDEO API
-  ========================= */
 
   const {
     data: videoData,
-    isLoading: loadingVideo,
-    error: videoQueryError,
+    isLoading: videoLoading,
+    error: videoError,
   } = useQuery({
     queryKey: [
       "meloshort-watch-video",
       bookId,
-      chapterId,
+      currentEpisodeId,
     ],
 
     queryFn: async () => {
-      const res = await fetch(
-        `/api/meloshort?path=/api/v2/video&id=${encodeURIComponent(
-          bookId
-        )}&chapterId=${encodeURIComponent(
-          chapterId
-        )}&lang=id`
-      );
+      if (!currentEpisodeId) {
+        throw new Error("ID episode tidak ditemukan");
+      }
+
+      const url =
+        `/api/meloshort?path=/api/v2/video` +
+        `&id=${encodeURIComponent(bookId)}` +
+        `&chapterId=${encodeURIComponent(currentEpisodeId)}` +
+        `&lang=id`;
+
+      const res = await fetch(url, {
+        cache: "no-store",
+      });
 
       if (!res.ok) {
         throw new Error(
@@ -123,145 +207,303 @@ export default function MeloShortWatchPage() {
 
       const json = await res.json();
 
-      console.log("MELOSHORT VIDEO:", json);
+      console.log(
+        "========== MELOSHORT VIDEO RAW ==========",
+        JSON.stringify(json, null, 2)
+      );
 
       return json.data || json;
     },
 
-    enabled: !!bookId && !!chapterId,
+    enabled:
+      !!bookId &&
+      !!currentEpisodeId,
   });
 
-  /* =========================
-     AMBIL STREAM
-  ========================= */
+  const streams: Stream[] = useMemo(() => {
+    if (!videoData) return [];
 
-  const streamInfo = useMemo(() => {
-    if (!videoData) return null;
-
-    const streams =
+    const raw =
       videoData.streams ||
       videoData.videoList ||
       videoData.sources ||
+      videoData.data ||
       [];
 
-    const firstStream =
-      Array.isArray(streams) && streams.length > 0
-        ? streams[0]
-        : null;
+    if (Array.isArray(raw)) {
+      return raw;
+    }
 
-    const url =
-      videoData.url ||
-      videoData.videoUrl ||
-      videoData.playUrl ||
-      firstStream?.url ||
-      "";
+    // Kadang API langsung mengembalikan object stream
+    if (typeof raw === "object" && raw !== null) {
+      return [raw];
+    }
 
-    const headers =
-      videoData.streamHeaders ||
-      firstStream?.streamHeaders ||
-      firstStream?.headers ||
-      videoData.headers ||
-      {};
-
-    return {
-      url,
-      headers,
-    };
+    return [];
   }, [videoData]);
 
-  /* =========================
-     PROXY STREAM
-  ========================= */
+  const selectedStream = useMemo(() => {
+    if (!streams.length) return null;
 
-  const proxiedVideoUrl = useMemo(() => {
-    if (!streamInfo?.url) return "";
+    // Prioritas:
+    // 1. HLS/video stream
+    // 2. stream yang bukan audio-only
+    // 3. stream pertama sebagai fallback
+    return (
+      streams.find(isVideoStream) ||
+      streams.find((stream) => {
+        const url = getStreamUrl(stream).toLowerCase();
+
+        return (
+          url.includes(".mp4") ||
+          url.includes(".m3u8") ||
+          url.includes("video")
+        );
+      }) ||
+      streams[0]
+    );
+  }, [streams]);
+
+  const originalStreamUrl = selectedStream
+    ? getStreamUrl(selectedStream)
+    : "";
+
+  const streamHeaders =
+    selectedStream?.headers ||
+    selectedStream?.streamHeaders ||
+    {};
+
+  const proxiedStreamUrl = useMemo(() => {
+    if (!originalStreamUrl) return "";
 
     return (
-      `/api/meloshort/stream?url=${encodeURIComponent(
-        streamInfo.url
-      )}` +
-      `&headers=${encodeURIComponent(
-        JSON.stringify(streamInfo.headers || {})
+      `/api/meloshort/stream?url=` +
+      `${encodeURIComponent(originalStreamUrl)}` +
+      `&headers=` +
+      `${encodeURIComponent(
+        JSON.stringify(streamHeaders)
       )}`
     );
-  }, [streamInfo]);
+  }, [
+    originalStreamUrl,
+    streamHeaders,
+  ]);
 
-  /* =========================
-     LOAD VIDEO
-  ========================= */
+  const title =
+    detail?.title ||
+    detail?.bookName ||
+    detail?.name ||
+    "MeloShort";
 
+  const cover =
+    detail?.cover ||
+    detail?.coverWap ||
+    detail?.image ||
+    "";
+
+  const description =
+    detail?.description ||
+    detail?.introduction ||
+    detail?.desc ||
+    "";
+
+  /*
+   * ==========================================
+   * HLS PLAYER
+   * ==========================================
+   */
   useEffect(() => {
-    setVideoError(false);
+    let cancelled = false;
 
-    const video = videoRef.current;
+    async function setupPlayer() {
+      const video = videoRef.current;
 
-    if (!video || !proxiedVideoUrl) return;
+      if (!video || !proxiedStreamUrl) {
+        return;
+      }
 
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
+      setPlayerError("");
 
-    video.src = proxiedVideoUrl;
+      // Bersihkan HLS sebelumnya
+      if (hlsRef.current) {
+        try {
+          hlsRef.current.destroy();
+        } catch {}
 
-    /*
-     * Jangan paksa autoplay.
-     * Mobile browser sering memblokir autoplay.
-     */
-    video.load();
+        hlsRef.current = null;
+      }
 
-    return () => {
       video.pause();
       video.removeAttribute("src");
       video.load();
-    };
-  }, [proxiedVideoUrl]);
 
-  /* =========================
-     JUDUL EPISODE
-  ========================= */
+      const isHls =
+        originalStreamUrl
+          .toLowerCase()
+          .includes(".m3u8") ||
+        proxiedStreamUrl
+          .toLowerCase()
+          .includes(".m3u8");
 
-  const getEpisodeTitle = (
-    episode: Episode,
-    index: number
-  ) => {
-    return (
-      episode.episodeName ||
-      episode.chapterName ||
-      episode.title ||
-      episode.name ||
-      `Episode ${index + 1}`
-    );
-  };
+      /*
+       * Safari / browser yang punya native HLS
+       */
+      if (
+        isHls &&
+        video.canPlayType(
+          "application/vnd.apple.mpegurl"
+        )
+      ) {
+        video.src = proxiedStreamUrl;
 
-  /* =========================
-     PILIH EPISODE
-  ========================= */
+        try {
+          await video.play();
+        } catch {}
 
-  const selectEpisode = (index: number) => {
-    if (index < 0 || index >= episodes.length) {
-      return;
+        return;
+      }
+
+      /*
+       * Chrome / Android / browser lain:
+       * gunakan HLS.js
+       */
+      if (isHls) {
+        try {
+          const HlsModule =
+            await import("hls.js");
+
+          const Hls =
+            HlsModule.default;
+
+          if (cancelled) return;
+
+          if (Hls.isSupported()) {
+            const hls = new Hls({
+              enableWorker: true,
+
+              // Biar player memilih video rendition
+              // yang sesuai bandwidth perangkat.
+              startLevel: -1,
+
+              capLevelToPlayerSize: true,
+
+              maxBufferLength: 30,
+
+              backBufferLength: 30,
+            });
+
+            hlsRef.current = hls;
+
+            hls.loadSource(
+              proxiedStreamUrl
+            );
+
+            hls.attachMedia(video);
+
+            hls.on(
+              Hls.Events.MANIFEST_PARSED,
+              () => {
+                if (cancelled) return;
+
+                video
+                  .play()
+                  .catch(() => {});
+              }
+            );
+
+            hls.on(
+              Hls.Events.ERROR,
+              (
+                _event: any,
+                data: any
+              ) => {
+                console.error(
+                  "HLS ERROR:",
+                  data
+                );
+
+                if (
+                  data?.fatal
+                ) {
+                  setPlayerError(
+                    "Video gagal dimuat. Coba pilih episode lain."
+                  );
+
+                  try {
+                    if (
+                      data.type ===
+                      Hls.ErrorTypes.NETWORK_ERROR
+                    ) {
+                      hls.startLoad();
+                    } else if (
+                      data.type ===
+                      Hls.ErrorTypes.MEDIA_ERROR
+                    ) {
+                      hls.recoverMediaError();
+                    }
+                  } catch {}
+                }
+              }
+            );
+
+            return;
+          }
+        } catch (error) {
+          console.error(
+            "HLS.js gagal dimuat:",
+            error
+          );
+        }
+      }
+
+      /*
+       * Fallback untuk MP4/direct video
+       */
+      video.src = proxiedStreamUrl;
+
+      try {
+        await video.play();
+      } catch {}
     }
 
-    setCurrentEpisodeIndex(index);
-    setEpisodeMenuOpen(false);
-    setVideoError(false);
+    setupPlayer();
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
+    return () => {
+      cancelled = true;
 
-  /* =========================
-     LOADING DETAIL
-  ========================= */
+      if (hlsRef.current) {
+        try {
+          hlsRef.current.destroy();
+        } catch {}
 
-  if (loadingDetail) {
+        hlsRef.current = null;
+      }
+
+      const video =
+        videoRef.current;
+
+      if (video) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      }
+    };
+  }, [
+    proxiedStreamUrl,
+    originalStreamUrl,
+  ]);
+
+  /*
+   * ==========================================
+   * LOADING
+   * ==========================================
+   */
+
+  if (detailLoading) {
     return (
-      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center">
+      <main className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
-
+          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
           <p className="text-white/60">
             Memuat drama...
           </p>
@@ -270,25 +512,22 @@ export default function MeloShortWatchPage() {
     );
   }
 
-  /* =========================
-     ERROR DETAIL
-  ========================= */
-
-  if (detailError || !detailData) {
+  if (
+    detailError ||
+    !detail
+  ) {
     return (
-      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center p-6">
+      <main className="min-h-screen bg-black text-white flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="text-4xl mb-4">
-            ⚠️
-          </div>
-
           <p className="text-red-400 mb-4">
             Gagal memuat drama.
           </p>
 
           <button
-            onClick={() => router.back()}
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15"
+            onClick={() =>
+              router.back()
+            }
+            className="px-5 py-2.5 rounded-xl bg-white text-black"
           >
             Kembali
           </button>
@@ -297,360 +536,283 @@ export default function MeloShortWatchPage() {
     );
   }
 
-  /* =========================
-     INFO DRAMA
-  ========================= */
-
-  const title =
-    detailData.title ||
-    detailData.bookName ||
-    "MeloShort";
-
-  const cover =
-    detailData.cover ||
-    detailData.coverWap ||
-    detailData.image ||
-    "";
-
-  const description =
-    detailData.description ||
-    detailData.introduction ||
-    detailData.desc ||
-    "";
+  /*
+   * ==========================================
+   * MAIN
+   * ==========================================
+   */
 
   return (
-    <main className="min-h-screen bg-[#07090d] text-white">
-      <div className="max-w-6xl mx-auto">
-        {/* =====================
-            HEADER
-        ===================== */}
+    <main className="min-h-screen bg-black text-white">
+      <div className="max-w-5xl mx-auto">
+        {/* PLAYER */}
+        <div className="relative bg-black aspect-video">
+          {videoLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-3" />
 
-        <header className="h-16 px-4 flex items-center gap-3 border-b border-white/5">
-          <button
-            onClick={() => router.back()}
-            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10"
-          >
-            ←
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <h1 className="font-semibold truncate">
-              {title}
-            </h1>
-
-            <p className="text-xs text-white/40">
-              Episode {currentEpisodeIndex + 1}
-              {episodes.length > 0
-                ? ` / ${episodes.length}`
-                : ""}
-            </p>
-          </div>
-        </header>
-
-        {/* =====================
-            VIDEO PLAYER
-        ===================== */}
-
-        <section className="w-full bg-black">
-          <div className="relative w-full aspect-video overflow-hidden">
-            {/* VIDEO */}
-
-            {!loadingVideo &&
-              !videoQueryError &&
-              proxiedVideoUrl &&
-              !videoError && (
-                <video
-                  ref={videoRef}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  poster={cover}
-                  className="absolute inset-0 w-full h-full object-contain bg-black"
-                  onError={() => {
-                    setVideoError(true);
-                  }}
-                />
-              )}
-
-            {/* LOADING VIDEO */}
-
-            {loadingVideo && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black">
-                <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin mb-4" />
-
-                <p className="text-sm text-white/50">
-                  Memuat Episode{" "}
-                  {currentEpisodeIndex + 1}...
+                <p className="text-sm text-white/60">
+                  Memuat video...
                 </p>
               </div>
-            )}
+            </div>
+          ) : videoError ||
+            !originalStreamUrl ? (
+            <div
+              className="absolute inset-0 flex items-center justify-center bg-zinc-950"
+              style={{
+                backgroundImage: cover
+                  ? `url("${cover}")`
+                  : undefined,
+                backgroundSize: "cover",
+                backgroundPosition:
+                  "center",
+              }}
+            >
+              <div className="absolute inset-0 bg-black/70" />
 
-            {/* VIDEO ERROR */}
+              <div className="relative z-10 text-center px-6">
+                <p className="text-red-400 mb-2">
+                  Video tidak tersedia
+                </p>
 
-            {!loadingVideo &&
-              (videoQueryError ||
-                videoError ||
-                !proxiedVideoUrl) && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black p-6 text-center">
-                  <div className="text-4xl mb-3">
-                    ⚠️
-                  </div>
+                <p className="text-sm text-white/60">
+                  Stream episode ini tidak
+                  ditemukan.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <video
+                ref={videoRef}
+                controls
+                playsInline
+                preload="metadata"
+                poster={cover}
+                className="w-full h-full object-contain bg-black"
+              />
 
-                  <p className="text-sm text-white/70">
-                    Video tidak dapat diputar.
-                  </p>
+              {/* HAMBURGER EPISODE */}
+              <button
+                type="button"
+                onClick={() =>
+                  setEpisodeDrawer(
+                    true
+                  )
+                }
+                className="absolute top-4 right-4 z-20 w-11 h-11 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-black/90 transition"
+                aria-label="Daftar episode"
+              >
+                <span className="text-xl">
+                  ☰
+                </span>
+              </button>
 
-                  <p className="text-xs text-white/35 mt-2">
-                    Coba pilih episode lain.
-                  </p>
-
-                  <button
-                    onClick={() =>
-                      setVideoError(false)
-                    }
-                    className="mt-4 px-4 py-2 rounded-lg bg-white/10 text-sm"
-                  >
-                    Coba lagi
-                  </button>
+              {playerError && (
+                <div className="absolute bottom-16 left-4 right-4 z-20 rounded-xl bg-red-950/90 border border-red-500/20 px-4 py-3 text-sm text-red-200">
+                  {playerError}
                 </div>
               )}
+            </>
+          )}
+        </div>
 
-            {/* =====================
-                HAMBURGER
-            ===================== */}
+        {/* INFO */}
+        <section className="px-4 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold leading-tight">
+                {title}
+              </h1>
+
+              {episodes.length > 0 && (
+                <p className="text-sm text-white/50 mt-1">
+                  Episode{" "}
+                  {selectedEpisode + 1}{" "}
+                  dari {episodes.length}
+                </p>
+              )}
+            </div>
 
             <button
               onClick={() =>
-                setEpisodeMenuOpen(
-                  (value) => !value
-                )
+                router.back()
               }
-              className="
-                absolute
-                top-3
-                right-3
-                z-30
-                w-11
-                h-11
-                rounded-xl
-                bg-black/70
-                backdrop-blur-md
-                border
-                border-white/10
-                flex
-                items-center
-                justify-center
-                text-xl
-                shadow-xl
-              "
-              aria-label="Daftar episode"
+              className="shrink-0 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm"
             >
-              ☰
+              Kembali
             </button>
-
-            {/* =====================
-                EPISODE DRAWER
-            ===================== */}
-
-            {episodeMenuOpen && (
-              <>
-                {/* BACKDROP */}
-
-                <button
-                  className="absolute inset-0 z-40 bg-black/50"
-                  onClick={() =>
-                    setEpisodeMenuOpen(false)
-                  }
-                  aria-label="Tutup daftar episode"
-                />
-
-                {/* DRAWER */}
-
-                <aside
-                  className="
-                    absolute
-                    top-0
-                    right-0
-                    bottom-0
-                    z-50
-                    w-[78%]
-                    max-w-[320px]
-                    bg-[#101217]/95
-                    backdrop-blur-xl
-                    border-l
-                    border-white/10
-                    shadow-2xl
-                    flex
-                    flex-col
-                  "
-                >
-                  {/* DRAWER HEADER */}
-
-                  <div className="p-4 flex items-center justify-between border-b border-white/10">
-                    <div>
-                      <h2 className="font-semibold">
-                        Daftar Episode
-                      </h2>
-
-                      <p className="text-xs text-white/40 mt-1">
-                        {episodes.length} episode
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        setEpisodeMenuOpen(false)
-                      }
-                      className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-lg"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  {/* EPISODES */}
-
-                  <div className="flex-1 overflow-y-auto p-3">
-                    {episodes.length === 0 ? (
-                      <p className="text-sm text-white/40 text-center py-8">
-                        Episode tidak ditemukan.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-2">
-                        {episodes.map(
-                          (
-                            episode,
-                            index
-                          ) => {
-                            const active =
-                              index ===
-                              currentEpisodeIndex;
-
-                            return (
-                              <button
-                                key={`${String(
-                                  episode.chapterId ??
-                                    episode.id ??
-                                    episode.episodeId ??
-                                    index
-                                )}-${index}`}
-                                onClick={() =>
-                                  selectEpisode(
-                                    index
-                                  )
-                                }
-                                className={`
-                                  h-10
-                                  rounded-lg
-                                  text-sm
-                                  font-medium
-                                  transition
-                                  ${
-                                    active
-                                      ? "bg-white text-black"
-                                      : "bg-white/5 text-white/70 hover:bg-white/10"
-                                  }
-                                `}
-                              >
-                                {index + 1}
-                              </button>
-                            );
-                          }
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </aside>
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* =====================
-            PREV / NEXT
-        ===================== */}
-
-        <div className="px-4 py-4 flex gap-2 border-b border-white/5">
-          <button
-            disabled={
-              currentEpisodeIndex <= 0
-            }
-            onClick={() =>
-              selectEpisode(
-                currentEpisodeIndex - 1
-              )
-            }
-            className="
-              flex-1
-              h-11
-              rounded-xl
-              bg-white/5
-              hover:bg-white/10
-              disabled:opacity-30
-              disabled:hover:bg-white/5
-              transition
-            "
-          >
-            ← Sebelumnya
-          </button>
-
-          <button
-            disabled={
-              currentEpisodeIndex >=
-              episodes.length - 1
-            }
-            onClick={() =>
-              selectEpisode(
-                currentEpisodeIndex + 1
-              )
-            }
-            className="
-              flex-1
-              h-11
-              rounded-xl
-              bg-white/5
-              hover:bg-white/10
-              disabled:opacity-30
-              disabled:hover:bg-white/5
-              transition
-            "
-          >
-            Berikutnya →
-          </button>
-        </div>
-
-        {/* =====================
-            DRAMA INFO
-        ===================== */}
-
-        <section className="p-5">
-          <div className="flex gap-4">
-            {cover && (
-              <img
-                src={cover}
-                alt={title}
-                className="w-20 h-28 rounded-xl object-cover bg-white/5 shrink-0"
-              />
-            )}
-
-            <div className="min-w-0">
-              <h2 className="font-semibold text-lg">
-                {title}
-              </h2>
-
-              <p className="text-sm text-white/40 mt-1">
-                Sedang menonton Episode{" "}
-                {currentEpisodeIndex + 1}
-              </p>
-            </div>
           </div>
 
           {description && (
-            <p className="mt-5 text-sm leading-6 text-white/60">
+            <p className="mt-4 text-sm leading-6 text-white/60">
               {description}
             </p>
           )}
         </section>
+
+        {/* PREVIOUS / NEXT */}
+        {episodes.length > 0 && (
+          <div className="px-4 pb-6 flex gap-3">
+            <button
+              disabled={
+                selectedEpisode <= 0
+              }
+              onClick={() => {
+                setSelectedEpisode(
+                  (value) =>
+                    Math.max(
+                      0,
+                      value - 1
+                    )
+                );
+
+                window.scrollTo({
+                  top: 0,
+                  behavior: "smooth",
+                });
+              }}
+              className="flex-1 py-3 rounded-xl bg-white/10 disabled:opacity-30"
+            >
+              ← Sebelumnya
+            </button>
+
+            <button
+              disabled={
+                selectedEpisode >=
+                episodes.length - 1
+              }
+              onClick={() => {
+                setSelectedEpisode(
+                  (value) =>
+                    Math.min(
+                      episodes.length - 1,
+                      value + 1
+                    )
+                );
+
+                window.scrollTo({
+                  top: 0,
+                  behavior: "smooth",
+                });
+              }}
+              className="flex-1 py-3 rounded-xl bg-white/10 disabled:opacity-30"
+            >
+              Berikutnya →
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* ======================================
+          EPISODE DRAWER
+          ====================================== */}
+
+      {episodeDrawer && (
+        <div className="fixed inset-0 z-50">
+          {/* BACKDROP */}
+          <button
+            type="button"
+            aria-label="Tutup"
+            onClick={() =>
+              setEpisodeDrawer(false)
+            }
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+          />
+
+          {/* DRAWER */}
+          <aside className="absolute top-0 right-0 h-full w-[88%] max-w-md bg-zinc-950 border-l border-white/10 shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h2 className="font-bold">
+                  Daftar Episode
+                </h2>
+
+                <p className="text-xs text-white/40 mt-1">
+                  {episodes.length} episode
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setEpisodeDrawer(
+                    false
+                  )
+                }
+                className="w-10 h-10 rounded-xl bg-white/10 text-lg"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {episodes.length === 0 ? (
+                <div className="text-center py-10 text-white/40 text-sm">
+                  Episode tidak ditemukan.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {episodes.map(
+                    (
+                      episode,
+                      index
+                    ) => {
+                      const active =
+                        index ===
+                        selectedEpisode;
+
+                      return (
+                        <button
+                          key={`${getEpisodeId(
+                            episode
+                          )}-${index}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedEpisode(
+                              index
+                            );
+
+                            setEpisodeDrawer(
+                              false
+                            );
+
+                            window.scrollTo({
+                              top: 0,
+                              behavior:
+                                "smooth",
+                            });
+                          }}
+                          className={`
+                            min-h-[48px]
+                            rounded-xl
+                            px-2
+                            text-sm
+                            font-medium
+                            transition
+                            ${
+                              active
+                                ? "bg-white text-black"
+                                : "bg-white/5 text-white/70 hover:bg-white/10"
+                            }
+                          `}
+                        >
+                          {getEpisodeTitle(
+                            episode,
+                            index
+                          )}
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
     </main>
   );
 }
