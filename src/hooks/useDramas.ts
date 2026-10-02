@@ -89,7 +89,7 @@ export function useMeloShortDramas() {
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
       // PERHATIKAN DI SINI: Menembak proxy universal ke endpoint v2/home dengan bahasa Indonesia
-      const res = await fetch("/api/meloshort/v2/home?lang=id");
+      const res = await fetch("/api/meloshort/proxy?path=/api/v2/home&lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
