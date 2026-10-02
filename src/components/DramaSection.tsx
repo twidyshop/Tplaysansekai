@@ -8,6 +8,7 @@ import type { Drama } from "@/types/drama";
 interface DramaSectionProps {
   title: string;
   dramas: Drama[] | undefined;
+  platform?: "dramabox" | "meloshort";
   isLoading: boolean;
   error: boolean;
   onRetry: () => void;
@@ -16,6 +17,7 @@ interface DramaSectionProps {
 export function DramaSection({
   title,
   dramas,
+  platform = "dramabox",
   isLoading,
   error,
   onRetry,
@@ -23,15 +25,21 @@ export function DramaSection({
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl md:text-3xl font-bold gradient-text">{title}</h2>
+        <h2 className="text-2xl md:text-3xl font-bold gradient-text">
+          {title}
+        </h2>
       </div>
 
       {error && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
           <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+
           <div className="flex-1">
-            <p className="text-sm text-destructive font-medium">Gagal memuat data</p>
+            <p className="text-sm text-destructive font-medium">
+              Gagal memuat data
+            </p>
           </div>
+
           <button
             onClick={onRetry}
             className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors"
@@ -54,11 +62,14 @@ export function DramaSection({
             <DramaCard
               key={drama.bookId}
               drama={drama}
+              platform={platform}
             />
           ))
         ) : (
           <div className="col-span-full text-center py-12">
-            <p className="text-muted-foreground">Tidak ada drama tersedia</p>
+            <p className="text-muted-foreground">
+              Tidak ada drama tersedia
+            </p>
           </div>
         )}
       </div>
