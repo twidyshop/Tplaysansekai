@@ -6,34 +6,20 @@ const BASE = "https://api.quickplay.my.id";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
-    const path = searchParams.get("path");
+    
+    // Path default sesuai struktur endpoint Quickplay Anda
+    const targetPath = "/api/v2/home";
+    const upstream = new URL(BASE + targetPath);
 
-    const allowed = [
-      "/api/v2/discover",
-      "/api/v2/search",
-      "/api/v2/detail",
-      "/api/v2/video",
-      "/api/v2/home",
-      "/api/v2/banner",
-      "/api/v2/categories"
-    ];
-
-    if (!path || !allowed.includes(path)) {
-      return NextResponse.json({
-        success: false,
-        error: "Invalid API path: " + path
-      }, { status: 400 });
-    }
-
-    const upstream = new URL(BASE + path);
-
+    // Masukkan semua parameter dari frontend (seperti category_p=meloshort & lang=id)
     for (const [k, v] of searchParams.entries()) {
-      if (k !== "path") {
-        upstream.searchParams.set(k, v);
-      }
+      upstream.searchParams.set(k, v);
     }
 
-    // Default paksa bahasa Indonesia jika belum ada
+    // Pastikan parameter wajib selalu ada jika belum diset dari frontend
+    if (!upstream.searchParams.has("category_p")) {
+      upstream.searchParams.set("category_p", "meloshort");
+    }
     if (!upstream.searchParams.has("lang")) {
       upstream.searchParams.set("lang", "id");
     }
@@ -43,13 +29,14 @@ export async function GET(req: NextRequest) {
     if (!key) {
       return NextResponse.json({
         success: false,
-        error: "QUICKPLAY_API_KEY belum dikonfigurasi"
+        error: "QUICKPLAY_API_KEY belum dikonfigurasi di Vercel"
       }, { status: 500 });
     }
 
     const ts = Date.now().toString();
     const fullPath = upstream.pathname + upstream.search;
 
+    // Hitung signature HMAC-SHA256
     const signature = crypto
       .createHmac("sha256", key)
       .update(`GET:${fullPath}:${ts}`)
@@ -66,13 +53,12 @@ export async function GET(req: NextRequest) {
 
     const text = await response.text();
 
-    const resHeaders = new Headers();
-    resHeaders.set("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
-    resHeaders.set("Content-Type", response.headers.get("content-type") || "application/json");
-
     return new NextResponse(text, {
       status: response.status,
-      headers: resHeaders
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "s-maxage=60, stale-while-revalidate=300"
+      }
     });
 
   } catch (error: any) {
