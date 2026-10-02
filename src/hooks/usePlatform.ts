@@ -18,55 +18,55 @@ export const PLATFORMS = [
   {
     id: "meloshort",
     name: "MeloShort",
-    logo: "/logos/pinedrama.png", // <- Sementara pakai logo pinedrama agar tidak blank
+    logo: "/meloshort.png", // Sementara pinjam logo pinedrama kalau bos belum punya meloshort.png
     apiBase: "/api/meloshort",
   },
   {
     id: "pinedrama",
     name: "PineDrama",
-    logo: "/logos/pinedrama.png",
+    logo: "/pinedrama.png",
     apiBase: "/api/pinedrama",
   },
   {
     id: "dramabox",
     name: "DramaBox",
-    logo: "/logos/dramabox.png",
+    logo: "/dramabox.png",
     apiBase: "/api/dramabox",
   },
   {
     id: "reelshort",
     name: "ReelShort",
-    logo: "/logos/reelshort.png",
+    logo: "/reelshort.png",
     apiBase: "/api/reelshort",
   },
   {
     id: "shortmax",
     name: "ShortMax",
-    logo: "/logos/shortmax.png",
+    logo: "/shortmax.png",
     apiBase: "/api/shortmax",
   },
   {
     id: "netshort",
     name: "NetShort",
-    logo: "/logos/netshort.png",
+    logo: "/netshort.png",
     apiBase: "/api/netshort",
   },
   {
     id: "melolo",
     name: "Melolo",
-    logo: "/logos/melolo.png",
+    logo: "/melolo.png",
     apiBase: "/api/melolo",
   },
   {
     id: "freereels",
     name: "FreeReels",
-    logo: "/logos/freereels.png",
+    logo: "/freereels.png",
     apiBase: "/api/freereels",
   },
   {
     id: "flickreels",
     name: "FlickReels",
-    logo: "/logos/flickreels.png",
+    logo: "/flickreels.png",
     apiBase: "/api/flickreels",
   },
 ];
