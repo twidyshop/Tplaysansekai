@@ -22,13 +22,14 @@ function rewritePlaylist(
   headers: Record<string, string>
 ) {
   /*
-   * Rewrite URI="..." di:
+   * Rewrite URI="..."
    *
-   * #EXT-X-KEY
-   * #EXT-X-MAP
-   * #EXT-X-MEDIA
-   * #EXT-X-I-FRAME-STREAM-INF
-   * dll.
+   * Ini penting untuk:
+   * - EXT-X-MEDIA
+   * - EXT-X-KEY
+   * - EXT-X-MAP
+   * - subtitle/audio playlist
+   * - variant playlist
    */
   let result = playlist.replace(
     /URI="([^"]+)"/g,
@@ -50,20 +51,18 @@ function rewritePlaylist(
   );
 
   /*
-   * Rewrite URL segment / child playlist
-   * yang berdiri sendiri di setiap baris.
+   * Rewrite URL playlist/segment
+   * yang muncul sebagai baris biasa.
    */
   result = result
     .split("\n")
     .map((line) => {
-      const trimmed =
-        line.trim();
+      const trimmed = line.trim();
 
       if (!trimmed) {
         return line;
       }
 
-      // Jangan ubah directive HLS
       if (trimmed.startsWith("#")) {
         return line;
       }
@@ -88,21 +87,64 @@ function rewritePlaylist(
   return result;
 }
 
+function isSubtitleResponse(
+  contentType: string,
+  streamUrl: string,
+  subtitleParam: string | null
+) {
+  const type =
+    contentType.toLowerCase();
+
+  const url =
+    streamUrl.toLowerCase();
+
+  return (
+    subtitleParam === "1" ||
+    type.includes("text/vtt") ||
+    type.includes("webvtt") ||
+    type.includes("subrip") ||
+    type.includes("subtitle") ||
+    url.includes(".vtt") ||
+    url.includes(".srt")
+  );
+}
+
+function srtToVtt(srt: string) {
+  let text = srt
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+
+  /*
+   * SRT:
+   * 00:00:01,000 --> 00:00:03,000
+   *
+   * VTT:
+   * 00:00:01.000 --> 00:00:03.000
+   */
+  text = text.replace(
+    /(\d{2}:\d{2}:\d{2}),(\d{3})/g,
+    "$1.$2"
+  );
+
+  return `WEBVTT\n\n${text}\n`;
+}
+
 export async function GET(
   req: NextRequest
 ) {
   try {
-    const {
-      searchParams,
-    } = new URL(req.url);
+    const { searchParams } =
+      new URL(req.url);
 
     const streamUrl =
       searchParams.get("url");
 
     const headersRaw =
-      searchParams.get(
-        "headers"
-      );
+      searchParams.get("headers");
+
+    const subtitleParam =
+      searchParams.get("subtitle");
 
     if (!streamUrl) {
       return new Response(
@@ -113,26 +155,35 @@ export async function GET(
       );
     }
 
+    /*
+     * Header dasar.
+     */
     const headers: Record<
       string,
       string
     > = {
       Accept: "*/*",
+
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
+      Referer:
+        "https://api.meloshort.com/",
     };
 
+    /*
+     * Header dari API.
+     */
     if (headersRaw) {
       try {
         const parsed =
-          JSON.parse(
-            headersRaw
-          );
+          JSON.parse(headersRaw);
 
         if (
           parsed &&
           typeof parsed ===
-            "object"
+            "object" &&
+          !Array.isArray(parsed)
         ) {
           for (const [
             key,
@@ -149,35 +200,38 @@ export async function GET(
             }
           }
         }
-      } catch {
-        // Ignore invalid custom headers
-      }
+      } catch {}
     }
 
     /*
-     * Forward Range request.
-     * Ini penting untuk MP4/video tertentu.
+     * Range untuk MP4/segment.
      */
     const range =
-      req.headers.get(
-        "range"
-      );
+      req.headers.get("range");
 
     if (range) {
       headers.Range = range;
     }
 
+    console.log(
+      "MELOSHORT PROXY:",
+      streamUrl
+    );
+
     const upstream =
-      await fetch(
-        streamUrl,
-        {
-          method: "GET",
-          headers,
-          cache: "no-store",
-        }
-      );
+      await fetch(streamUrl, {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      });
 
     if (!upstream.ok) {
+      console.error(
+        "UPSTREAM STATUS:",
+        upstream.status,
+        streamUrl
+      );
+
       return new Response(
         `Stream upstream error: ${upstream.status}`,
         {
@@ -192,22 +246,76 @@ export async function GET(
         "content-type"
       ) || "";
 
-    const isHls =
-      contentType.includes(
-        "mpegurl"
-      ) ||
-      contentType.includes(
-        "m3u8"
-      ) ||
-      streamUrl
-        .toLowerCase()
-        .includes(".m3u8");
+    /*
+     * =========================================
+     * SUBTITLE
+     * =========================================
+     */
+    if (
+      isSubtitleResponse(
+        contentType,
+        streamUrl,
+        subtitleParam
+      )
+    ) {
+      const text =
+        await upstream.text();
+
+      const isSrt =
+        contentType
+          .toLowerCase()
+          .includes("subrip") ||
+        streamUrl
+          .toLowerCase()
+          .includes(".srt");
+
+      const subtitleText =
+        isSrt
+          ? srtToVtt(text)
+          : text;
+
+      return new Response(
+        subtitleText,
+        {
+          status: 200,
+
+          headers: {
+            "Content-Type":
+              "text/vtt; charset=utf-8",
+
+            "Cache-Control":
+              "no-store, no-cache, must-revalidate",
+
+            "Access-Control-Allow-Origin":
+              "*",
+
+            "Access-Control-Allow-Headers":
+              "*",
+
+            "Access-Control-Allow-Methods":
+              "GET, HEAD, OPTIONS",
+          },
+        }
+      );
+    }
 
     /*
-     * ======================================
+     * =========================================
      * HLS
-     * ======================================
+     * =========================================
      */
+    const lowerType =
+      contentType.toLowerCase();
+
+    const lowerUrl =
+      streamUrl.toLowerCase();
+
+    const isHls =
+      lowerType.includes(
+        "mpegurl"
+      ) ||
+      lowerType.includes("m3u8") ||
+      lowerUrl.includes(".m3u8");
 
     if (isHls) {
       const playlist =
@@ -246,18 +354,17 @@ export async function GET(
     }
 
     /*
-     * ======================================
-     * DIRECT VIDEO / MP4
-     * ======================================
+     * =========================================
+     * VIDEO / SEGMENT / FILE
+     * =========================================
      */
-
     const responseHeaders =
       new Headers();
 
     responseHeaders.set(
       "Content-Type",
       contentType ||
-        "video/mp4"
+        "application/octet-stream"
     );
 
     responseHeaders.set(
@@ -309,17 +416,10 @@ export async function GET(
         "accept-ranges"
       );
 
-    if (acceptRanges) {
-      responseHeaders.set(
-        "Accept-Ranges",
-        acceptRanges
-      );
-    } else {
-      responseHeaders.set(
-        "Accept-Ranges",
-        "bytes"
-      );
-    }
+    responseHeaders.set(
+      "Accept-Ranges",
+      acceptRanges || "bytes"
+    );
 
     return new Response(
       upstream.body,
@@ -347,18 +447,18 @@ export async function GET(
 }
 
 export async function OPTIONS() {
-  return new Response(
-    null,
-    {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin":
-          "*",
-        "Access-Control-Allow-Headers":
-          "*",
-        "Access-Control-Allow-Methods":
-          "GET, HEAD, OPTIONS",
-      },
-    }
-  );
+  return new Response(null, {
+    status: 204,
+
+    headers: {
+      "Access-Control-Allow-Origin":
+        "*",
+
+      "Access-Control-Allow-Headers":
+        "*",
+
+      "Access-Control-Allow-Methods":
+        "GET, HEAD, OPTIONS",
+    },
+  });
 }
