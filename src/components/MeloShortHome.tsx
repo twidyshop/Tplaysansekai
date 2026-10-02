@@ -10,6 +10,7 @@ export function MeloShortHome() {
     <DramaSection
       title="MeloShort"
       dramas={dramas}
+      platform="meloshort"
       isLoading={isLoading}
       error={!!error}
       onRetry={() => refetch()}
