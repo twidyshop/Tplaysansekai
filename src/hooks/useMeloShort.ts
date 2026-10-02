@@ -7,12 +7,11 @@ export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // Menembak proxy universal yang diteruskan ke peladen Quickplay dengan HMAC-SHA256
-      const res = await fetch("/api/meloshort/proxy?path=/api/v2/home&lang=id");
+      // Memanggil endpoint route.ts kita dengan menyertakan ?path=/api/v2/home
+      const res = await fetch("/api/meloshort?path=/api/v2/home&lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
-      // Mapping data agar aman dan langsung tampil di UI TPLAY+
       return (json.data || []).map((item: any) => ({
         id: String(item.id || item.bookId || item.quickplay_id || ''),
         title: item.title || item.name || item.bookName || 'Untitled',
