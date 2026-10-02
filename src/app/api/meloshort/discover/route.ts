@@ -23,12 +23,13 @@ export async function GET(request: Request) {
     const API_KEY = process.env.QUICKPLAY_API_KEY;
     
     if (!API_KEY) {
-      console.error("CRITICAL: QUICKPLAY_API_KEY kosong di env Vercel!");
       return NextResponse.json({ error: "API Key belum di-set" }, { status: 500 });
     }
 
     const BASE_URL = "https://api.quickplay.my.id";
-    const path = "/api/v2/discover";
+    
+    // GANTI KE /api/v2/home SESUAI DOKUMENTASI UNTUK HALAMAN UTAMA
+    const path = "/api/v2/home";
     const params = { lang: "id" };
     
     const qs = new URLSearchParams(params).toString();
@@ -39,9 +40,6 @@ export async function GET(request: Request) {
     const sig = await generateSignature(API_KEY, payload);
 
     const targetUrl = `${BASE_URL}${full}`;
-    console.log("DEBUG URL:", targetUrl);
-    console.log("DEBUG Signature:", sig);
-    console.log("DEBUG Timestamp:", ts);
 
     const res = await fetch(targetUrl, {
       headers: {
@@ -52,10 +50,9 @@ export async function GET(request: Request) {
     });
 
     const responseText = await res.text();
-    console.log("DEBUG Response Status:", res.status);
-    console.log("DEBUG Response Body:", responseText);
 
     if (!res.ok) {
+      console.error("Quickplay Error:", res.status, responseText);
       return NextResponse.json({ 
         error: `Quickplay Error ${res.status}`, 
         details: responseText 
@@ -66,7 +63,7 @@ export async function GET(request: Request) {
     return NextResponse.json(json);
     
   } catch (error: any) {
-    console.error("FATAL ERROR DI MELOSHORT API:", error.stack || error.message || error);
+    console.error("Internal Server Error:", error.message);
     return NextResponse.json({ 
       error: "Internal Server Error", 
       message: error.message 
