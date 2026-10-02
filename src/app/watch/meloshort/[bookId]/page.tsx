@@ -42,7 +42,10 @@ function getEpisodeId(ep: Episode) {
   );
 }
 
-function getEpisodeTitle(ep: Episode, index: number) {
+function getEpisodeTitle(
+  ep: Episode,
+  index: number
+) {
   return (
     ep.name ||
     ep.title ||
@@ -76,7 +79,6 @@ function isVideoStream(stream: Stream) {
 
   const combined = `${url} ${type}`;
 
-  // Hindari stream audio-only
   if (
     combined.includes("audio/mp4") ||
     combined.includes("audio/mpeg") ||
@@ -86,7 +88,6 @@ function isVideoStream(stream: Stream) {
     return false;
   }
 
-  // Prioritaskan HLS / video
   if (
     combined.includes(".m3u8") ||
     combined.includes("application/vnd.apple.mpegurl") ||
@@ -95,8 +96,6 @@ function isVideoStream(stream: Stream) {
     return true;
   }
 
-  // Kalau API tidak memberi MIME type,
-  // anggap URL stream sebagai kandidat video.
   return !!url;
 }
 
@@ -106,11 +105,13 @@ export default function MeloShortWatchPage() {
 
   const bookId = String(params.bookId || "");
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef =
+    useRef<HTMLVideoElement | null>(null);
+
   const hlsRef = useRef<any>(null);
 
   const [selectedEpisode, setSelectedEpisode] =
-    useState<number>(0);
+    useState(0);
 
   const [episodeDrawer, setEpisodeDrawer] =
     useState(false);
@@ -118,12 +119,21 @@ export default function MeloShortWatchPage() {
   const [playerError, setPlayerError] =
     useState("");
 
+  /*
+   * ==========================================
+   * DETAIL
+   * ==========================================
+   */
+
   const {
     data: detail,
     isLoading: detailLoading,
     error: detailError,
   } = useQuery({
-    queryKey: ["meloshort-watch-detail", bookId],
+    queryKey: [
+      "meloshort-watch-detail",
+      bookId,
+    ],
 
     queryFn: async () => {
       const res = await fetch(
@@ -136,7 +146,9 @@ export default function MeloShortWatchPage() {
       );
 
       if (!res.ok) {
-        throw new Error("Gagal mengambil detail drama");
+        throw new Error(
+          "Gagal mengambil detail drama"
+        );
       }
 
       const json = await res.json();
@@ -151,6 +163,12 @@ export default function MeloShortWatchPage() {
 
     enabled: !!bookId,
   });
+
+  /*
+   * ==========================================
+   * EPISODES
+   * ==========================================
+   */
 
   const episodes: Episode[] = useMemo(() => {
     if (!detail) return [];
@@ -169,9 +187,16 @@ export default function MeloShortWatchPage() {
   const currentEpisode =
     episodes[selectedEpisode] || null;
 
-  const currentEpisodeId = currentEpisode
-    ? getEpisodeId(currentEpisode)
-    : "";
+  const currentEpisodeId =
+    currentEpisode
+      ? getEpisodeId(currentEpisode)
+      : "";
+
+  /*
+   * ==========================================
+   * VIDEO API
+   * ==========================================
+   */
 
   const {
     data: videoData,
@@ -186,13 +211,17 @@ export default function MeloShortWatchPage() {
 
     queryFn: async () => {
       if (!currentEpisodeId) {
-        throw new Error("ID episode tidak ditemukan");
+        throw new Error(
+          "ID episode tidak ditemukan"
+        );
       }
 
       const url =
         `/api/meloshort?path=/api/v2/video` +
         `&id=${encodeURIComponent(bookId)}` +
-        `&chapterId=${encodeURIComponent(currentEpisodeId)}` +
+        `&chapterId=${encodeURIComponent(
+          currentEpisodeId
+        )}` +
         `&lang=id`;
 
       const res = await fetch(url, {
@@ -220,6 +249,12 @@ export default function MeloShortWatchPage() {
       !!currentEpisodeId,
   });
 
+  /*
+   * ==========================================
+   * STREAMS
+   * ==========================================
+   */
+
   const streams: Stream[] = useMemo(() => {
     if (!videoData) return [];
 
@@ -234,8 +269,10 @@ export default function MeloShortWatchPage() {
       return raw;
     }
 
-    // Kadang API langsung mengembalikan object stream
-    if (typeof raw === "object" && raw !== null) {
+    if (
+      typeof raw === "object" &&
+      raw !== null
+    ) {
       return [raw];
     }
 
@@ -245,14 +282,13 @@ export default function MeloShortWatchPage() {
   const selectedStream = useMemo(() => {
     if (!streams.length) return null;
 
-    // Prioritas:
-    // 1. HLS/video stream
-    // 2. stream yang bukan audio-only
-    // 3. stream pertama sebagai fallback
     return (
       streams.find(isVideoStream) ||
       streams.find((stream) => {
-        const url = getStreamUrl(stream).toLowerCase();
+        const url =
+          getStreamUrl(
+            stream
+          ).toLowerCase();
 
         return (
           url.includes(".mp4") ||
@@ -264,30 +300,44 @@ export default function MeloShortWatchPage() {
     );
   }, [streams]);
 
-  const originalStreamUrl = selectedStream
-    ? getStreamUrl(selectedStream)
-    : "";
+  const originalStreamUrl =
+    selectedStream
+      ? getStreamUrl(selectedStream)
+      : "";
 
   const streamHeaders =
     selectedStream?.headers ||
     selectedStream?.streamHeaders ||
     {};
 
-  const proxiedStreamUrl = useMemo(() => {
-    if (!originalStreamUrl) return "";
+  const proxiedStreamUrl =
+    useMemo(() => {
+      if (!originalStreamUrl) {
+        return "";
+      }
 
-    return (
-      `/api/meloshort/stream?url=` +
-      `${encodeURIComponent(originalStreamUrl)}` +
-      `&headers=` +
-      `${encodeURIComponent(
-        JSON.stringify(streamHeaders)
-      )}`
-    );
-  }, [
-    originalStreamUrl,
-    streamHeaders,
-  ]);
+      return (
+        `/api/meloshort/stream?url=` +
+        `${encodeURIComponent(
+          originalStreamUrl
+        )}` +
+        `&headers=` +
+        `${encodeURIComponent(
+          JSON.stringify(
+            streamHeaders
+          )
+        )}`
+      );
+    }, [
+      originalStreamUrl,
+      streamHeaders,
+    ]);
+
+  /*
+   * ==========================================
+   * CONTENT INFO
+   * ==========================================
+   */
 
   const title =
     detail?.title ||
@@ -312,19 +362,23 @@ export default function MeloShortWatchPage() {
    * HLS PLAYER
    * ==========================================
    */
+
   useEffect(() => {
     let cancelled = false;
 
     async function setupPlayer() {
-      const video = videoRef.current;
+      const video =
+        videoRef.current;
 
-      if (!video || !proxiedStreamUrl) {
+      if (
+        !video ||
+        !proxiedStreamUrl
+      ) {
         return;
       }
 
       setPlayerError("");
 
-      // Bersihkan HLS sebelumnya
       if (hlsRef.current) {
         try {
           hlsRef.current.destroy();
@@ -346,7 +400,7 @@ export default function MeloShortWatchPage() {
           .includes(".m3u8");
 
       /*
-       * Safari / browser yang punya native HLS
+       * Native HLS
        */
       if (
         isHls &&
@@ -354,7 +408,8 @@ export default function MeloShortWatchPage() {
           "application/vnd.apple.mpegurl"
         )
       ) {
-        video.src = proxiedStreamUrl;
+        video.src =
+          proxiedStreamUrl;
 
         try {
           await video.play();
@@ -364,8 +419,7 @@ export default function MeloShortWatchPage() {
       }
 
       /*
-       * Chrome / Android / browser lain:
-       * gunakan HLS.js
+       * HLS.js
        */
       if (isHls) {
         try {
@@ -375,22 +429,19 @@ export default function MeloShortWatchPage() {
           const Hls =
             HlsModule.default;
 
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
 
           if (Hls.isSupported()) {
-            const hls = new Hls({
-              enableWorker: true,
-
-              // Biar player memilih video rendition
-              // yang sesuai bandwidth perangkat.
-              startLevel: -1,
-
-              capLevelToPlayerSize: true,
-
-              maxBufferLength: 30,
-
-              backBufferLength: 30,
-            });
+            const hls =
+              new Hls({
+                enableWorker: true,
+                startLevel: -1,
+                capLevelToPlayerSize: true,
+                maxBufferLength: 30,
+                backBufferLength: 30,
+              });
 
             hlsRef.current = hls;
 
@@ -403,7 +454,9 @@ export default function MeloShortWatchPage() {
             hls.on(
               Hls.Events.MANIFEST_PARSED,
               () => {
-                if (cancelled) return;
+                if (cancelled) {
+                  return;
+                }
 
                 video
                   .play()
@@ -422,9 +475,7 @@ export default function MeloShortWatchPage() {
                   data
                 );
 
-                if (
-                  data?.fatal
-                ) {
+                if (data?.fatal) {
                   setPlayerError(
                     "Video gagal dimuat. Coba pilih episode lain."
                   );
@@ -457,9 +508,10 @@ export default function MeloShortWatchPage() {
       }
 
       /*
-       * Fallback untuk MP4/direct video
+       * Direct MP4 fallback
        */
-      video.src = proxiedStreamUrl;
+      video.src =
+        proxiedStreamUrl;
 
       try {
         await video.play();
@@ -504,6 +556,7 @@ export default function MeloShortWatchPage() {
       <main className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
+
           <p className="text-white/60">
             Memuat drama...
           </p>
@@ -512,25 +565,53 @@ export default function MeloShortWatchPage() {
     );
   }
 
+  /*
+   * ==========================================
+   * ERROR
+   * ==========================================
+   */
+
   if (
     detailError ||
     !detail
   ) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">
-            Gagal memuat drama.
-          </p>
+      <main className="min-h-screen bg-black text-white">
+        {/* HEADER */}
+        <header className="sticky top-0 z-40 h-14 bg-black/95 backdrop-blur-xl border-b border-white/10">
+          <div className="h-full max-w-5xl mx-auto px-4 flex items-center">
+            <button
+              onClick={() =>
+                router.push("/")
+              }
+              className="flex items-center gap-2 text-white"
+            >
+              <span className="text-xl">
+                ←
+              </span>
 
-          <button
-            onClick={() =>
-              router.back()
-            }
-            className="px-5 py-2.5 rounded-xl bg-white text-black"
-          >
-            Kembali
-          </button>
+              <span className="font-bold text-lg">
+                TPLAY
+              </span>
+            </button>
+          </div>
+        </header>
+
+        <div className="flex items-center justify-center p-6 min-h-[70vh]">
+          <div className="text-center">
+            <p className="text-red-400 mb-4">
+              Gagal memuat drama.
+            </p>
+
+            <button
+              onClick={() =>
+                router.push("/")
+              }
+              className="px-5 py-2.5 rounded-xl bg-white text-black"
+            >
+              Kembali ke TPLAY
+            </button>
+          </div>
         </div>
       </main>
     );
@@ -544,8 +625,57 @@ export default function MeloShortWatchPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
+      {/* ======================================
+          TPLAY HEADER
+          ====================================== */}
+
+      <header className="sticky top-0 z-40 h-14 bg-black/95 backdrop-blur-xl border-b border-white/10">
+        <div className="h-full max-w-5xl mx-auto px-4 flex items-center justify-between">
+          {/* LOGO / HOME */}
+          <button
+            type="button"
+            onClick={() =>
+              router.push("/")
+            }
+            className="flex items-center gap-2 group"
+          >
+            <span className="text-xl text-white/80 group-hover:text-white transition">
+              ←
+            </span>
+
+            <span className="text-lg font-extrabold tracking-tight">
+              TPLAY
+            </span>
+          </button>
+
+          {/* EPISODE BUTTON */}
+          {episodes.length > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                setEpisodeDrawer(
+                  true
+                )
+              }
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 transition text-sm"
+            >
+              <span>
+                ☰
+              </span>
+
+              <span>
+                Episode
+              </span>
+            </button>
+          )}
+        </div>
+      </header>
+
       <div className="max-w-5xl mx-auto">
-        {/* PLAYER */}
+        {/* ======================================
+            PLAYER
+            ====================================== */}
+
         <div className="relative bg-black aspect-video">
           {videoLoading ? (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -565,7 +695,8 @@ export default function MeloShortWatchPage() {
                 backgroundImage: cover
                   ? `url("${cover}")`
                   : undefined,
-                backgroundSize: "cover",
+                backgroundSize:
+                  "cover",
                 backgroundPosition:
                   "center",
               }}
@@ -578,8 +709,8 @@ export default function MeloShortWatchPage() {
                 </p>
 
                 <p className="text-sm text-white/60">
-                  Stream episode ini tidak
-                  ditemukan.
+                  Stream episode ini
+                  tidak ditemukan.
                 </p>
               </div>
             </div>
@@ -594,7 +725,7 @@ export default function MeloShortWatchPage() {
                 className="w-full h-full object-contain bg-black"
               />
 
-              {/* HAMBURGER EPISODE */}
+              {/* PLAYER EPISODE BUTTON */}
               <button
                 type="button"
                 onClick={() =>
@@ -619,7 +750,10 @@ export default function MeloShortWatchPage() {
           )}
         </div>
 
-        {/* INFO */}
+        {/* ======================================
+            INFO
+            ====================================== */}
+
         <section className="px-4 py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -631,18 +765,19 @@ export default function MeloShortWatchPage() {
                 <p className="text-sm text-white/50 mt-1">
                   Episode{" "}
                   {selectedEpisode + 1}{" "}
-                  dari {episodes.length}
+                  dari{" "}
+                  {episodes.length}
                 </p>
               )}
             </div>
 
             <button
               onClick={() =>
-                router.back()
+                router.push("/")
               }
               className="shrink-0 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm"
             >
-              Kembali
+              Home
             </button>
           </div>
 
@@ -653,7 +788,10 @@ export default function MeloShortWatchPage() {
           )}
         </section>
 
-        {/* PREVIOUS / NEXT */}
+        {/* ======================================
+            PREVIOUS / NEXT
+            ====================================== */}
+
         {episodes.length > 0 && (
           <div className="px-4 pb-6 flex gap-3">
             <button
@@ -671,7 +809,8 @@ export default function MeloShortWatchPage() {
 
                 window.scrollTo({
                   top: 0,
-                  behavior: "smooth",
+                  behavior:
+                    "smooth",
                 });
               }}
               className="flex-1 py-3 rounded-xl bg-white/10 disabled:opacity-30"
@@ -695,7 +834,8 @@ export default function MeloShortWatchPage() {
 
                 window.scrollTo({
                   top: 0,
-                  behavior: "smooth",
+                  behavior:
+                    "smooth",
                 });
               }}
               className="flex-1 py-3 rounded-xl bg-white/10 disabled:opacity-30"
@@ -717,13 +857,16 @@ export default function MeloShortWatchPage() {
             type="button"
             aria-label="Tutup"
             onClick={() =>
-              setEpisodeDrawer(false)
+              setEpisodeDrawer(
+                false
+              )
             }
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
           />
 
           {/* DRAWER */}
           <aside className="absolute top-0 right-0 h-full w-[88%] max-w-md bg-zinc-950 border-l border-white/10 shadow-2xl flex flex-col">
+            {/* DRAWER HEADER */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div>
                 <h2 className="font-bold">
@@ -731,7 +874,8 @@ export default function MeloShortWatchPage() {
                 </h2>
 
                 <p className="text-xs text-white/40 mt-1">
-                  {episodes.length} episode
+                  {episodes.length}{" "}
+                  episode
                 </p>
               </div>
 
@@ -748,10 +892,13 @@ export default function MeloShortWatchPage() {
               </button>
             </div>
 
+            {/* EPISODES */}
             <div className="flex-1 overflow-y-auto p-4">
-              {episodes.length === 0 ? (
+              {episodes.length ===
+              0 ? (
                 <div className="text-center py-10 text-white/40 text-sm">
-                  Episode tidak ditemukan.
+                  Episode tidak
+                  ditemukan.
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
