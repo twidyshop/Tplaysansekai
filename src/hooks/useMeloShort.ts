@@ -12,12 +12,10 @@ export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // Sesuaikan endpoint API Quickplay Anda di sini
-      const res = await fetch("/api/meloshort/trending");
+      const res = await fetch("/api/meloshort/trending"); // Sesuaikan endpoint API Quickplay Anda
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
-      // Mapping data agar aman dan seragam
       return (json.data || []).map((item: any) => ({
         id: String(item.id || item.bookId || ''),
         title: item.title || item.name || 'Untitled',
@@ -26,6 +24,6 @@ export function useMeloShortDramas() {
         tags: item.tags || [],
       }));
     },
-    staleTime: 1000 * 60 * 5, // Cache 5 menit
+    staleTime: 1000 * 60 * 5,
   });
 }
