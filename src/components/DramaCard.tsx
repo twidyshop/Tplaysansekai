@@ -4,24 +4,42 @@ import type { Drama } from "@/types/drama";
 interface DramaCardProps {
   drama: Drama;
   index?: number;
+  platform?: "dramabox" | "meloshort";
 }
 
-export function DramaCard({ drama, index = 0 }: DramaCardProps) {
+export function DramaCard({
+  drama,
+  index = 0,
+  platform = "dramabox",
+}: DramaCardProps) {
+  const detailLink =
+    platform === "meloshort"
+      ? `/detail/meloshort/${drama.bookId}`
+      : `/detail/dramabox/${drama.bookId}`;
+
   return (
-    <UnifiedMediaCard 
+    <UnifiedMediaCard
       index={index}
       title={drama.bookName}
       cover={drama.coverWap || drama.cover || ""}
-      link={`/detail/dramabox/${drama.bookId}`}
+      link={detailLink}
       episodes={drama.chapterCount}
-      topLeftBadge={drama.corner ? {
-        text: drama.corner.name,
-        color: drama.corner.color || "#e5a00d"
-      } : null}
-      topRightBadge={drama.rankVo ? {
-        text: drama.rankVo.hotCode,
-        isTransparent: true
-      } : null}
+      topLeftBadge={
+        drama.corner
+          ? {
+              text: drama.corner.name,
+              color: drama.corner.color || "#e5a00d",
+            }
+          : null
+      }
+      topRightBadge={
+        drama.rankVo
+          ? {
+              text: drama.rankVo.hotCode,
+              isTransparent: true,
+            }
+          : null
+      }
     />
   );
 }
