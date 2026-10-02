@@ -7,16 +7,13 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
     
-    // Path default sesuai struktur endpoint Quickplay Anda
     const targetPath = "/api/v2/home";
     const upstream = new URL(BASE + targetPath);
 
-    // Masukkan semua parameter dari frontend (seperti category_p=meloshort & lang=id)
     for (const [k, v] of searchParams.entries()) {
       upstream.searchParams.set(k, v);
     }
 
-    // Pastikan parameter wajib selalu ada jika belum diset dari frontend
     if (!upstream.searchParams.has("category_p")) {
       upstream.searchParams.set("category_p", "meloshort");
     }
@@ -36,7 +33,6 @@ export async function GET(req: NextRequest) {
     const ts = Date.now().toString();
     const fullPath = upstream.pathname + upstream.search;
 
-    // Hitung signature HMAC-SHA256
     const signature = crypto
       .createHmac("sha256", key)
       .update(`GET:${fullPath}:${ts}`)
