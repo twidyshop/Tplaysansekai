@@ -1,14 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
-// ==========================================
-// HOOK MELOSHORT (QUICKPLAY) - TERPISAH
-// ==========================================
 export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // Memanggil endpoint route.ts kita dengan menyertakan ?path=/api/v2/home
-      const res = await fetch("/api/meloshort?path=/api/v2/home&lang=id");
+      // Memanggil endpoint backend kita dengan parameter lengkap
+      const res = await fetch("/api/meloshort?category_p=meloshort&lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
       
