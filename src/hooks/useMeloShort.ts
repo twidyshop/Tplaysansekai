@@ -1,22 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
-type MeloShortDrama = {
-  id: string;
-  title: string;
-  cover: string;
-  description: string;
-  tags: string[];
-  author?: string;
-  status?: string;
-  views?: string | number;
-  chapters?: number;
-};
-
 export function useMeloShortDramas() {
-  return useQuery<MeloShortDrama[]>({
+  return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // QuickPlay v2 /home requires category_p.
       const params = new URLSearchParams({
         path: "/api/v2/home",
         category_p: "meloshort",
@@ -33,61 +20,91 @@ export function useMeloShortDramas() {
       try {
         json = JSON.parse(raw);
       } catch {
-        throw new Error(
-          `Respons MeloShort bukan JSON (HTTP ${res.status}).`
-        );
+        throw new Error(`Respons MeloShort bukan JSON (HTTP ${res.status})`);
       }
 
       if (!res.ok || json?.success === false) {
-        const apiError =
-          json?.error ||
-          json?.message ||
-          `HTTP ${res.status} dari QuickPlay API`;
-
-        throw new Error(`MeloShort: ${apiError}`);
+        throw new Error(
+          `MeloShort: ${
+            json?.error ||
+            json?.message ||
+            `HTTP ${res.status} dari QuickPlay API`
+          }`
+        );
       }
 
       const list = Array.isArray(json?.data) ? json.data : [];
 
       return list
-        .map((item: any): MeloShortDrama => ({
-          id: String(
-            item.id ??
-              item.bookId ??
+        .map((item: any) => {
+          const bookId = String(
+            item.bookId ??
               item.book_id ??
+              item.id ??
               item.quickplay_id ??
+              item.quickplayId ??
               ""
-          ),
-          title:
+          );
+
+          const bookName =
+            item.bookName ??
+            item.book_name ??
             item.title ??
             item.name ??
-            item.bookName ??
-            "Untitled",
-          cover:
-            item.cover ??
-            item.image ??
-            item.coverWap ??
-            item.cover_url ??
-            "",
-          description:
+            "Untitled";
+
+          const introduction =
+            item.introduction ??
             item.synopsis ??
             item.description ??
-            item.introduction ??
             item.desc ??
-            "",
-          tags: Array.isArray(item.tags)
+            "";
+
+          const cover =
+            item.cover ??
+            item.coverWap ??
+            item.cover_url ??
+            item.image ??
+            "";
+
+          const chapterCount = Number(
+            item.chapterCount ??
+              item.chapter_count ??
+              item.chapters ??
+              item.total_episodes ??
+              item.totalEpisodes ??
+              0
+          );
+
+          const tags = Array.isArray(item.tags)
             ? item.tags
             : Array.isArray(item.tagNames)
             ? item.tagNames
             : Array.isArray(item.book_theme)
             ? item.book_theme
-            : [],
-          author: item.author ?? "",
-          status: item.status ?? "",
-          views: item.views ?? "",
-          chapters: Number(item.chapters ?? item.total_episodes ?? 0),
-        }))
-        .filter((item) => item.id && item.title);
+            : [];
+
+          // Bentuk object sengaja disamakan dengan Drama[] yang dipakai
+          // oleh DramaSection agar TypeScript tidak gagal build.
+          return {
+            id: bookId,
+            bookId,
+            title: bookName,
+            bookName,
+            cover,
+            image: cover,
+            description: introduction,
+            introduction,
+            tags,
+            author: item.author ?? "",
+            status: item.status ?? "",
+            views: item.views ?? "",
+            chapters: chapterCount,
+            chapterCount,
+            inLibrary: Boolean(item.inLibrary ?? false),
+          };
+        })
+        .filter((item: any) => item.bookId && item.bookName);
     },
     staleTime: 1000 * 60 * 5,
     retry: 2,
