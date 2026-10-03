@@ -34,14 +34,14 @@ function findStream(v:any):string{
 }
 
 export default function IqiyiWatchPage(){
-  const {id}=useParams(),router=useRouter(),dramaId=String(id||"");
+  const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
   const video=useRef<HTMLVideoElement|null>(null),hls=useRef<Hls|null>(null);
   const [episodes,setEpisodes]=useState<any[]>([]),[title,setTitle]=useState("iQIYI"),[selected,setSelected]=useState(1),[source,setSource]=useState(""),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[error,setError]=useState("");
 
   const play=useCallback(async(n:number)=>{
     setSelected(n);setPlaying(false);setError("");setSource("");
     try{
-      const r=await fetch("/api/iqiyi?action=play&id="+encodeURIComponent(dramaId)+"&episode="+n+"&lang=id");
+      const r=await fetch("/api/iqiyi?action=play&id="+encodeURIComponent(dramaId)+(albumId?"&albumId="+encodeURIComponent(albumId):"")+"&episode="+n+"&lang=id");
       const j=await r.json();
       if(!r.ok) throw new Error(j?.error||"Gagal mengambil video");
       const stream=findStream(j);
@@ -58,7 +58,7 @@ export default function IqiyiWatchPage(){
     void play(1);
 
     // Metadata is deliberately background-only so a slow detail endpoint cannot block playback.
-    void fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(dramaId)+"&lang=id")
+    void fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(dramaId)+(albumId?"&albumId="+encodeURIComponent(albumId):"")+"&lang=id")
       .then(r=>r.ok?r.json():null)
       .then(j=>{
         if(j){
@@ -68,7 +68,7 @@ export default function IqiyiWatchPage(){
       }).catch(()=>{});
 
     try{
-      const a=await fetch("/api/iqiyi?action=episodes&id="+encodeURIComponent(dramaId)+"&lang=id");
+      const a=await fetch("/api/iqiyi?action=episodes&id="+encodeURIComponent(dramaId)+(albumId?"&albumId="+encodeURIComponent(albumId):"")+"&lang=id");
       const aj=await a.json();
       if(!a.ok) throw new Error(aj?.error||"Gagal memuat episode");
       const list=arr(aj).map((x:any,i:number)=>({
