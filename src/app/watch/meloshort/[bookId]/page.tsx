@@ -31,19 +31,6 @@ interface Subtitle {
   [key: string]: any;
 }
 
-interface VideoData {
-  streams?: Stream[];
-  subtitles?: Subtitle[];
-  subs?: Subtitle[];
-  episode_index?: number;
-  total_episodes?: number;
-  title?: string;
-  duration?: number;
-  next_video_id?: string;
-  prev_video_id?: string;
-  [key: string]: any;
-}
-
 const WORKER_PROXY =
   "https://tplay-proxy.3twidy.workers.dev/?url=";
 
@@ -53,75 +40,19 @@ export default function WatchPage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<any>(null);
-  const currentStreamRef = useRef("");
-  const currentSubtitleRef = useRef("");
 
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [dramaTitle, setDramaTitle] = useState("TPLAY");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
-  const [episodeLoading, setEpisodeLoading] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
 
-  // =========================================================
-  // LOAD DETAIL
-  // =========================================================
-
-  const loadDetail = useCallback(async () => {
-    try {
-      setError("");
-
-      const url =
-        `/api/meloshort?path=/api/v2/detail` +
-        `&category_p=meloshort` +
-        `&id=${encodeURIComponent(bookId)}` +
-        `&lang=id`;
-
-      const response = await fetch(url, {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Detail API error ${response.status}`);
-      }
-
-      const json = await response.json();
-
-      const data = json?.data || json;
-
-      const foundEpisodes =
-        data?.chapters ||
-        data?.episodes ||
-        data?.list ||
-        [];
-
-      if (!Array.isArray(foundEpisodes) || foundEpisodes.length === 0) {
-        throw new Error("Episode tidak ditemukan.");
-      }
-
-      setEpisodes(foundEpisodes);
-
-      const title =
-        data?.bookName ||
-        data?.title ||
-        data?.name ||
-        "TPLAY";
-
-      setDramaTitle(title);
-
-      return foundEpisodes as Episode[];
-    } catch (err: any) {
-      console.error("DETAIL ERROR:", err);
-      setError(err?.message || "Gagal memuat drama.");
-      throw err;
-    }
-  }, [bookId]);
-
-  // =========================================================
-  // DESTROY HLS
-  // =========================================================
+  // ---------------------------------------------------------
+  // CLEAN PLAYER
+  // ---------------------------------------------------------
 
   const destroyPlayer = useCallback(() => {
     if (hlsRef.current) {
@@ -134,54 +65,60 @@ export default function WatchPage() {
 
     const video = videoRef.current;
 
-    if (video) {
+    if (!video) return;
+
+    try {
       video.pause();
-      video.removeAttribute("src");
+    } catch {}
 
-      while (video.firstChild) {
-        video.removeChild(video.firstChild);
-      }
+    video.removeAttribute("src");
 
-      try {
-        video.load();
-      } catch {}
+    while (video.firstChild) {
+      video.removeChild(video.firstChild);
     }
+
+    try {
+      video.load();
+    } catch {}
   }, []);
 
-  // =========================================================
+  // ---------------------------------------------------------
   // PLAY STREAM
-  // =========================================================
+  // ---------------------------------------------------------
 
   const playStream = useCallback(
     async (
-      streamUrl: string,
-      subtitleUrl?: string,
-      autoplay = true
+      originalUrl: string,
+      subtitleUrl?: string
     ) => {
       const video = videoRef.current;
 
-      if (!video || !streamUrl) {
-        throw new Error("Video player belum siap.");
+      if (!video) {
+        throw new Error("Player belum siap.");
       }
 
       destroyPlayer();
 
-      currentStreamRef.current = streamUrl;
-      currentSubtitleRef.current = subtitleUrl || "";
+      setError("");
+      setLoading(true);
+      setPlaying(false);
 
       const playableUrl =
-        WORKER_PROXY + encodeURIComponent(streamUrl);
+        WORKER_PROXY +
+        encodeURIComponent(originalUrl);
 
       const proxiedSubtitle = subtitleUrl
-        ? WORKER_PROXY + encodeURIComponent(subtitleUrl)
+        ? WORKER_PROXY +
+          encodeURIComponent(subtitleUrl)
         : "";
 
-      // -------------------------------------------------------
+      // -----------------------------------------------------
       // SUBTITLE
-      // -------------------------------------------------------
+      // -----------------------------------------------------
 
       if (proxiedSubtitle) {
-        const track = document.createElement("track");
+        const track =
+          document.createElement("track");
 
         track.kind = "subtitles";
         track.label = "Indonesia";
@@ -192,18 +129,59 @@ export default function WatchPage() {
         video.appendChild(track);
       }
 
-      // -------------------------------------------------------
+      // -----------------------------------------------------
+      // VIDEO EVENTS
+      // -----------------------------------------------------
+
+      const handlePlaying = () => {
+        setPlaying(true);
+        setLoading(false);
+        setError("");
+      };
+
+      const handleWaiting = () => {
+        // Jangan bikin spinner berkedip ketika buffering
+        // kecil. Video tetap terlihat.
+      };
+
+      const handleError = () => {
+        // Jangan langsung tampilkan popup.
+        // HLS.js sendiri akan menangani error fatal.
+        console.warn(
+          "Native video error:",
+          video.error
+        );
+      };
+
+      video.addEventListener(
+        "playing",
+        handlePlaying
+      );
+
+      video.addEventListener(
+        "waiting",
+        handleWaiting
+      );
+
+      video.addEventListener(
+        "error",
+        handleError
+      );
+
+      // -----------------------------------------------------
       // HLS.JS
-      // -------------------------------------------------------
+      // -----------------------------------------------------
 
       try {
-        const HlsModule = await import("hls.js");
+        const HlsModule =
+          await import("hls.js");
+
         const Hls = HlsModule.default;
 
         if (
           Hls &&
           Hls.isSupported() &&
-          streamUrl.includes(".m3u8")
+          originalUrl.includes(".m3u8")
         ) {
           const hls = new Hls({
             maxBufferLength: 30,
@@ -218,86 +196,162 @@ export default function WatchPage() {
           hls.loadSource(playableUrl);
           hls.attachMedia(video);
 
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (autoplay) {
-              video.play().catch(() => {});
+          hls.on(
+            Hls.Events.MANIFEST_PARSED,
+            () => {
+              video
+                .play()
+                .catch((err: any) => {
+                  console.warn(
+                    "Autoplay gagal:",
+                    err
+                  );
+                });
             }
-          });
+          );
 
-          hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
-            console.error("HLS ERROR:", data);
+          hls.on(
+            Hls.Events.ERROR,
+            (_event: any, data: any) => {
+              console.warn(
+                "HLS:",
+                data?.type,
+                data?.details,
+                data?.fatal
+              );
 
-            if (!data?.fatal) return;
+              if (!data?.fatal) {
+                return;
+              }
 
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                try {
-                  hls.startLoad();
-                } catch {}
-                break;
+              switch (data.type) {
+                case Hls.ErrorTypes
+                  .NETWORK_ERROR:
+                  try {
+                    hls.startLoad();
+                  } catch {}
+                  break;
 
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                try {
-                  hls.recoverMediaError();
-                } catch {}
-                break;
+                case Hls.ErrorTypes
+                  .MEDIA_ERROR:
+                  try {
+                    hls.recoverMediaError();
+                  } catch {}
+                  break;
 
-              default:
-                try {
-                  hls.destroy();
-                } catch {}
+                default:
+                  try {
+                    hls.destroy();
+                  } catch {}
 
-                hlsRef.current = null;
+                  hlsRef.current = null;
 
-                // Native fallback
-                video.src = playableUrl;
+                  // Native fallback
+                  video.src = playableUrl;
 
-                if (autoplay) {
-                  video.play().catch(() => {});
-                }
-
-                break;
+                  video
+                    .play()
+                    .catch(() => {});
+                  break;
+              }
             }
-          });
+          );
 
+          // Penting:
+          // Jangan await event HLS di sini.
+          // Fungsi dianggap sukses begitu HLS sudah
+          // berhasil dipasang ke video.
           return;
         }
       } catch (err) {
-        console.warn("HLS.js gagal dimuat:", err);
+        console.warn(
+          "HLS.js tidak dapat digunakan:",
+          err
+        );
       }
 
-      // -------------------------------------------------------
-      // NATIVE HLS FALLBACK
-      // -------------------------------------------------------
+      // -----------------------------------------------------
+      // NATIVE FALLBACK
+      // -----------------------------------------------------
 
       video.src = playableUrl;
 
-      if (autoplay) {
-        video.play().catch(() => {});
-      }
+      video.load();
+
+      video
+        .play()
+        .catch((err) => {
+          console.warn(
+            "Native autoplay gagal:",
+            err
+          );
+        });
     },
     [destroyPlayer]
   );
 
-  // =========================================================
-  // LOAD EPISODE
-  // =========================================================
+  // ---------------------------------------------------------
+  // LOAD DETAIL
+  // ---------------------------------------------------------
+
+  const loadDetail = useCallback(async () => {
+    const response = await fetch(
+      `/api/meloshort?path=/api/v2/detail` +
+        `&category_p=meloshort` +
+        `&id=${encodeURIComponent(bookId)}` +
+        `&lang=id`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Detail API ${response.status}`
+      );
+    }
+
+    const json = await response.json();
+
+    const data = json?.data || json;
+
+    const list =
+      data?.chapters ||
+      data?.episodes ||
+      data?.list ||
+      [];
+
+    if (!Array.isArray(list) || !list.length) {
+      throw new Error(
+        "Episode tidak ditemukan."
+      );
+    }
+
+    return list as Episode[];
+  }, [bookId]);
+
+  // ---------------------------------------------------------
+  // PLAY EPISODE
+  // ---------------------------------------------------------
 
   const playEpisode = useCallback(
     async (
       index: number,
-      episodeList?: Episode[]
+      listOverride?: Episode[]
     ) => {
-      const list = episodeList || episodes;
+      const list =
+        listOverride || episodes;
+
       const episode = list[index];
 
       if (!episode) return;
 
-      try {
-        setEpisodeLoading(true);
-        setError("");
-        setCurrentIndex(index);
+      setCurrentIndex(index);
+      setError("");
+      setLoading(true);
+      setPlaying(false);
 
+      try {
         const chapterId =
           episode.id ??
           episode.chapterId ??
@@ -305,54 +359,66 @@ export default function WatchPage() {
           episode.episode ??
           index + 1;
 
-        const url =
+        const response = await fetch(
           `/api/meloshort?path=/api/v2/video` +
-          `&category_p=meloshort` +
-          `&id=${encodeURIComponent(bookId)}` +
-          `&chapterId=${encodeURIComponent(String(chapterId))}` +
-          `&lang=id`;
-
-        const response = await fetch(url, {
-          cache: "no-store",
-        });
+            `&category_p=meloshort` +
+            `&id=${encodeURIComponent(bookId)}` +
+            `&chapterId=${encodeURIComponent(
+              String(chapterId)
+            )}` +
+            `&lang=id`,
+          {
+            cache: "no-store",
+          }
+        );
 
         if (!response.ok) {
-          throw new Error(`Video API error ${response.status}`);
+          throw new Error(
+            `Video API ${response.status}`
+          );
         }
 
         const json = await response.json();
 
-        const data: VideoData =
-          json?.data ||
-          json;
+        const data =
+          json?.data || json;
 
         const streams =
           data?.streams ||
           data?.urls ||
           [];
 
-        if (!Array.isArray(streams) || streams.length === 0) {
-          throw new Error("Stream video tidak tersedia.");
+        if (
+          !Array.isArray(streams) ||
+          !streams.length
+        ) {
+          throw new Error(
+            "Stream video tidak tersedia."
+          );
         }
 
-        // Prioritas kualitas tinggi
         const stream =
-          streams.find((item) =>
-            /1080/i.test(item?.quality || "")
+          streams.find((x: Stream) =>
+            /1080/i.test(
+              x?.quality || ""
+            )
           ) ||
-          streams.find((item) =>
-            /720/i.test(item?.quality || "")
+          streams.find((x: Stream) =>
+            /720/i.test(
+              x?.quality || ""
+            )
           ) ||
-          streams.find((item) =>
-            /480/i.test(item?.quality || "")
-          ) ||
-          streams.find((item) =>
-            /360/i.test(item?.quality || "")
+          streams.find((x: Stream) =>
+            /480/i.test(
+              x?.quality || ""
+            )
           ) ||
           streams[0];
 
         if (!stream?.url) {
-          throw new Error("URL stream tidak ditemukan.");
+          throw new Error(
+            "URL video tidak ditemukan."
+          );
         }
 
         const subtitles =
@@ -360,88 +426,136 @@ export default function WatchPage() {
           data?.subs ||
           [];
 
-        // Prioritaskan subtitle Indonesia
-        const indonesiaSubtitle =
+        const indonesia =
           subtitles.find(
-            (sub) =>
-              sub?.languageCode === "id" ||
-              /indonesia/i.test(sub?.language || "")
+            (x: Subtitle) =>
+              x?.languageCode === "id"
+          ) ||
+          subtitles.find(
+            (x: Subtitle) =>
+              /indonesia/i.test(
+                x?.language || ""
+              )
           ) ||
           subtitles[0];
 
+        /*
+         * Di sini kita sengaja TIDAK menunggu video
+         * selesai loading.
+         *
+         * playStream langsung memasang HLS.
+         * Jadi tidak akan muncul error palsu hanya
+         * karena HLS masih membutuhkan waktu untuk
+         * mulai memutar.
+         */
         await playStream(
           stream.url,
-          indonesiaSubtitle?.url,
-          true
+          indonesia?.url
         );
 
         setDrawerOpen(false);
-      } catch (err: any) {
-        console.error("PLAY ERROR:", err);
 
-        setError(
-          err?.message ||
-            "Gagal memutar episode."
+        /*
+         * Jangan setError di sini.
+         * Jika video belum siap, event "playing"
+         * yang akan mengubah loading menjadi false.
+         */
+      } catch (err: any) {
+        console.error(
+          "PLAY EPISODE ERROR:",
+          err
         );
-      } finally {
-        setEpisodeLoading(false);
-        setLoading(false);
+
+        /*
+         * Beri waktu HLS/native untuk mulai.
+         * Ini mencegah popup error palsu ketika
+         * stream sebenarnya sedang berhasil dimuat.
+         */
+        setTimeout(() => {
+          const video =
+            videoRef.current;
+
+          if (
+            video &&
+            !video.paused &&
+            video.currentTime > 0
+          ) {
+            setError("");
+            setLoading(false);
+            return;
+          }
+
+          setLoading(false);
+          setError(
+            err?.message ||
+              "Gagal memuat episode."
+          );
+        }, 1500);
       }
     },
-    [bookId, episodes, playStream]
+    [
+      bookId,
+      episodes,
+      playStream,
+    ]
   );
 
-  // =========================================================
-  // AUTO NEXT EPISODE
-  // =========================================================
-
-  const handleVideoEnded = useCallback(() => {
-    const nextIndex = currentIndex + 1;
-
-    if (nextIndex < episodes.length) {
-      playEpisode(nextIndex);
-    }
-  }, [currentIndex, episodes.length, playEpisode]);
-
-  // =========================================================
+  // ---------------------------------------------------------
   // INITIAL LOAD
-  // =========================================================
+  // ---------------------------------------------------------
 
   useEffect(() => {
     let cancelled = false;
 
     async function start() {
       try {
-        const list = await loadDetail();
+        setLoading(true);
+        setError("");
+
+        const list =
+          await loadDetail();
 
         if (cancelled) return;
 
-        // Ambil episode dari query ?episode=
-        const searchParams = new URLSearchParams(
-          window.location.search
-        );
+        setEpisodes(list);
 
-        const requestedEpisode = Number(
-          searchParams.get("episode") || "1"
-        );
+        const params =
+          new URLSearchParams(
+            window.location.search
+          );
 
-        let initialIndex = requestedEpisode - 1;
+        const requested =
+          Number(
+            params.get("episode") || "1"
+          );
 
-        if (
-          !Number.isFinite(initialIndex) ||
-          initialIndex < 0
-        ) {
-          initialIndex = 0;
+        let index =
+          Number.isFinite(requested)
+            ? requested - 1
+            : 0;
+
+        if (index < 0) index = 0;
+
+        if (index >= list.length) {
+          index = 0;
         }
 
-        if (initialIndex >= list.length) {
-          initialIndex = 0;
-        }
-
-        await playEpisode(initialIndex, list);
-      } catch (err) {
+        await playEpisode(
+          index,
+          list
+        );
+      } catch (err: any) {
         if (!cancelled) {
+          console.error(
+            "INITIAL ERROR:",
+            err
+          );
+
           setLoading(false);
+          setError(
+            err?.message ||
+              "Gagal memuat drama."
+          );
         }
       }
     }
@@ -461,68 +575,78 @@ export default function WatchPage() {
     destroyPlayer,
   ]);
 
-  // =========================================================
-  // KEYBOARD
-  // =========================================================
+  // ---------------------------------------------------------
+  // AUTO NEXT
+  // ---------------------------------------------------------
+
+  const handleEnded = () => {
+    const next =
+      currentIndex + 1;
+
+    if (
+      next < episodes.length
+    ) {
+      playEpisode(next);
+    }
+  };
+
+  // ---------------------------------------------------------
+  // CLEANUP
+  // ---------------------------------------------------------
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setDrawerOpen(false);
-      }
-    }
-
-    window.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
-
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
+      destroyPlayer();
     };
-  }, []);
+  }, [destroyPlayer]);
 
-  // =========================================================
+  // ---------------------------------------------------------
   // RENDER
-  // =========================================================
+  // ---------------------------------------------------------
 
   return (
     <main className="watchPage">
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
 
       <header className="topHeader">
-        <Link href="/" className="brand">
-          <span className="brandIcon">▶</span>
+        <Link
+          href="/"
+          className="brand"
+        >
+          <span className="brandIcon">
+            ▶
+          </span>
+
           <span>TPLAY</span>
         </Link>
 
-        <Link href="/" className="homeButton">
+        <Link
+          href="/"
+          className="homeButton"
+        >
           Home
         </Link>
       </header>
 
-      {/* =====================================================
-          PLAYER
-      ====================================================== */}
+      {/* PLAYER */}
 
       <section className="playerSection">
         <div className="player">
-
           <video
             ref={videoRef}
             className="video"
             controls
             playsInline
-            preload="metadata"
-            onEnded={handleVideoEnded}
+            preload="auto"
+            onPlaying={() => {
+              setPlaying(true);
+              setLoading(false);
+              setError("");
+            }}
+            onEnded={handleEnded}
           />
 
-          {/* HAMBURGER — SELALU TERLIHAT */}
+          {/* HAMBURGER */}
           <button
             type="button"
             className="episodeButton"
@@ -536,23 +660,29 @@ export default function WatchPage() {
             <span />
           </button>
 
-          {/* LOADING */}
-          {(loading || episodeLoading) && (
-            <div className="loadingOverlay">
-              <div className="spinner" />
-            </div>
-          )}
+          {/* LOADING HANYA SAAT BELUM PLAY */}
+          {loading &&
+            !playing &&
+            !error && (
+              <div className="loadingOverlay">
+                <div className="spinner" />
+              </div>
+            )}
 
-          {/* ERROR */}
-          {error && !loading && (
+          {/* ERROR HANYA JIKA BENAR-BENAR GAGAL */}
+          {error && (
             <div className="errorOverlay">
               <div className="errorBox">
-                <div>Gagal memutar video</div>
+                <div className="errorText">
+                  {error}
+                </div>
 
                 <button
                   type="button"
                   onClick={() =>
-                    playEpisode(currentIndex)
+                    playEpisode(
+                      currentIndex
+                    )
                   }
                 >
                   Coba lagi
@@ -563,9 +693,7 @@ export default function WatchPage() {
         </div>
       </section>
 
-      {/* =====================================================
-          EPISODE DRAWER
-      ====================================================== */}
+      {/* EPISODE DRAWER */}
 
       {drawerOpen && (
         <div
@@ -576,13 +704,16 @@ export default function WatchPage() {
         >
           <aside
             className="episodeDrawer"
-            onClick={(event) =>
-              event.stopPropagation()
+            onClick={(e) =>
+              e.stopPropagation()
             }
           >
             <div className="drawerHeader">
               <div>
-                <strong>Episode</strong>
+                <strong>
+                  Episode
+                </strong>
+
                 <small>
                   {episodes.length} episode
                 </small>
@@ -594,7 +725,6 @@ export default function WatchPage() {
                 onClick={() =>
                   setDrawerOpen(false)
                 }
-                aria-label="Tutup"
               >
                 ×
               </button>
@@ -602,8 +732,11 @@ export default function WatchPage() {
 
             <div className="episodeList">
               {episodes.map(
-                (episode, index) => {
-                  const episodeNumber =
+                (
+                  episode,
+                  index
+                ) => {
+                  const number =
                     episode.episode ??
                     episode.episode_index ??
                     episode.index ??
@@ -612,10 +745,11 @@ export default function WatchPage() {
                   const title =
                     episode.title ||
                     episode.name ||
-                    `Episode ${episodeNumber}`;
+                    `Episode ${number}`;
 
                   const active =
-                    index === currentIndex;
+                    index ===
+                    currentIndex;
 
                   return (
                     <button
@@ -631,13 +765,18 @@ export default function WatchPage() {
                           : ""
                       }`}
                       onClick={() =>
-                        playEpisode(index)
+                        playEpisode(
+                          index
+                        )
                       }
                     >
                       <span className="episodeNumber">
                         {String(
-                          episodeNumber
-                        ).padStart(2, "0")}
+                          number
+                        ).padStart(
+                          2,
+                          "0"
+                        )}
                       </span>
 
                       <span className="episodeName">
@@ -663,17 +802,25 @@ export default function WatchPage() {
           box-sizing: border-box;
         }
 
-        .watchPage {
-          min-height: 100vh;
+        html,
+        body {
           margin: 0;
           padding: 0;
+        }
+
+        .watchPage {
+          min-height: 100vh;
+          width: 100%;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
           background: #05070b;
           color: #fff;
         }
 
-        /* =====================================================
+        /* ===============================
            HEADER
-        ====================================================== */
+        ================================ */
 
         .topHeader {
           position: sticky;
@@ -689,16 +836,29 @@ export default function WatchPage() {
 
           padding: 0 18px;
 
-          background: rgba(5, 7, 11, 0.96);
+          background: rgba(
+            5,
+            7,
+            11,
+            0.96
+          );
+
           border-bottom: 1px solid
-            rgba(255, 255, 255, 0.07);
+            rgba(
+              255,
+              255,
+              255,
+              0.07
+            );
 
           backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(
+            14px
+          );
         }
 
         .brand {
-          display: inline-flex;
+          display: flex;
           align-items: center;
           gap: 8px;
 
@@ -707,16 +867,15 @@ export default function WatchPage() {
 
           font-size: 20px;
           font-weight: 900;
-          letter-spacing: -0.5px;
         }
 
         .brandIcon {
+          width: 27px;
+          height: 27px;
+
           display: flex;
           align-items: center;
           justify-content: center;
-
-          width: 27px;
-          height: 27px;
 
           border-radius: 8px;
 
@@ -727,34 +886,48 @@ export default function WatchPage() {
         }
 
         .homeButton {
-          color: rgba(255, 255, 255, 0.7);
+          color: rgba(
+            255,
+            255,
+            255,
+            0.7
+          );
+
           text-decoration: none;
 
           font-size: 13px;
           font-weight: 600;
-
-          transition: color 0.2s ease;
         }
 
-        .homeButton:hover {
-          color: #fff;
-        }
-
-        /* =====================================================
-           PLAYER
-        ====================================================== */
+        /* ===============================
+           FULL WIDTH PLAYER
+        ================================ */
 
         .playerSection {
-          width: 100%;
-          margin: 0;
+          width: 100vw;
+          max-width: none;
+
+          margin-left: calc(
+            50% - 50vw
+          );
+
+          margin-right: calc(
+            50% - 50vw
+          );
+
           padding: 0;
         }
 
         .player {
           position: relative;
 
-          width: 100%;
+          width: 100vw;
+          max-width: 100vw;
+
           aspect-ratio: 16 / 9;
+
+          margin: 0;
+          padding: 0;
 
           background: #000;
 
@@ -767,20 +940,27 @@ export default function WatchPage() {
           width: 100%;
           height: 100%;
 
-          object-fit: contain;
+          max-width: none;
+
+          margin: 0;
+          padding: 0;
 
           background: #000;
+
+          object-fit: contain;
         }
 
-        /* =====================================================
+        /* ===============================
            HAMBURGER
-        ====================================================== */
+        ================================ */
 
         .episodeButton {
           position: absolute;
-          top: 14px;
-          right: 14px;
-          z-index: 10;
+
+          top: 12px;
+          right: 12px;
+
+          z-index: 20;
 
           width: 42px;
           height: 42px;
@@ -789,39 +969,37 @@ export default function WatchPage() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
+
           gap: 5px;
 
           padding: 0;
 
           border: 1px solid
-            rgba(255, 255, 255, 0.18);
+            rgba(
+              255,
+              255,
+              255,
+              0.18
+            );
 
-          border-radius: 12px;
+          border-radius: 11px;
 
-          background: rgba(0, 0, 0, 0.62);
-          color: #fff;
+          background: rgba(
+            0,
+            0,
+            0,
+            0.58
+          );
 
           cursor: pointer;
 
           backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-
-          transition:
-            background 0.2s ease,
-            transform 0.2s ease;
-        }
-
-        .episodeButton:hover {
-          background: rgba(0, 0, 0, 0.82);
-        }
-
-        .episodeButton:active {
-          transform: scale(0.94);
+          -webkit-backdrop-filter: blur(
+            10px
+          );
         }
 
         .episodeButton span {
-          display: block;
-
           width: 18px;
           height: 2px;
 
@@ -830,15 +1008,15 @@ export default function WatchPage() {
           background: #fff;
         }
 
-        /* =====================================================
+        /* ===============================
            LOADING
-        ====================================================== */
+        ================================ */
 
         .loadingOverlay {
           position: absolute;
           inset: 0;
 
-          z-index: 5;
+          z-index: 10;
 
           display: flex;
           align-items: center;
@@ -848,17 +1026,23 @@ export default function WatchPage() {
         }
 
         .spinner {
-          width: 34px;
-          height: 34px;
+          width: 32px;
+          height: 32px;
 
           border: 3px solid
-            rgba(255, 255, 255, 0.2);
+            rgba(
+              255,
+              255,
+              255,
+              0.18
+            );
 
           border-top-color: #fff;
 
           border-radius: 50%;
 
-          animation: spin 0.8s linear infinite;
+          animation: spin
+            0.8s linear infinite;
         }
 
         @keyframes spin {
@@ -867,33 +1051,37 @@ export default function WatchPage() {
           }
         }
 
-        /* =====================================================
+        /* ===============================
            ERROR
-        ====================================================== */
+        ================================ */
 
         .errorOverlay {
           position: absolute;
           inset: 0;
 
-          z-index: 7;
+          z-index: 30;
 
           display: flex;
           align-items: center;
           justify-content: center;
 
-          background: rgba(0, 0, 0, 0.55);
-
-          pointer-events: none;
+          background: rgba(
+            0,
+            0,
+            0,
+            0.62
+          );
         }
 
         .errorBox {
-          pointer-events: auto;
-
           text-align: center;
+        }
 
+        .errorText {
+          max-width: 280px;
+
+          font-size: 13px;
           color: #fff;
-
-          font-size: 14px;
         }
 
         .errorBox button {
@@ -907,37 +1095,41 @@ export default function WatchPage() {
           background: #fff;
           color: #000;
 
+          font-size: 13px;
           font-weight: 700;
 
           cursor: pointer;
         }
 
-        /* =====================================================
-           DRAWER BACKDROP
-        ====================================================== */
+        /* ===============================
+           DRAWER
+        ================================ */
 
         .drawerBackdrop {
           position: fixed;
           inset: 0;
+
           z-index: 100;
 
-          background: rgba(0, 0, 0, 0.58);
-
-          backdrop-filter: blur(2px);
-          -webkit-backdrop-filter: blur(2px);
+          background: rgba(
+            0,
+            0,
+            0,
+            0.58
+          );
         }
-
-        /* =====================================================
-           DRAWER
-        ====================================================== */
 
         .episodeDrawer {
           position: absolute;
+
           top: 0;
           right: 0;
           bottom: 0;
 
-          width: min(360px, 88vw);
+          width: min(
+            360px,
+            88vw
+          );
 
           display: flex;
           flex-direction: column;
@@ -945,18 +1137,31 @@ export default function WatchPage() {
           background: #0b0e14;
 
           border-left: 1px solid
-            rgba(255, 255, 255, 0.08);
+            rgba(
+              255,
+              255,
+              255,
+              0.08
+            );
 
           box-shadow:
             -15px 0 50px
-            rgba(0, 0, 0, 0.45);
+            rgba(
+              0,
+              0,
+              0,
+              0.45
+            );
 
-          animation: drawerIn 0.22s ease-out;
+          animation: drawerIn
+            0.2s ease-out;
         }
 
         @keyframes drawerIn {
           from {
-            transform: translateX(100%);
+            transform: translateX(
+              100%
+            );
           }
 
           to {
@@ -974,7 +1179,12 @@ export default function WatchPage() {
           padding: 18px;
 
           border-bottom: 1px solid
-            rgba(255, 255, 255, 0.07);
+            rgba(
+              255,
+              255,
+              255,
+              0.07
+            );
         }
 
         .drawerHeader strong {
@@ -989,7 +1199,12 @@ export default function WatchPage() {
 
           margin-top: 3px;
 
-          color: rgba(255, 255, 255, 0.45);
+          color: rgba(
+            255,
+            255,
+            255,
+            0.45
+          );
 
           font-size: 12px;
         }
@@ -1015,7 +1230,6 @@ export default function WatchPage() {
           color: #fff;
 
           font-size: 25px;
-          line-height: 1;
 
           cursor: pointer;
         }
@@ -1031,10 +1245,10 @@ export default function WatchPage() {
         .episodeItem {
           width: 100%;
 
+          min-height: 52px;
+
           display: flex;
           align-items: center;
-
-          min-height: 52px;
 
           margin-bottom: 4px;
           padding: 8px 10px;
@@ -1043,26 +1257,16 @@ export default function WatchPage() {
           border-radius: 10px;
 
           background: transparent;
-          color: rgba(255, 255, 255, 0.72);
+          color: rgba(
+            255,
+            255,
+            255,
+            0.72
+          );
 
           text-align: left;
 
           cursor: pointer;
-
-          transition:
-            background 0.18s ease,
-            color 0.18s ease;
-        }
-
-        .episodeItem:hover {
-          background: rgba(
-            255,
-            255,
-            255,
-            0.06
-          );
-
-          color: #fff;
         }
 
         .episodeItem.active {
@@ -1082,12 +1286,12 @@ export default function WatchPage() {
           font-size: 12px;
           font-weight: 800;
 
-          color: rgba(255, 255, 255, 0.4);
-        }
-
-        .episodeItem.active
-          .episodeNumber {
-          color: #fff;
+          color: rgba(
+            255,
+            255,
+            255,
+            0.4
+          );
         }
 
         .episodeName {
@@ -1103,18 +1307,14 @@ export default function WatchPage() {
         }
 
         .playingDot {
-          flex: 0 0 auto;
-
           margin-left: 8px;
 
           font-size: 9px;
-
-          color: #fff;
         }
 
-        /* =====================================================
+        /* ===============================
            MOBILE
-        ====================================================== */
+        ================================ */
 
         @media (max-width: 600px) {
           .topHeader {
@@ -1136,13 +1336,11 @@ export default function WatchPage() {
           }
 
           .episodeButton {
-            top: 10px;
-            right: 10px;
+            top: 9px;
+            right: 9px;
 
             width: 38px;
             height: 38px;
-
-            border-radius: 10px;
           }
 
           .episodeButton span {
@@ -1150,7 +1348,7 @@ export default function WatchPage() {
           }
 
           .episodeDrawer {
-            width: min(340px, 90vw);
+            width: 90vw;
           }
         }
       `}</style>
