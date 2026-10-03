@@ -15,6 +15,7 @@ import { GoodShortHome } from "@/components/GoodShortHome";
 import { FlickReelsHome } from "@/components/FlickReelsHome";
 import { PineDramaHome } from "@/components/PineDramaHome";
 import { MeloShortHome } from "@/components/MeloShortHome";
+import { IqiyiHome } from "@/components/IqiyiHome";
 import { InfiniteDramaSection } from "@/components/InfiniteDramaSection";
 import { PlatformSelector } from "@/components/PlatformSelector";
 
@@ -36,7 +37,7 @@ interface TrendingBannerItem {
 export default function HomeContent() {
   const { 
     isMeloShort, isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort, 
-    isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels 
+    isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels, isIqiyi 
   } = usePlatform();
 
   const { data: latestDramas, isLoading: loadingLatest, error: errorLatest, refetch: refetchLatest } = useLatestDramas();
@@ -136,6 +137,12 @@ export default function HomeContent() {
       </div>
 
       {/* === KONTEN DINAMIS BERDASARKAN PLATFORM === */}
+      {isIqiyi && (
+        <div className="container mx-auto px-4 py-6 space-y-8">
+          <IqiyiHome />
+        </div>
+      )}
+
       {isMeloShort && (
         <div className="container mx-auto px-4 py-6 space-y-8">
           <MeloShortHome />
