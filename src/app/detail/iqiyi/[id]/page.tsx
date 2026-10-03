@@ -33,10 +33,11 @@ export default function IqiyiDetailPage(){
   const params=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),id=String(params.id||"");
   const quickTitle=search.get("title")||"iQIYI";
   const quickCover=search.get("cover")||"";
+  const quickAlbumId=search.get("albumId")||"";
   const {data,isLoading,error}=useQuery({
     queryKey:["iqiyi-detail",id],
     queryFn:async()=>{
-      const response=await fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(id)+"&lang=id");
+      const response=await fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(id)+(quickAlbumId?"&albumId="+encodeURIComponent(quickAlbumId):"")+"&lang=id");
       const json=await response.json();
       if(!response.ok) throw new Error(json?.error||"Gagal memuat detail IQIYI");
       return unwrap(json);
@@ -62,7 +63,7 @@ export default function IqiyiDetailPage(){
           {description&&<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>}
 {error&&<p className="mb-5 text-xs text-amber-300/80">Info lengkap iQIYI sedang tidak tersedia, tetapi film tetap bisa dicoba diputar.</p>}
           {episodes>0&&<p className="mb-6 text-sm text-white/45">{episodes} episode</p>}
-          <button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button>
+          <button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id)+(quickAlbumId?"?albumId="+encodeURIComponent(quickAlbumId):""))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button>
         </section>
       </div>
     </div>
