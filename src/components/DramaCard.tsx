@@ -4,7 +4,7 @@ import type { Drama } from "@/types/drama";
 interface DramaCardProps {
   drama: Drama;
   index?: number;
-  platform?: "dramabox" | "meloshort";
+  platform?: "dramabox" | "meloshort" | "iqiyi";
 }
 
 export function DramaCard({
@@ -15,7 +15,9 @@ export function DramaCard({
   const detailLink =
     platform === "meloshort"
       ? `/detail/meloshort/${drama.bookId}`
-      : `/detail/dramabox/${drama.bookId}`;
+      : platform === "iqiyi"
+        ? `/detail/iqiyi/${drama.bookId}`
+        : `/detail/dramabox/${drama.bookId}`;
 
   return (
     <UnifiedMediaCard
