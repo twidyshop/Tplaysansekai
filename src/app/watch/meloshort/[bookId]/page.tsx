@@ -34,29 +34,176 @@ interface Subtitle {
 const WORKER_PROXY =
   "https://tplay-proxy.3twidy.workers.dev/?url=";
 
+function proxyUrl(url: string) {
+  return WORKER_PROXY + encodeURIComponent(url);
+}
+
+function getChapterId(
+  episode: Episode,
+  fallbackIndex: number
+) {
+  return (
+    episode.id ??
+    episode.chapterId ??
+    episode.chapter_id ??
+    episode.episode ??
+    fallbackIndex + 1
+  );
+}
+
+function getEpisodeNumber(
+  episode: Episode,
+  index: number
+) {
+  return (
+    episode.episode ??
+    episode.episode_index ??
+    episode.index ??
+    index + 1
+  );
+}
+
+function getEpisodeTitle(
+  episode: Episode,
+  index: number
+) {
+  const number = getEpisodeNumber(episode, index);
+
+  return (
+    episode.title ||
+    episode.name ||
+    `Episode ${number}`
+  );
+}
+
+/**
+ * MeloShort kadang mengembalikan bahasa dengan
+ * variasi penamaan yang berbeda.
+ *
+ * Prioritas:
+ * 1. languageCode === id
+ * 2. bahasa mengandung Indonesia
+ * 3. bahasa mengandung ind
+ * 4. subtitle pertama hanya sebagai fallback
+ */
+function findIndonesiaSubtitle(
+  subtitles: Subtitle[]
+): Subtitle | undefined {
+  if (!Array.isArray(subtitles) || subtitles.length === 0) {
+    return undefined;
+  }
+
+  const exactCode = subtitles.find(
+    (subtitle) =>
+      String(subtitle?.languageCode || "")
+        .trim()
+        .toLowerCase() === "id"
+  );
+
+  if (exactCode?.url) {
+    return exactCode;
+  }
+
+  const indonesia = subtitles.find((subtitle) => {
+    const language = String(
+      subtitle?.language || ""
+    ).toLowerCase();
+
+    const code = String(
+      subtitle?.languageCode || ""
+    ).toLowerCase();
+
+    return (
+      language.includes("indonesia") ||
+      language.includes("bahasa indonesia") ||
+      code === "id-id" ||
+      code.startsWith("id-")
+    );
+  });
+
+  if (indonesia?.url) {
+    return indonesia;
+  }
+
+  const ind = subtitles.find((subtitle) => {
+    const language = String(
+      subtitle?.language || ""
+    ).toLowerCase();
+
+    const code = String(
+      subtitle?.languageCode || ""
+    ).toLowerCase();
+
+    return (
+      language === "ind" ||
+      language.startsWith("ind ") ||
+      code === "ind"
+    );
+  });
+
+  if (ind?.url) {
+    return ind;
+  }
+
+  return subtitles.find(
+    (subtitle) => !!subtitle?.url
+  );
+}
+
 export default function WatchPage() {
   const params = useParams();
-  const bookId = String(params.bookId || "");
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const bookId = String(
+    params.bookId || ""
+  );
+
+  const videoRef =
+    useRef<HTMLVideoElement | null>(null);
+
   const hlsRef = useRef<any>(null);
 
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const requestIdRef =
+    useRef(0);
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [playing, setPlaying] = useState(false);
-  const [error, setError] = useState("");
+  const mountedRef =
+    useRef(true);
+
+  const [episodes, setEpisodes] =
+    useState<Episode[]>([]);
+
+  const [currentIndex, setCurrentIndex] =
+    useState(0);
+
+  const [drawerOpen, setDrawerOpen] =
+    useState(false);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [playing, setPlaying] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   // =========================================================
   // DESTROY PLAYER
   // =========================================================
 
   const destroyPlayer = useCallback(() => {
-    if (hlsRef.current) {
+    const hls = hlsRef.current;
+
+    if (hls) {
       try {
-        hlsRef.current.destroy();
+        hls.stopLoad();
+      } catch {}
+
+      try {
+        hls.detachMedia();
+      } catch {}
+
+      try {
+        hls.destroy();
       } catch {}
 
       hlsRef.current = null;
@@ -70,15 +217,23 @@ export default function WatchPage() {
       video.pause();
     } catch {}
 
-    video.removeAttribute("src");
+    video.onplaying = null;
+    video.onwaiting = null;
+    video.oncanplay = null;
+    video.onloadeddata = null;
+    video.onerror = null;
 
-    while (video.firstChild) {
-      video.removeChild(video.firstChild);
-    }
+    try {
+      video.removeAttribute("src");
+    } catch {}
 
     try {
       video.load();
     } catch {}
+
+    while (video.firstChild) {
+      video.removeChild(video.firstChild);
+    }
   }, []);
 
   // =========================================================
@@ -90,31 +245,43 @@ export default function WatchPage() {
       originalUrl: string,
       subtitleUrl?: string
     ) => {
-      const video = videoRef.current;
+      const video =
+        videoRef.current;
 
       if (!video) {
-        throw new Error("Player belum siap.");
+        throw new Error(
+          "Player belum siap."
+        );
       }
 
+      const localRequestId =
+        requestIdRef.current;
+
       destroyPlayer();
+
+      if (!mountedRef.current) return;
 
       setError("");
       setLoading(true);
       setPlaying(false);
 
       const playableUrl =
-        WORKER_PROXY +
-        encodeURIComponent(originalUrl);
+        proxyUrl(originalUrl);
 
-      const proxiedSubtitle = subtitleUrl
-        ? WORKER_PROXY +
-          encodeURIComponent(subtitleUrl)
-        : "";
+      const proxiedSubtitle =
+        subtitleUrl
+          ? proxyUrl(subtitleUrl)
+          : "";
 
-      // Subtitle Indonesia
+      // =======================================================
+      // SUBTITLE INDONESIA
+      // =======================================================
+
       if (proxiedSubtitle) {
         const track =
-          document.createElement("track");
+          document.createElement(
+            "track"
+          );
 
         track.kind = "subtitles";
         track.label = "Indonesia";
@@ -125,10 +292,74 @@ export default function WatchPage() {
         video.appendChild(track);
       }
 
+      // =======================================================
+      // VIDEO EVENTS
+      // =======================================================
+
       video.onplaying = () => {
+        if (
+          localRequestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        if (!mountedRef.current) return;
+
         setPlaying(true);
         setLoading(false);
         setError("");
+      };
+
+      video.onwaiting = () => {
+        if (
+          localRequestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        if (!mountedRef.current) return;
+
+        /*
+         * Jangan tampilkan error.
+         * Waiting/buffering adalah kondisi normal HLS.
+         */
+        setLoading(true);
+      };
+
+      video.oncanplay = () => {
+        if (
+          localRequestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        if (!mountedRef.current) return;
+
+        /*
+         * Kalau browser sudah bisa memainkan video,
+         * hilangkan loading.
+         */
+        if (!video.paused) {
+          setLoading(false);
+        }
+      };
+
+      video.onloadeddata = () => {
+        if (
+          localRequestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        if (!mountedRef.current) return;
+
+        if (!video.paused) {
+          setLoading(false);
+        }
       };
 
       // =======================================================
@@ -139,40 +370,106 @@ export default function WatchPage() {
         const HlsModule =
           await import("hls.js");
 
-        const Hls = HlsModule.default;
+        const Hls =
+          HlsModule.default;
+
+        if (
+          localRequestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
 
         if (
           Hls &&
           Hls.isSupported() &&
-          originalUrl.includes(".m3u8")
+          /\.m3u8(\?|$)/i.test(
+            originalUrl
+          )
         ) {
-          const hls = new Hls({
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
-            enableWorker: true,
-            lowLatencyMode: false,
-            backBufferLength: 90,
-          });
+          const hls =
+            new Hls({
+              enableWorker: true,
 
-          hlsRef.current = hls;
+              maxBufferLength: 30,
+              maxMaxBufferLength: 60,
 
-          hls.loadSource(playableUrl);
-          hls.attachMedia(video);
+              backBufferLength: 90,
+
+              lowLatencyMode: false,
+
+              fragLoadingMaxRetry: 4,
+              manifestLoadingMaxRetry: 4,
+              levelLoadingMaxRetry: 4,
+
+              fragLoadingRetryDelay: 1000,
+              manifestLoadingRetryDelay: 1000,
+              levelLoadingRetryDelay: 1000,
+            });
+
+          hlsRef.current =
+            hls;
 
           hls.on(
             Hls.Events.MANIFEST_PARSED,
             () => {
+              if (
+                localRequestId !==
+                requestIdRef.current
+              ) {
+                return;
+              }
+
+              if (!mountedRef.current) {
+                return;
+              }
+
+              /*
+               * Pastikan browser mencoba autoplay
+               * setelah manifest tersedia.
+               */
               video
                 .play()
-                .catch(() => {});
+                .then(() => {
+                  if (
+                    localRequestId ===
+                    requestIdRef.current
+                  ) {
+                    setLoading(false);
+                  }
+                })
+                .catch(() => {
+                  /*
+                   * Browser bisa menolak autoplay.
+                   * Ini bukan error stream.
+                   */
+                });
             }
           );
 
           hls.on(
             Hls.Events.ERROR,
-            (_event: any, data: any) => {
-              if (!data?.fatal) return;
+            (
+              _event: any,
+              data: any
+            ) => {
+              if (
+                localRequestId !==
+                requestIdRef.current
+              ) {
+                return;
+              }
 
+              if (!data?.fatal) {
+                return;
+              }
+
+              /*
+               * NETWORK ERROR
+               *
+               * Coba load ulang tanpa langsung
+               * menampilkan error ke user.
+               */
               if (
                 data.type ===
                 Hls.ErrorTypes.NETWORK_ERROR
@@ -180,9 +477,17 @@ export default function WatchPage() {
                 try {
                   hls.startLoad();
                 } catch {}
+
                 return;
               }
 
+              /*
+               * MEDIA ERROR
+               *
+               * RecoverMediaError adalah cara
+               * standar HLS.js untuk memulihkan
+               * decoder.
+               */
               if (
                 data.type ===
                 Hls.ErrorTypes.MEDIA_ERROR
@@ -190,30 +495,61 @@ export default function WatchPage() {
                 try {
                   hls.recoverMediaError();
                 } catch {}
+
                 return;
               }
 
-              // Jangan langsung munculkan popup.
-              // Coba native fallback.
+              /*
+               * Error fatal yang benar-benar tidak
+               * bisa dipulihkan.
+               *
+               * Jangan langsung membuat popup.
+               * Coba native playback sebagai fallback.
+               */
               try {
                 hls.destroy();
               } catch {}
 
-              hlsRef.current = null;
+              if (
+                hlsRef.current === hls
+              ) {
+                hlsRef.current =
+                  null;
+              }
 
-              video.src = playableUrl;
+              if (
+                localRequestId !==
+                requestIdRef.current
+              ) {
+                return;
+              }
 
-              video
-                .play()
-                .catch(() => {});
+              try {
+                video.src =
+                  playableUrl;
+
+                video.load();
+
+                video
+                  .play()
+                  .catch(() => {});
+              } catch {}
             }
+          );
+
+          hls.loadSource(
+            playableUrl
+          );
+
+          hls.attachMedia(
+            video
           );
 
           return;
         }
       } catch (err) {
         console.warn(
-          "HLS.js error:",
+          "HLS.js gagal dimuat:",
           err
         );
       }
@@ -222,12 +558,35 @@ export default function WatchPage() {
       // NATIVE FALLBACK
       // =======================================================
 
-      video.src = playableUrl;
+      if (
+        localRequestId !==
+        requestIdRef.current
+      ) {
+        return;
+      }
+
+      video.src =
+        playableUrl;
+
       video.load();
 
       video
         .play()
-        .catch(() => {});
+        .then(() => {
+          if (
+            localRequestId ===
+              requestIdRef.current &&
+            mountedRef.current
+          ) {
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          /*
+           * Jangan langsung dianggap stream error.
+           * Browser dapat menolak autoplay.
+           */
+        });
     },
     [destroyPlayer]
   );
@@ -236,81 +595,14 @@ export default function WatchPage() {
   // LOAD DETAIL
   // =========================================================
 
-  const loadDetail = useCallback(async () => {
-    const response = await fetch(
-      `/api/meloshort?path=/api/v2/detail` +
-        `&category_p=meloshort` +
-        `&id=${encodeURIComponent(bookId)}` +
-        `&lang=id`,
-      {
-        cache: "no-store",
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Detail API ${response.status}`
-      );
-    }
-
-    const json = await response.json();
-
-    const data =
-      json?.data || json;
-
-    const list =
-      data?.chapters ||
-      data?.episodes ||
-      data?.list ||
-      [];
-
-    if (
-      !Array.isArray(list) ||
-      list.length === 0
-    ) {
-      throw new Error(
-        "Episode tidak ditemukan."
-      );
-    }
-
-    return list as Episode[];
-  }, [bookId]);
-
-  // =========================================================
-  // PLAY EPISODE
-  // =========================================================
-
-  const playEpisode = useCallback(
-    async (
-      index: number,
-      overrideEpisodes?: Episode[]
-    ) => {
-      const list =
-        overrideEpisodes || episodes;
-
-      const episode = list[index];
-
-      if (!episode) return;
-
-      setCurrentIndex(index);
-      setError("");
-      setLoading(true);
-      setPlaying(false);
-
-      try {
-        const chapterId =
-          episode.id ??
-          episode.chapterId ??
-          episode.chapter_id ??
-          episode.episode ??
-          index + 1;
-
-        const response = await fetch(
-          `/api/meloshort?path=/api/v2/video` +
+  const loadDetail =
+    useCallback(async () => {
+      const response =
+        await fetch(
+          `/api/meloshort?path=/api/v2/detail` +
             `&category_p=meloshort` +
-            `&id=${encodeURIComponent(bookId)}` +
-            `&chapterId=${encodeURIComponent(
-              String(chapterId)
+            `&id=${encodeURIComponent(
+              bookId
             )}` +
             `&lang=id`,
           {
@@ -318,131 +610,318 @@ export default function WatchPage() {
           }
         );
 
-        if (!response.ok) {
-          throw new Error(
-            `Video API ${response.status}`
-          );
-        }
-
-        const json =
-          await response.json();
-
-        const data =
-          json?.data || json;
-
-        const streams =
-          data?.streams ||
-          data?.urls ||
-          [];
-
-        if (
-          !Array.isArray(streams) ||
-          streams.length === 0
-        ) {
-          throw new Error(
-            "Stream video tidak tersedia."
-          );
-        }
-
-        const stream =
-          streams.find(
-            (x: Stream) =>
-              /1080/i.test(
-                x?.quality || ""
-              )
-          ) ||
-          streams.find(
-            (x: Stream) =>
-              /720/i.test(
-                x?.quality || ""
-              )
-          ) ||
-          streams.find(
-            (x: Stream) =>
-              /480/i.test(
-                x?.quality || ""
-              )
-          ) ||
-          streams[0];
-
-        if (!stream?.url) {
-          throw new Error(
-            "URL video tidak ditemukan."
-          );
-        }
-
-        const subtitles =
-          data?.subtitles ||
-          data?.subs ||
-          [];
-
-        const indonesia =
-          subtitles.find(
-            (x: Subtitle) =>
-              x?.languageCode === "id"
-          ) ||
-          subtitles.find(
-            (x: Subtitle) =>
-              /indonesia/i.test(
-                x?.language || ""
-              )
-          ) ||
-          subtitles[0];
-
-        await playStream(
-          stream.url,
-          indonesia?.url
+      if (!response.ok) {
+        throw new Error(
+          `Detail API ${response.status}`
         );
+      }
 
-        // Drawer langsung tutup setelah episode dipilih
-        setDrawerOpen(false);
+      const json =
+        await response.json();
 
-        // Jangan error di sini.
-        // Tunggu event "playing".
-      } catch (err: any) {
-        console.error(
-          "PLAY EPISODE ERROR:",
-          err
+      const data =
+        json?.data ||
+        json;
+
+      const list =
+        data?.chapters ||
+        data?.episodes ||
+        data?.list ||
+        [];
+
+      if (
+        !Array.isArray(list) ||
+        list.length === 0
+      ) {
+        throw new Error(
+          "Episode tidak ditemukan."
         );
+      }
 
-        setLoading(false);
+      return list as Episode[];
+    }, [bookId]);
 
-        setTimeout(() => {
-          const video =
-            videoRef.current;
+  // =========================================================
+  // PLAY EPISODE
+  // =========================================================
 
-          // Kalau ternyata sudah jalan,
-          // jangan pernah tampilkan error.
+  const playEpisode =
+    useCallback(
+      async (
+        index: number,
+        overrideEpisodes?: Episode[]
+      ) => {
+        const list =
+          overrideEpisodes ||
+          episodes;
+
+        const episode =
+          list[index];
+
+        if (!episode) return;
+
+        /*
+         * Set request ID baru.
+         *
+         * Kalau user cepat berpindah E01 → E02,
+         * response E01 yang datang belakangan
+         * tidak boleh mengambil alih player E02.
+         */
+        const requestId =
+          ++requestIdRef.current;
+
+        setCurrentIndex(index);
+        setError("");
+        setLoading(true);
+        setPlaying(false);
+
+        try {
+          const chapterId =
+            getChapterId(
+              episode,
+              index
+            );
+
+          const response =
+            await fetch(
+              `/api/meloshort?path=/api/v2/video` +
+                `&category_p=meloshort` +
+                `&id=${encodeURIComponent(
+                  bookId
+                )}` +
+                `&chapterId=${encodeURIComponent(
+                  String(
+                    chapterId
+                  )
+                )}` +
+                `&lang=id`,
+              {
+                cache: "no-store",
+              }
+            );
+
+          if (!response.ok) {
+            throw new Error(
+              `Video API ${response.status}`
+            );
+          }
+
+          const json =
+            await response.json();
+
+          /*
+           * Kalau user sudah memilih episode lain
+           * sementara request ini berjalan, abaikan
+           * hasil request lama.
+           */
           if (
-            video &&
-            !video.paused &&
-            video.currentTime > 0
+            requestId !==
+            requestIdRef.current
           ) {
-            setError("");
-            setPlaying(true);
             return;
           }
 
-          setError(
-            err?.message ||
-              "Gagal memutar video."
+          const data =
+            json?.data ||
+            json;
+
+          const streams =
+            data?.streams ||
+            data?.urls ||
+            [];
+
+          if (
+            !Array.isArray(
+              streams
+            ) ||
+            streams.length === 0
+          ) {
+            throw new Error(
+              "Stream video tidak tersedia."
+            );
+          }
+
+          /*
+           * Prioritas kualitas:
+           * 1080 → 720 → 480 → stream pertama.
+           */
+          const stream =
+            streams.find(
+              (x: Stream) =>
+                /1080/i.test(
+                  String(
+                    x?.quality ||
+                      x?.resolution ||
+                      ""
+                  )
+                )
+            ) ||
+            streams.find(
+              (x: Stream) =>
+                /720/i.test(
+                  String(
+                    x?.quality ||
+                      x?.resolution ||
+                      ""
+                  )
+                )
+            ) ||
+            streams.find(
+              (x: Stream) =>
+                /480/i.test(
+                  String(
+                    x?.quality ||
+                      x?.resolution ||
+                      ""
+                  )
+                )
+            ) ||
+            streams[0];
+
+          if (!stream?.url) {
+            throw new Error(
+              "URL video tidak ditemukan."
+            );
+          }
+
+          // ===================================================
+          // SUBTITLE INDONESIA
+          // ===================================================
+
+          const subtitles =
+            Array.isArray(
+              data?.subtitles
+            )
+              ? data.subtitles
+              : Array.isArray(
+                  data?.subs
+                )
+              ? data.subs
+              : [];
+
+          const indonesia =
+            findIndonesiaSubtitle(
+              subtitles
+            );
+
+          /*
+           * MeloShort response yang kamu kirim memang
+           * menyediakan:
+           *
+           * language: Indonesia
+           * languageCode: id
+           * format: webvtt
+           *
+           * Jadi URL tersebut diprioritaskan.
+           */
+          const subtitleUrl =
+            indonesia?.url ||
+            "";
+
+          await playStream(
+            stream.url,
+            subtitleUrl
           );
-        }, 1200);
-      }
-    },
-    [
-      bookId,
-      episodes,
-      playStream,
-    ]
-  );
+
+          if (
+            requestId !==
+            requestIdRef.current
+          ) {
+            return;
+          }
+
+          setDrawerOpen(false);
+        } catch (err: any) {
+          if (
+            requestId !==
+            requestIdRef.current
+          ) {
+            return;
+          }
+
+          console.error(
+            "PLAY EPISODE ERROR:",
+            err
+          );
+
+          /*
+           * Beri sedikit waktu kepada HLS/player
+           * untuk mulai bermain.
+           *
+           * Ini mencegah pesan error palsu ketika
+           * video sebenarnya masih buffering.
+           */
+          setTimeout(() => {
+            if (
+              requestId !==
+              requestIdRef.current
+            ) {
+              return;
+            }
+
+            const video =
+              videoRef.current;
+
+            if (!video) {
+              setLoading(false);
+              setError(
+                err?.message ||
+                  "Gagal memutar video."
+              );
+              return;
+            }
+
+            /*
+             * Jika video sudah punya data / sedang
+             * berjalan, jangan tampilkan error.
+             */
+            const actuallyPlaying =
+              !video.paused &&
+              video.currentTime > 0;
+
+            const hasVideoData =
+              video.readyState >= 2;
+
+            if (
+              actuallyPlaying ||
+              hasVideoData
+            ) {
+              setError("");
+              setPlaying(
+                actuallyPlaying
+              );
+              setLoading(
+                !actuallyPlaying
+              );
+              return;
+            }
+
+            setLoading(false);
+
+            setError(
+              err?.message ||
+                "Gagal memutar video."
+            );
+          }, 1800);
+        }
+      },
+      [
+        bookId,
+        episodes,
+        playStream,
+      ]
+    );
 
   // =========================================================
   // INITIAL LOAD
   // =========================================================
 
   useEffect(() => {
-    let cancelled = false;
+    mountedRef.current =
+      true;
+
+    let cancelled =
+      false;
 
     async function start() {
       try {
@@ -452,7 +931,12 @@ export default function WatchPage() {
         const list =
           await loadDetail();
 
-        if (cancelled) return;
+        if (
+          cancelled ||
+          !mountedRef.current
+        ) {
+          return;
+        }
 
         setEpisodes(list);
 
@@ -463,18 +947,25 @@ export default function WatchPage() {
 
         const requested =
           Number(
-            searchParams.get("episode") ||
-              "1"
+            searchParams.get(
+              "episode"
+            ) || "1"
           );
 
         let index =
-          Number.isFinite(requested)
+          Number.isFinite(
+            requested
+          )
             ? requested - 1
             : 0;
 
-        if (index < 0) index = 0;
+        if (index < 0) {
+          index = 0;
+        }
 
-        if (index >= list.length) {
+        if (
+          index >= list.length
+        ) {
           index = 0;
         }
 
@@ -483,18 +974,24 @@ export default function WatchPage() {
           list
         );
       } catch (err: any) {
-        if (!cancelled) {
-          console.error(
-            "INITIAL ERROR:",
-            err
-          );
-
-          setLoading(false);
-          setError(
-            err?.message ||
-              "Gagal memuat drama."
-          );
+        if (
+          cancelled ||
+          !mountedRef.current
+        ) {
+          return;
         }
+
+        console.error(
+          "INITIAL ERROR:",
+          err
+        );
+
+        setLoading(false);
+
+        setError(
+          err?.message ||
+            "Gagal memuat drama."
+        );
       }
     }
 
@@ -504,6 +1001,11 @@ export default function WatchPage() {
 
     return () => {
       cancelled = true;
+      mountedRef.current =
+        false;
+
+      requestIdRef.current++;
+
       destroyPlayer();
     };
   }, [
@@ -517,16 +1019,21 @@ export default function WatchPage() {
   // AUTO NEXT
   // =========================================================
 
-  const handleEnded = () => {
-    const next =
-      currentIndex + 1;
+  const handleEnded =
+    useCallback(() => {
+      const next =
+        currentIndex + 1;
 
-    if (
-      next < episodes.length
-    ) {
-      playEpisode(next);
-    }
-  };
+      if (
+        next < episodes.length
+      ) {
+        playEpisode(next);
+      }
+    }, [
+      currentIndex,
+      episodes.length,
+      playEpisode,
+    ]);
 
   // =========================================================
   // RENDER
@@ -559,7 +1066,7 @@ export default function WatchPage() {
       </header>
 
       {/* =====================================================
-          PORTRAIT WATCH AREA
+          PLAYER
       ====================================================== */}
 
       <section className="watchArea">
@@ -575,10 +1082,34 @@ export default function WatchPage() {
               setLoading(false);
               setError("");
             }}
-            onEnded={handleEnded}
+            onWaiting={() => {
+              /*
+               * Buffering normal tidak dianggap error.
+               */
+              if (!error) {
+                setLoading(true);
+              }
+            }}
+            onCanPlay={() => {
+              const video =
+                videoRef.current;
+
+              if (
+                video &&
+                !video.paused
+              ) {
+                setLoading(false);
+              }
+            }}
+            onEnded={
+              handleEnded
+            }
           />
 
-          {/* HAMBURGER */}
+          {/* =================================================
+              HAMBURGER EPISODE
+          ================================================== */}
+
           <button
             type="button"
             className="episodeButton"
@@ -592,16 +1123,21 @@ export default function WatchPage() {
             <span />
           </button>
 
-          {/* LOADING */}
+          {/* =================================================
+              LOADING
+          ================================================== */}
+
           {loading &&
-            !playing &&
             !error && (
               <div className="loadingOverlay">
                 <div className="spinner" />
               </div>
             )}
 
-          {/* ERROR */}
+          {/* =================================================
+              ERROR
+          ================================================== */}
+
           {error && (
             <div className="errorOverlay">
               <div className="errorBox">
@@ -656,6 +1192,7 @@ export default function WatchPage() {
               <button
                 type="button"
                 className="closeButton"
+                aria-label="Tutup"
                 onClick={() =>
                   setDrawerOpen(false)
                 }
@@ -671,15 +1208,16 @@ export default function WatchPage() {
                   index
                 ) => {
                   const number =
-                    episode.episode ??
-                    episode.episode_index ??
-                    episode.index ??
-                    index + 1;
+                    getEpisodeNumber(
+                      episode,
+                      index
+                    );
 
                   const title =
-                    episode.title ||
-                    episode.name ||
-                    `Episode ${number}`;
+                    getEpisodeTitle(
+                      episode,
+                      index
+                    );
 
                   const active =
                     index ===
@@ -690,6 +1228,7 @@ export default function WatchPage() {
                       key={`${String(
                         episode.id ??
                           episode.chapter_id ??
+                          episode.chapterId ??
                           index
                       )}-${index}`}
                       type="button"
@@ -792,6 +1331,7 @@ export default function WatchPage() {
         .brand {
           display: flex;
           align-items: center;
+
           gap: 8px;
 
           color: #fff;
@@ -799,6 +1339,7 @@ export default function WatchPage() {
 
           font-size: 20px;
           font-weight: 900;
+
           letter-spacing: -0.5px;
         }
 
@@ -834,9 +1375,6 @@ export default function WatchPage() {
 
         /* =====================================================
            WATCH AREA
-           
-           INI YANG MEMBUAT PLAYER MEMENUHI
-           SISA SATU LAYAR PORTRAIT
         ====================================================== */
 
         .watchArea {
@@ -880,17 +1418,18 @@ export default function WatchPage() {
           background: #000;
 
           /*
-           * PENTING:
-           * video landscape tetap utuh.
-           * Area hitam di atas/bawah akan mengisi
-           * sisa layar portrait.
+           * WAJIB contain.
+           *
+           * Video landscape tidak dipotong.
+           * Pada HP portrait, bagian kosong akan
+           * menjadi black bars.
            */
           object-fit: contain;
           object-position: center center;
         }
 
         /* =====================================================
-           HAMBURGER
+           EPISODE BUTTON
         ====================================================== */
 
         .episodeButton {
@@ -930,11 +1469,19 @@ export default function WatchPage() {
             0.6
           );
 
+          color: #fff;
+
           cursor: pointer;
 
           backdrop-filter: blur(10px);
           -webkit-backdrop-filter: blur(
             10px
+          );
+        }
+
+        .episodeButton:active {
+          transform: scale(
+            0.94
           );
         }
 
@@ -962,6 +1509,8 @@ export default function WatchPage() {
           justify-content: center;
 
           pointer-events: none;
+
+          background: transparent;
         }
 
         .spinner {
@@ -980,13 +1529,18 @@ export default function WatchPage() {
 
           border-radius: 50%;
 
-          animation: spin
-            0.8s linear infinite;
+          animation:
+            spin
+            0.8s
+            linear
+            infinite;
         }
 
         @keyframes spin {
           to {
-            transform: rotate(360deg);
+            transform: rotate(
+              360deg
+            );
           }
         }
 
@@ -1004,11 +1558,13 @@ export default function WatchPage() {
           align-items: center;
           justify-content: center;
 
+          padding: 20px;
+
           background: rgba(
             0,
             0,
             0,
-            0.7
+            0.72
           );
         }
 
@@ -1022,6 +1578,7 @@ export default function WatchPage() {
           color: #fff;
 
           font-size: 13px;
+          line-height: 1.5;
         }
 
         .errorBox button {
@@ -1041,8 +1598,14 @@ export default function WatchPage() {
           cursor: pointer;
         }
 
+        .errorBox button:active {
+          transform: scale(
+            0.96
+          );
+        }
+
         /* =====================================================
-           DRAWER
+           DRAWER BACKDROP
         ====================================================== */
 
         .drawerBackdrop {
@@ -1058,6 +1621,10 @@ export default function WatchPage() {
             0.6
           );
         }
+
+        /* =====================================================
+           EPISODE DRAWER
+        ====================================================== */
 
         .episodeDrawer {
           position: absolute;
@@ -1085,16 +1652,19 @@ export default function WatchPage() {
             );
 
           box-shadow:
-            -15px 0 50px
-            rgba(
-              0,
-              0,
-              0,
-              0.5
-            );
+            -15px 0
+              50px
+              rgba(
+                0,
+                0,
+                0,
+                0.5
+              );
 
-          animation: drawerIn
-            0.2s ease-out;
+          animation:
+            drawerIn
+            0.2s
+            ease-out;
         }
 
         @keyframes drawerIn {
@@ -1105,7 +1675,9 @@ export default function WatchPage() {
           }
 
           to {
-            transform: translateX(0);
+            transform: translateX(
+              0
+            );
           }
         }
 
@@ -1170,9 +1742,14 @@ export default function WatchPage() {
           color: #fff;
 
           font-size: 25px;
+          line-height: 1;
 
           cursor: pointer;
         }
+
+        /* =====================================================
+           EPISODE LIST
+        ====================================================== */
 
         .episodeList {
           flex: 1;
@@ -1180,6 +1757,8 @@ export default function WatchPage() {
           overflow-y: auto;
 
           padding: 10px;
+
+          overscroll-behavior: contain;
         }
 
         .episodeItem {
@@ -1207,6 +1786,21 @@ export default function WatchPage() {
           text-align: left;
 
           cursor: pointer;
+
+          transition:
+            background
+              0.15s ease,
+            color
+              0.15s ease;
+        }
+
+        .episodeItem:hover {
+          background: rgba(
+            255,
+            255,
+            255,
+            0.05
+          );
         }
 
         .episodeItem.active {
@@ -1234,8 +1828,15 @@ export default function WatchPage() {
           );
         }
 
+        .episodeItem.active
+          .episodeNumber {
+          color: #fff;
+        }
+
         .episodeName {
           flex: 1;
+
+          min-width: 0;
 
           overflow: hidden;
 
@@ -1250,6 +1851,8 @@ export default function WatchPage() {
           margin-left: 8px;
 
           font-size: 9px;
+
+          color: #fff;
         }
 
         /* =====================================================
@@ -1271,6 +1874,8 @@ export default function WatchPage() {
           .brandIcon {
             width: 25px;
             height: 25px;
+
+            border-radius: 7px;
           }
 
           .homeButton {
@@ -1293,6 +1898,20 @@ export default function WatchPage() {
 
           .episodeDrawer {
             width: 90vw;
+          }
+        }
+
+        /* =====================================================
+           VERY SMALL PHONE
+        ====================================================== */
+
+        @media (max-width: 360px) {
+          .topHeader {
+            padding: 0 12px;
+          }
+
+          .episodeDrawer {
+            width: 94vw;
           }
         }
       `}</style>
