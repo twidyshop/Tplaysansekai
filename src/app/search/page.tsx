@@ -2,16 +2,22 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useSearchDramas } from "@/hooks/useDramas";
+import { useSearchDramas, useIqiyiSearch } from "@/hooks/useDramas";
+import { usePlatform } from "@/hooks/usePlatform";
 import { DramaCard } from "@/components/DramaCard";
 import type { Drama } from "@/types/drama";
 
 function SearchResults() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
+  const { isIqiyi } = usePlatform();
 
   // Memanggil hook pencarian
-  const { data: searchResults, isLoading, error } = useSearchDramas(query);
+  const dramaSearch = useSearchDramas(query);
+  const iqiyiSearch = useIqiyiSearch(query);
+  const searchResults = isIqiyi ? iqiyiSearch.data : dramaSearch.data;
+  const isLoading = isIqiyi ? iqiyiSearch.isLoading : dramaSearch.isLoading;
+  const error = isIqiyi ? iqiyiSearch.error : dramaSearch.error;
 
   return (
     <div className="container mx-auto px-4">
@@ -45,11 +51,22 @@ function SearchResults() {
               inLibrary: result.inLibrary || false,
             };
 
+            if (isIqiyi) {
+              return (
+                <DramaCard
+                  key={String(iqiyiId) + "-" + index}
+                  drama={dramaMapped}
+                  index={index}
+                  platform="iqiyi"
+                />
+              );
+            }
+
             return (
-              <DramaCard 
-                key={result.bookId || index} 
-                drama={dramaMapped} 
-                index={index} 
+              <DramaCard
+                key={result.bookId || index}
+                drama={dramaMapped}
+                index={index}
               />
             );
           })}
