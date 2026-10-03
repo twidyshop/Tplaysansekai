@@ -76,16 +76,6 @@ function getEpisodeTitle(
   );
 }
 
-/**
- * MeloShort kadang mengembalikan bahasa dengan
- * variasi penamaan yang berbeda.
- *
- * Prioritas:
- * 1. languageCode === id
- * 2. bahasa mengandung Indonesia
- * 3. bahasa mengandung ind
- * 4. subtitle pertama hanya sebagai fallback
- */
 function findIndonesiaSubtitle(
   subtitles: Subtitle[]
 ): Subtitle | undefined {
@@ -150,6 +140,15 @@ function findIndonesiaSubtitle(
   );
 }
 
+/*
+ * Tunggu sebentar tanpa membuat request beruntun.
+ */
+function sleep(ms: number) {
+  return new Promise((resolve) =>
+    setTimeout(resolve, ms)
+  );
+}
+
 export default function WatchPage() {
   const params = useParams();
 
@@ -167,6 +166,27 @@ export default function WatchPage() {
 
   const mountedRef =
     useRef(true);
+
+  /*
+   * Menyimpan daftar episode terbaru tanpa membuat
+   * callback playEpisode berubah setiap setEpisodes().
+   */
+  const episodesRef =
+    useRef<Episode[]>([]);
+
+  /*
+   * Batalkan request Video API sebelumnya ketika
+   * user berpindah episode.
+   */
+  const videoAbortRef =
+    useRef<AbortController | null>(null);
+
+  /*
+   * Timestamp request terakhir.
+   * Membantu mencegah request video terlalu rapat.
+   */
+  const lastVideoRequestRef =
+    useRef(0);
 
   const [episodes, setEpisodes] =
     useState<Episode[]>([]);
@@ -321,10 +341,6 @@ export default function WatchPage() {
 
         if (!mountedRef.current) return;
 
-        /*
-         * Jangan tampilkan error.
-         * Waiting/buffering adalah kondisi normal HLS.
-         */
         setLoading(true);
       };
 
@@ -338,10 +354,6 @@ export default function WatchPage() {
 
         if (!mountedRef.current) return;
 
-        /*
-         * Kalau browser sudah bisa memainkan video,
-         * hilangkan loading.
-         */
         if (!video.paused) {
           setLoading(false);
         }
@@ -398,13 +410,17 @@ export default function WatchPage() {
 
               lowLatencyMode: false,
 
-              fragLoadingMaxRetry: 4,
-              manifestLoadingMaxRetry: 4,
-              levelLoadingMaxRetry: 4,
+              /*
+               * Jangan terlalu agresif retry.
+               * Retry HLS berbeda dengan retry Video API.
+               */
+              fragLoadingMaxRetry: 3,
+              manifestLoadingMaxRetry: 3,
+              levelLoadingMaxRetry: 3,
 
-              fragLoadingRetryDelay: 1000,
-              manifestLoadingRetryDelay: 1000,
-              levelLoadingRetryDelay: 1000,
+              fragLoadingRetryDelay: 1500,
+              manifestLoadingRetryDelay: 1500,
+              levelLoadingRetryDelay: 1500,
             });
 
           hlsRef.current =
@@ -424,10 +440,6 @@ export default function WatchPage() {
                 return;
               }
 
-              /*
-               * Pastikan browser mencoba autoplay
-               * setelah manifest tersedia.
-               */
               video
                 .play()
                 .then(() => {
@@ -438,12 +450,7 @@ export default function WatchPage() {
                     setLoading(false);
                   }
                 })
-                .catch(() => {
-                  /*
-                   * Browser bisa menolak autoplay.
-                   * Ini bukan error stream.
-                   */
-                });
+                .catch(() => {});
             }
           );
 
@@ -464,12 +471,6 @@ export default function WatchPage() {
                 return;
               }
 
-              /*
-               * NETWORK ERROR
-               *
-               * Coba load ulang tanpa langsung
-               * menampilkan error ke user.
-               */
               if (
                 data.type ===
                 Hls.ErrorTypes.NETWORK_ERROR
@@ -481,13 +482,6 @@ export default function WatchPage() {
                 return;
               }
 
-              /*
-               * MEDIA ERROR
-               *
-               * RecoverMediaError adalah cara
-               * standar HLS.js untuk memulihkan
-               * decoder.
-               */
               if (
                 data.type ===
                 Hls.ErrorTypes.MEDIA_ERROR
@@ -499,13 +493,6 @@ export default function WatchPage() {
                 return;
               }
 
-              /*
-               * Error fatal yang benar-benar tidak
-               * bisa dipulihkan.
-               *
-               * Jangan langsung membuat popup.
-               * Coba native playback sebagai fallback.
-               */
               try {
                 hls.destroy();
               } catch {}
@@ -581,12 +568,7 @@ export default function WatchPage() {
             setLoading(false);
           }
         })
-        .catch(() => {
-          /*
-           * Jangan langsung dianggap stream error.
-           * Browser dapat menolak autoplay.
-           */
-        });
+        .catch(() => {});
     },
     [destroyPlayer]
   );
@@ -653,7 +635,7 @@ export default function WatchPage() {
       ) => {
         const list =
           overrideEpisodes ||
-          episodes;
+          episodesRef.current;
 
         const episode =
           list[index];
@@ -661,11 +643,22 @@ export default function WatchPage() {
         if (!episode) return;
 
         /*
-         * Set request ID baru.
-         *
-         * Kalau user cepat berpindah E01 → E02,
-         * response E01 yang datang belakangan
-         * tidak boleh mengambil alih player E02.
+         * Request lama langsung dibatalkan.
+         */
+        if (videoAbortRef.current) {
+          try {
+            videoAbortRef.current.abort();
+          } catch {}
+        }
+
+        const abortController =
+          new AbortController();
+
+        videoAbortRef.current =
+          abortController;
+
+        /*
+         * Request ID baru.
          */
         const requestId =
           ++requestIdRef.current;
@@ -682,25 +675,129 @@ export default function WatchPage() {
               index
             );
 
-          const response =
+          /*
+           * Pastikan request Video API tidak ditembak
+           * terlalu rapat.
+           */
+          const elapsed =
+            Date.now() -
+            lastVideoRequestRef.current;
+
+          const minimumGap = 700;
+
+          if (
+            elapsed <
+            minimumGap
+          ) {
+            await sleep(
+              minimumGap - elapsed
+            );
+          }
+
+          if (
+            requestId !==
+            requestIdRef.current
+          ) {
+            return;
+          }
+
+          lastVideoRequestRef.current =
+            Date.now();
+
+          const videoApiUrl =
+            `/api/meloshort?path=/api/v2/video` +
+            `&category_p=meloshort` +
+            `&id=${encodeURIComponent(
+              bookId
+            )}` +
+            `&chapterId=${encodeURIComponent(
+              String(chapterId)
+            )}` +
+            `&lang=id`;
+
+          let response =
             await fetch(
-              `/api/meloshort?path=/api/v2/video` +
-                `&category_p=meloshort` +
-                `&id=${encodeURIComponent(
-                  bookId
-                )}` +
-                `&chapterId=${encodeURIComponent(
-                  String(
-                    chapterId
-                  )
-                )}` +
-                `&lang=id`,
+              videoApiUrl,
               {
                 cache: "no-store",
+                signal:
+                  abortController.signal,
               }
             );
 
-          if (!response.ok) {
+          /*
+           * ===================================================
+           * QUICKPLAY 429
+           * ===================================================
+           *
+           * Jangan langsung menembak ulang berkali-kali.
+           *
+           * Coba sekali setelah jeda.
+           */
+          if (
+            response.status === 429
+          ) {
+            console.warn(
+              "QuickPlay Video API 429. Menunggu sebelum retry..."
+            );
+
+            const retryAfter =
+              Number(
+                response.headers.get(
+                  "Retry-After"
+                )
+              );
+
+            const waitTime =
+              Number.isFinite(
+                retryAfter
+              ) &&
+              retryAfter > 0
+                ? Math.min(
+                    retryAfter * 1000,
+                    8000
+                  )
+                : 2500;
+
+            await sleep(
+              waitTime
+            );
+
+            if (
+              requestId !==
+                requestIdRef.current ||
+              abortController.signal
+                .aborted
+            ) {
+              return;
+            }
+
+            lastVideoRequestRef.current =
+              Date.now();
+
+            response =
+              await fetch(
+                videoApiUrl,
+                {
+                  cache: "no-store",
+                  signal:
+                    abortController.signal,
+                }
+              );
+          }
+
+          if (
+            !response.ok
+          ) {
+            if (
+              response.status ===
+              429
+            ) {
+              throw new Error(
+                "Video API sedang membatasi request. Tunggu beberapa detik lalu coba lagi."
+              );
+            }
+
             throw new Error(
               `Video API ${response.status}`
             );
@@ -710,9 +807,7 @@ export default function WatchPage() {
             await response.json();
 
           /*
-           * Kalau user sudah memilih episode lain
-           * sementara request ini berjalan, abaikan
-           * hasil request lama.
+           * Abaikan response lama.
            */
           if (
             requestId !==
@@ -742,8 +837,8 @@ export default function WatchPage() {
           }
 
           /*
-           * Prioritas kualitas:
-           * 1080 → 720 → 480 → stream pertama.
+           * Prioritas:
+           * 1080p → 720p → 480p → pertama.
            */
           const stream =
             streams.find(
@@ -804,16 +899,6 @@ export default function WatchPage() {
               subtitles
             );
 
-          /*
-           * MeloShort response yang kamu kirim memang
-           * menyediakan:
-           *
-           * language: Indonesia
-           * languageCode: id
-           * format: webvtt
-           *
-           * Jadi URL tersebut diprioritaskan.
-           */
           const subtitleUrl =
             indonesia?.url ||
             "";
@@ -832,6 +917,16 @@ export default function WatchPage() {
 
           setDrawerOpen(false);
         } catch (err: any) {
+          /*
+           * Abort bukan error player.
+           */
+          if (
+            err?.name ===
+            "AbortError"
+          ) {
+            return;
+          }
+
           if (
             requestId !==
             requestIdRef.current
@@ -844,70 +939,16 @@ export default function WatchPage() {
             err
           );
 
-          /*
-           * Beri sedikit waktu kepada HLS/player
-           * untuk mulai bermain.
-           *
-           * Ini mencegah pesan error palsu ketika
-           * video sebenarnya masih buffering.
-           */
-          setTimeout(() => {
-            if (
-              requestId !==
-              requestIdRef.current
-            ) {
-              return;
-            }
+          setLoading(false);
 
-            const video =
-              videoRef.current;
-
-            if (!video) {
-              setLoading(false);
-              setError(
-                err?.message ||
-                  "Gagal memutar video."
-              );
-              return;
-            }
-
-            /*
-             * Jika video sudah punya data / sedang
-             * berjalan, jangan tampilkan error.
-             */
-            const actuallyPlaying =
-              !video.paused &&
-              video.currentTime > 0;
-
-            const hasVideoData =
-              video.readyState >= 2;
-
-            if (
-              actuallyPlaying ||
-              hasVideoData
-            ) {
-              setError("");
-              setPlaying(
-                actuallyPlaying
-              );
-              setLoading(
-                !actuallyPlaying
-              );
-              return;
-            }
-
-            setLoading(false);
-
-            setError(
-              err?.message ||
-                "Gagal memutar video."
-            );
-          }, 1800);
+          setError(
+            err?.message ||
+              "Gagal memutar video."
+          );
         }
       },
       [
         bookId,
-        episodes,
         playStream,
       ]
     );
@@ -937,6 +978,16 @@ export default function WatchPage() {
         ) {
           return;
         }
+
+        /*
+         * Simpan ke state dan ref.
+         *
+         * Ref penting supaya perubahan state episodes
+         * tidak menyebabkan useEffect awal menembak
+         * ulang Video API.
+         */
+        episodesRef.current =
+          list;
 
         setEpisodes(list);
 
@@ -969,6 +1020,9 @@ export default function WatchPage() {
           index = 0;
         }
 
+        /*
+         * Hanya satu pemanggilan episode awal.
+         */
         await playEpisode(
           index,
           list
@@ -977,6 +1031,13 @@ export default function WatchPage() {
         if (
           cancelled ||
           !mountedRef.current
+        ) {
+          return;
+        }
+
+        if (
+          err?.name ===
+          "AbortError"
         ) {
           return;
         }
@@ -1001,10 +1062,17 @@ export default function WatchPage() {
 
     return () => {
       cancelled = true;
+
       mountedRef.current =
         false;
 
       requestIdRef.current++;
+
+      if (videoAbortRef.current) {
+        try {
+          videoAbortRef.current.abort();
+        } catch {}
+      }
 
       destroyPlayer();
     };
@@ -1025,15 +1093,11 @@ export default function WatchPage() {
         currentIndex + 1;
 
       if (
-        next < episodes.length
+        next < episodesRef.current.length
       ) {
         playEpisode(next);
       }
-    }, [
-      currentIndex,
-      episodes.length,
-      playEpisode,
-    ]);
+    }, [currentIndex, playEpisode]);
 
   // =========================================================
   // RENDER
@@ -1083,9 +1147,6 @@ export default function WatchPage() {
               setError("");
             }}
             onWaiting={() => {
-              /*
-               * Buffering normal tidak dianggap error.
-               */
               if (!error) {
                 setLoading(true);
               }
@@ -1107,7 +1168,7 @@ export default function WatchPage() {
           />
 
           {/* =================================================
-              HAMBURGER EPISODE
+              EPISODE BUTTON
           ================================================== */}
 
           <button
@@ -1298,10 +1359,6 @@ export default function WatchPage() {
           color: #fff;
         }
 
-        /* =====================================================
-           HEADER
-        ====================================================== */
-
         .topHeader {
           position: relative;
           z-index: 50;
@@ -1373,10 +1430,6 @@ export default function WatchPage() {
           font-weight: 600;
         }
 
-        /* =====================================================
-           WATCH AREA
-        ====================================================== */
-
         .watchArea {
           position: relative;
 
@@ -1417,20 +1470,9 @@ export default function WatchPage() {
 
           background: #000;
 
-          /*
-           * WAJIB contain.
-           *
-           * Video landscape tidak dipotong.
-           * Pada HP portrait, bagian kosong akan
-           * menjadi black bars.
-           */
           object-fit: contain;
           object-position: center center;
         }
-
-        /* =====================================================
-           EPISODE BUTTON
-        ====================================================== */
 
         .episodeButton {
           position: absolute;
@@ -1494,10 +1536,6 @@ export default function WatchPage() {
           background: #fff;
         }
 
-        /* =====================================================
-           LOADING
-        ====================================================== */
-
         .loadingOverlay {
           position: absolute;
           inset: 0;
@@ -1544,10 +1582,6 @@ export default function WatchPage() {
           }
         }
 
-        /* =====================================================
-           ERROR
-        ====================================================== */
-
         .errorOverlay {
           position: absolute;
           inset: 0;
@@ -1573,7 +1607,7 @@ export default function WatchPage() {
         }
 
         .errorText {
-          max-width: 280px;
+          max-width: 300px;
 
           color: #fff;
 
@@ -1604,10 +1638,6 @@ export default function WatchPage() {
           );
         }
 
-        /* =====================================================
-           DRAWER BACKDROP
-        ====================================================== */
-
         .drawerBackdrop {
           position: fixed;
           inset: 0;
@@ -1621,10 +1651,6 @@ export default function WatchPage() {
             0.6
           );
         }
-
-        /* =====================================================
-           EPISODE DRAWER
-        ====================================================== */
 
         .episodeDrawer {
           position: absolute;
@@ -1747,10 +1773,6 @@ export default function WatchPage() {
           cursor: pointer;
         }
 
-        /* =====================================================
-           EPISODE LIST
-        ====================================================== */
-
         .episodeList {
           flex: 1;
 
@@ -1855,10 +1877,6 @@ export default function WatchPage() {
           color: #fff;
         }
 
-        /* =====================================================
-           MOBILE
-        ====================================================== */
-
         @media (max-width: 600px) {
           .topHeader {
             flex-basis: 54px;
@@ -1900,10 +1918,6 @@ export default function WatchPage() {
             width: 90vw;
           }
         }
-
-        /* =====================================================
-           VERY SMALL PHONE
-        ====================================================== */
 
         @media (max-width: 360px) {
           .topHeader {
