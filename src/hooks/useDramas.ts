@@ -2,134 +2,122 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import type { Drama, SearchResult } from "@/types/drama";
 
 const API_BASE = "/api/dramabox";
-
 import { fetchJson } from "@/lib/fetcher";
-
 const REC_API_BASE = "/api/reelshort";
 
-// Infinite Scroll Hook for DramaBox "Lainnya"
 export function useInfiniteForYouDramas() {
   return useInfiniteQuery({
     queryKey: ["dramas", "foryou", "infinite"],
     queryFn: ({ pageParam = 1 }) => fetchJson<Drama[]>(`${API_BASE}/foryou?page=${pageParam}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Drama[], allPages: Drama[][]) => {
-        if (!lastPage || lastPage.length === 0 || allPages.length >= 100) return undefined;
-        return allPages.length + 1;
+      if (!lastPage || lastPage.length === 0 || allPages.length >= 100) return undefined;
+      return allPages.length + 1;
     },
     staleTime: 1000 * 60 * 5,
   });
 }
 
-// Infinite Scroll Hook for ReelShort "Lainnya"
 export function useInfiniteReelShortDramas() {
   return useInfiniteQuery({
     queryKey: ["reels", "foryou", "infinite"],
     queryFn: ({ pageParam = 1 }) => fetchJson<Drama[]>(`${REC_API_BASE}/foryou?page=${pageParam}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Drama[], allPages: Drama[][]) => {
-        if (!lastPage || lastPage.length === 0 || allPages.length >= 100) return undefined;
-        return allPages.length + 1;
+      if (!lastPage || lastPage.length === 0 || allPages.length >= 100) return undefined;
+      return allPages.length + 1;
     },
     staleTime: 1000 * 60 * 5,
   });
 }
 
-export function useForYouDramas() {
+export function useForYouDramas(enabled = true) {
   return useQuery({
     queryKey: ["dramas", "foryou"],
     queryFn: () => fetchJson<Drama[]>(`${API_BASE}/foryou`),
+    enabled,
     staleTime: 1000 * 60 * 5,
   });
 }
 
-export function useLatestDramas() {
+export function useLatestDramas(enabled = true) {
   return useQuery({
     queryKey: ["dramas", "latest"],
     queryFn: () => fetchJson<Drama[]>(`${API_BASE}/latest`),
+    enabled,
     staleTime: 1000 * 60 * 5,
   });
 }
 
-export function useTrendingDramas() {
+export function useTrendingDramas(enabled = true) {
   return useQuery({
     queryKey: ["dramas", "trending"],
     queryFn: () => fetchJson<Drama[]>(`${API_BASE}/trending`),
+    enabled,
     staleTime: 1000 * 60 * 5,
   });
 }
 
 export function useSearchDramas(query: string) {
   const normalizedQuery = query.trim();
-
   return useQuery({
     queryKey: ["dramas", "search", normalizedQuery],
     queryFn: async () => {
-         if (!normalizedQuery) return [];
-         return fetchJson<SearchResult[]>(`${API_BASE}/search?query=${encodeURIComponent(normalizedQuery)}`);
+      if (!normalizedQuery) return [];
+      return fetchJson<SearchResult[]>(`${API_BASE}/search?query=${encodeURIComponent(normalizedQuery)}`);
     },
     enabled: normalizedQuery.length > 0,
     staleTime: 1000 * 60 * 2,
   });
 }
 
-export function useDubindoDramas() {
+export function useDubindoDramas(enabled = true) {
   return useQuery({
     queryKey: ["dramas", "dubindo"],
     queryFn: () => fetchJson<Drama[]>(`${API_BASE}/dubindo`),
+    enabled,
     staleTime: 1000 * 60 * 5,
   });
 }
 
-// ==========================================
-// HOOK MELOSHORT (QUICKPLAY) - SUDAH DISESUAIKAN KE PROXY CATCH-ALL
-// ==========================================
 export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort-dramas"],
     queryFn: async () => {
-      // PERHATIKAN DI SINI: Menembak proxy universal ke endpoint v2/home dengan bahasa Indonesia
       const res = await fetch("/api/meloshort?path=/api/v2/home&lang=id");
       if (!res.ok) throw new Error("Gagal mengambil data MeloShort");
       const json = await res.json();
-      
-      // Mapping data agar aman dan langsung tampil di UI TPLAY+
       return (json.data || []).map((item: any) => ({
-        id: String(item.id || item.bookId || item.quickplay_id || ''),
-        title: item.title || item.name || item.bookName || 'Untitled',
-        cover: item.cover || item.image || item.coverWap || '',
-        description: item.description || item.introduction || item.desc || '',
+        id: String(item.id || item.bookId || item.quickplay_id || ""),
+        title: item.title || item.name || item.bookName || "Untitled",
+        cover: item.cover || item.image || item.coverWap || "",
+        description: item.description || item.introduction || item.desc || "",
         tags: item.tags || item.tagNames || item.book_theme || [],
       }));
     },
     staleTime: 1000 * 60 * 5,
   });
 }
+
 export function useIqiyiSearch(query: string) {
   const normalizedQuery = query.trim();
-
   return useQuery({
     queryKey: ["iqiyi-search", normalizedQuery],
     queryFn: async () => {
       if (!normalizedQuery) return [];
-      const res = await fetch(
-        "/api/iqiyi?action=search&q=" + encodeURIComponent(normalizedQuery) + "&lang=id",
-        { cache: "no-store" }
-      );
+      const res = await fetch("/api/iqiyi?action=search&q=" + encodeURIComponent(normalizedQuery) + "&lang=id");
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Gagal mencari IQIYI");
-
       const findArray = (value: any): any[] => {
         if (Array.isArray(value)) return value;
         if (!value || typeof value !== "object") return [];
-        for (const key of ["data", "list", "rows", "results", "items", "books", "dramas"]) {
+        for (const key of ["data", "list", "rows", "results", "items", "books", "dramas", "albums"]) {
           if (Array.isArray(value[key])) return value[key];
           const nested = findArray(value[key]);
           if (nested.length) return nested;
         }
         return [];
       };
-
       return findArray(json);
     },
     enabled: normalizedQuery.length > 0,
