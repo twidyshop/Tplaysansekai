@@ -1,17 +1,69 @@
 "use client";
 
-import { useParams,useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
-function unwrap(value:any):any{let data=value?.data??value;for(let i=0;i<4;i++){if(!data||typeof data!=="object"||Array.isArray(data))break;const next=data.detail??data.drama??data.book??data.item??data.data;if(!next||next===data||Array.isArray(next))break;data=next}return data}
-function text(value:any,keys:string[],fallback=""){for(const key of keys){const v=value?.[key];if(typeof v==="string"&&v.trim())return v.trim()}return fallback}
-function number(value:any,keys:string[]){for(const key of keys){const n=Number(value?.[key]);if(Number.isFinite(n)&&n>0)return n}return 0}
+function unwrap(value:any):any {
+  let data=value?.data??value;
+  for(let i=0;i<8;i++){
+    if(!data||typeof data!=="object"||Array.isArray(data)) break;
+    const next=data.detail??data.drama??data.album??data.video??data.item??data.result??data.data;
+    if(!next||next===data||Array.isArray(next)) break;
+    data=next;
+  }
+  return data;
+}
+function text(value:any,keys:string[],fallback=""){
+  for(const key of keys){
+    const v=value?.[key];
+    if(typeof v==="string"&&v.trim()) return v.trim();
+    if(typeof v==="number"&&Number.isFinite(v)) return String(v);
+  }
+  return fallback;
+}
+function number(value:any,keys:string[]){
+  for(const key of keys){
+    const n=Number(value?.[key]);
+    if(Number.isFinite(n)&&n>0) return n;
+  }
+  return 0;
+}
 
 export default function IqiyiDetailPage(){
- const params=useParams(),router=useRouter(),id=String(params.id||"");
- const {data,isLoading,error}=useQuery({queryKey:["iqiyi-detail",id],queryFn:async()=>{const response=await fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(id));const json=await response.json();if(!response.ok)throw new Error(json?.error||"Gagal memuat detail IQIYI");return unwrap(json)},enabled:Boolean(id),staleTime:300000});
- if(isLoading)return <div className="min-h-screen bg-black text-white flex items-center justify-center">Memuat detail...</div>;
- if(error||!data)return <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-5 text-center"><p className="text-red-400 font-semibold mb-4">Drama IQIYI tidak ditemukan.</p><button onClick={()=>router.back()} className="rounded-xl bg-white px-5 py-2.5 text-black font-semibold">Kembali</button></div>;
- const title=text(data,["title","name","bookName","albumName"],"Untitled"),cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic"],""),description=text(data,["description","synopsis","introduction","desc","summary"],""),episodes=number(data,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode"]);
- return <main className="min-h-screen bg-[#0a0e27] text-white"><header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70 hover:text-white">‹&nbsp; Kembali</button></div></header><div className="container mx-auto max-w-5xl px-4 py-8"><div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]"><div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={cover} alt={title} className="h-full w-full object-cover"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div><section className="flex min-w-0 flex-col"><span className="mb-3 inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">iQIYI</span><h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>{description&&<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>}{episodes>0&&<p className="mb-6 text-sm text-white/45">{episodes} episode</p>}<button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button></section></div></div></main>
+  const params=useParams(),router=useRouter(),id=String(params.id||"");
+  const {data,isLoading,error}=useQuery({
+    queryKey:["iqiyi-detail",id],
+    queryFn:async()=>{
+      const response=await fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(id)+"&lang=id");
+      const json=await response.json();
+      if(!response.ok) throw new Error(json?.error||"Gagal memuat detail IQIYI");
+      return unwrap(json);
+    },
+    enabled:Boolean(id),
+    staleTime:300000,
+  });
+
+  if(isLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Memuat detail...</div>;
+  if(error||!data) return <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-5 text-center"><p className="text-red-400 font-semibold mb-4">Drama IQIYI tidak ditemukan.</p><button onClick={()=>router.back()} className="rounded-xl bg-white px-5 py-2.5 text-black font-semibold">Kembali</button></div>;
+
+  const title=text(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],"iQIYI");
+  const cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],"");
+  const description=text(data,["description","synopsis","introduction","desc","summary","shotDesc"],"");
+  const episodes=number(data,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"]);
+
+  return <main className="min-h-screen bg-[#0a0e27] text-white">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70 hover:text-white">‹&nbsp; Kembali</button></div></header>
+    <div className="container mx-auto max-w-5xl px-4 py-8">
+      <div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]">
+        <div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={cover} alt={title} className="h-full w-full object-cover"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div>
+        <section className="flex min-w-0 flex-col">
+          <span className="mb-3 inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">iQIYI</span>
+          <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>
+          {description&&<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>}
+          {episodes>0&&<p className="mb-6 text-sm text-white/45">{episodes} episode</p>}
+          <button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button>
+        </section>
+      </div>
+    </div>
+  </main>;
 }
