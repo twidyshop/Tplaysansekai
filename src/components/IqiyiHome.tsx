@@ -36,7 +36,7 @@ export function IqiyiHome() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["iqiyi-home"],
     queryFn: async () => {
-      const response = await fetch("/api/iqiyi?action=home", { cache: "no-store" });
+      const response = await fetch("/api/iqiyi?action=home&lang=id", { cache: "no-store" });
       const json = await response.json();
       if (!response.ok) throw new Error(json?.error || "Gagal mengambil data IQIYI");
       return json;
