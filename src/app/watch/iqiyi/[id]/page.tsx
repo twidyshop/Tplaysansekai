@@ -35,11 +35,11 @@ function findStream(v:any):string{
 
 export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),dramaId=String(id||"");
-  const video=useRef<HTMLVideoElement|null>(null),hls=useRef<Hls|null>(null),proxyTried=useRef(false);
+  const video=useRef<HTMLVideoElement|null>(null),hls=useRef<Hls|null>(null);
   const [episodes,setEpisodes]=useState<any[]>([]),[title,setTitle]=useState("iQIYI"),[selected,setSelected]=useState(1),[source,setSource]=useState(""),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[error,setError]=useState("");
 
   const play=useCallback(async(n:number)=>{
-    setSelected(n);setPlaying(false);setError("");setSource("");proxyTried.current=false;
+    setSelected(n);setPlaying(false);setError("");setSource("");
     try{
       const r=await fetch("/api/iqiyi?action=play&id="+encodeURIComponent(dramaId)+"&episode="+n+"&lang=id");
       const j=await r.json();
@@ -92,21 +92,7 @@ export default function IqiyiWatchPage(){
     let url=source;
     const isDirect=/^https?:\/\//i.test(source);
 
-    const useProxy=()=>{
-      if(proxyTried.current) { setError("Video gagal dimuat oleh CDN iQIYI."); return; }
-      proxyTried.current=true;
-      instance?.destroy();instance=null;hls.current=null;
-      url="/api/iqiyi/proxy?url="+encodeURIComponent(source);
-      if(Hls.isSupported()){
-        const fallback=new Hls({enableWorker:true});
-        hls.current=fallback;
-        fallback.loadSource(url);fallback.attachMedia(v);
-        fallback.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
-        fallback.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)setError("Video gagal dimuat oleh CDN iQIYI.")});
-      }else{
-        v.src=url;void v.play().catch(()=>{});
-      }
-    };
+    const fail=()=>setError("Video iQIYI tidak bisa diputar langsung. URL stream dari Hoshiyomi tidak kompatibel dengan browser ini.");
 
     const start=async()=>{
       try{
@@ -119,7 +105,7 @@ export default function IqiyiWatchPage(){
         }
         if(v.canPlayType("application/vnd.apple.mpegurl")){
           v.src=url;
-          v.addEventListener("error",useProxy,{once:true});
+          v.addEventListener("error",fail,{once:true});
           await v.play().catch(()=>{});
           setPlaying(true);
           return;
@@ -129,7 +115,7 @@ export default function IqiyiWatchPage(){
           hls.current=instance;
           instance.loadSource(url);instance.attachMedia(v);
           instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
-          instance.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)useProxy()});
+          instance.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)fail()});
         }else setError("Browser tidak mendukung HLS.");
       }catch(e){setError(e instanceof Error?e.message:"Gagal menyiapkan player")}
     };
