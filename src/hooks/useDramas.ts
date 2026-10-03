@@ -113,7 +113,7 @@ export function useIqiyiSearch(query: string) {
     queryFn: async () => {
       if (!normalizedQuery) return [];
       const res = await fetch(
-        "/api/iqiyi?action=search&query=" + encodeURIComponent(normalizedQuery),
+        "/api/iqiyi?action=search&q=" + encodeURIComponent(normalizedQuery) + "&lang=id",
         { cache: "no-store" }
       );
       const json = await res.json();
