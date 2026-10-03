@@ -102,20 +102,20 @@ function parseVttTimestamp(value: string) {
 
 function parseSubtitleCues(text: string): SubtitleCue[] {
   const normalized = text
-    .replace(/^\\uFEFF/, "")
-    .replace(/\\r/g, "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r/g, "")
     .trim();
 
-  const blocks = normalized.split(/\\n\\s*\\n/);
+  const blocks = normalized.split(/\n\s*\n/);
   const cues: SubtitleCue[] = [];
 
   for (const block of blocks) {
     const lines = block
-      .split("\\n")
+      .split("\n")
       .map((line) => line.trimEnd());
 
     const timingIndex = lines.findIndex((line) =>
-      /(?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3}\\s*-->\\s*(?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3}/.test(
+      /(?:\d{2}:)?\d{2}:\d{2}[.,]\d{3}\s*-->\s*(?:\d{2}:)?\d{2}:\d{2}[.,]\d{3}/.test(
         line
       )
     );
@@ -124,7 +124,7 @@ function parseSubtitleCues(text: string): SubtitleCue[] {
 
     const timing = lines[timingIndex];
     const match = timing.match(
-      /((?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3})\\s*-->\\s*((?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3})/
+      /((?:\d{2}:)?\d{2}:\d{2}[.,]\d{3})\s*-->\s*((?:\d{2}:)?\d{2}:\d{2}[.,]\d{3})/
     );
 
     if (!match) continue;
@@ -138,8 +138,8 @@ function parseSubtitleCues(text: string): SubtitleCue[] {
 
     const cueText = lines
       .slice(timingIndex + 1)
-      .join("\\n")
-      .replace(/<br\\s*\\/?>(?=\\S)/gi, "\\n")
+      .join("\n")
+      .replace(/<br\s*\/?>(?=\S)/gi, "\n")
       .replace(/<[^>]+>/g, "")
       .trim();
 
