@@ -54,7 +54,7 @@ function SearchResults() {
             if (isIqiyi) {
               return (
                 <DramaCard
-                  key={String(iqiyiId) + "-" + index}
+                  key={String(result.bookId || index) + "-iqiyi"}
                   drama={dramaMapped}
                   index={index}
                   platform="iqiyi"
