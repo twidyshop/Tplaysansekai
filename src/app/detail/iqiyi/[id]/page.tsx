@@ -45,8 +45,6 @@ export default function IqiyiDetailPage(){
     staleTime:300000,
   });
 
-  if(isLoading) return <div className="min-h-screen bg-[#0a0e27] text-white"><div className="container mx-auto max-w-5xl px-4 py-8"><div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]"><div className="aspect-[3/4] animate-pulse rounded-2xl bg-white/5"/><div className="space-y-4 pt-2"><div className="h-4 w-20 animate-pulse rounded bg-white/5"/><div className="h-10 w-3/4 animate-pulse rounded bg-white/5"/><div className="h-24 w-full animate-pulse rounded bg-white/5"/><div className="h-12 w-44 animate-pulse rounded-xl bg-white/5"/></div></div></div></div>;
-  if(error&&!data) return <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-5 text-center"><p className="text-red-400 font-semibold mb-4">Detail iQIYI gagal dimuat.</p><button onClick={()=>router.back()} className="rounded-xl bg-white px-5 py-2.5 text-black font-semibold">Kembali</button></div>;
 
   const title=text(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
   const cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
@@ -62,6 +60,7 @@ export default function IqiyiDetailPage(){
           <span className="mb-3 inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">iQIYI</span>
           <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>
           {description&&<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>}
+{error&&<p className="mb-5 text-xs text-amber-300/80">Info lengkap iQIYI sedang tidak tersedia, tetapi film tetap bisa dicoba diputar.</p>}
           {episodes>0&&<p className="mb-6 text-sm text-white/45">{episodes} episode</p>}
           <button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button>
         </section>
