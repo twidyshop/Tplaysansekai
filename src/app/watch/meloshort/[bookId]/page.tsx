@@ -546,11 +546,6 @@ export default function WatchPage() {
       const playableUrl =
         proxyUrl(originalUrl);
 
-      const proxiedSubtitle =
-        subtitleUrl
-          ? proxyUrl(subtitleUrl)
-          : "";
-
       // =======================================================
       // SUBTITLE INDONESIA — HARD-SUB STYLE OVERLAY
       // =======================================================
@@ -558,14 +553,13 @@ export default function WatchPage() {
       subtitleCuesRef.current = [];
       setSubtitleText("");
 
-      if (proxiedSubtitle) {
+      if (subtitleUrl) {
         try {
           const subtitleResponse =
             await fetch(
               subtitleProxyUrl(subtitleUrl),
               {
                 cache: "no-store",
-                signal: undefined,
               }
             );
 
