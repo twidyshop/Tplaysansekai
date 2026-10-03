@@ -32,6 +32,12 @@ interface Subtitle {
   [key: string]: any;
 }
 
+interface SubtitleCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
 interface DramaMetadata {
   title: string;
   image: string;
@@ -43,6 +49,139 @@ const WORKER_PROXY =
 
 function proxyUrl(url: string) {
   return WORKER_PROXY + encodeURIComponent(url);
+}
+
+/*
+ * MeloShort subtitle dibuat sebagai overlay HTML sendiri.
+ *
+ * Beberapa browser/tablet tidak konsisten menampilkan <track>
+ * subtitle pada video HLS. Dengan overlay ini subtitle tetap
+ * terlihat di atas video seperti hard-sub, tetapi file video
+ * aslinya tidak perlu diubah/transcode.
+ */
+function subtitleProxyUrl(url: string) {
+  return (
+    "/api/meloshort/stream?url=" +
+    encodeURIComponent(url) +
+    "&subtitle=1"
+  );
+}
+
+function parseVttTimestamp(value: string) {
+  const normalized = value.trim().replace(",", ".");
+  const parts = normalized.split(":");
+
+  if (parts.length === 3) {
+    const hours = Number(parts[0]);
+    const minutes = Number(parts[1]);
+    const seconds = Number(parts[2]);
+
+    if (
+      Number.isFinite(hours) &&
+      Number.isFinite(minutes) &&
+      Number.isFinite(seconds)
+    ) {
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+  }
+
+  if (parts.length === 2) {
+    const minutes = Number(parts[0]);
+    const seconds = Number(parts[1]);
+
+    if (
+      Number.isFinite(minutes) &&
+      Number.isFinite(seconds)
+    ) {
+      return minutes * 60 + seconds;
+    }
+  }
+
+  return NaN;
+}
+
+function parseSubtitleCues(text: string): SubtitleCue[] {
+  const normalized = text
+    .replace(/^\\uFEFF/, "")
+    .replace(/\\r/g, "")
+    .trim();
+
+  const blocks = normalized.split(/\\n\\s*\\n/);
+  const cues: SubtitleCue[] = [];
+
+  for (const block of blocks) {
+    const lines = block
+      .split("\\n")
+      .map((line) => line.trimEnd());
+
+    const timingIndex = lines.findIndex((line) =>
+      /(?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3}\\s*-->\\s*(?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3}/.test(
+        line
+      )
+    );
+
+    if (timingIndex < 0) continue;
+
+    const timing = lines[timingIndex];
+    const match = timing.match(
+      /((?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3})\\s*-->\\s*((?:\\d{2}:)?\\d{2}:\\d{2}[.,]\\d{3})/
+    );
+
+    if (!match) continue;
+
+    const start = parseVttTimestamp(match[1]);
+    const end = parseVttTimestamp(match[2]);
+
+    if (!Number.isFinite(start) || !Number.isFinite(end)) {
+      continue;
+    }
+
+    const cueText = lines
+      .slice(timingIndex + 1)
+      .join("\\n")
+      .replace(/<br\\s*\\/?>(?=\\S)/gi, "\\n")
+      .replace(/<[^>]+>/g, "")
+      .trim();
+
+    if (!cueText) continue;
+
+    cues.push({
+      start,
+      end,
+      text: cueText,
+    });
+  }
+
+  return cues;
+}
+
+function getActiveSubtitle(
+  cues: SubtitleCue[],
+  currentTime: number
+) {
+  if (!cues.length) return "";
+
+  /*
+   * Binary search supaya tetap ringan walaupun subtitle
+   * memiliki banyak cue.
+   */
+  let low = 0;
+  let high = cues.length - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const cue = cues[mid];
+
+    if (currentTime < cue.start) {
+      high = mid - 1;
+    } else if (currentTime > cue.end) {
+      low = mid + 1;
+    } else {
+      return cue.text;
+    }
+  }
+
+  return "";
 }
 
 function getChapterId(
@@ -313,6 +452,12 @@ export default function WatchPage() {
   const [playing, setPlaying] =
     useState(false);
 
+  const [subtitleText, setSubtitleText] =
+    useState("");
+
+  const subtitleCuesRef =
+    useRef<SubtitleCue[]>([]);
+
   const [error, setError] =
     useState("");
 
@@ -364,6 +509,9 @@ export default function WatchPage() {
     while (video.firstChild) {
       video.removeChild(video.firstChild);
     }
+
+    subtitleCuesRef.current = [];
+    setSubtitleText("");
   }, []);
 
   // =========================================================
@@ -404,22 +552,47 @@ export default function WatchPage() {
           : "";
 
       // =======================================================
-      // SUBTITLE INDONESIA
+      // SUBTITLE INDONESIA — HARD-SUB STYLE OVERLAY
       // =======================================================
 
+      subtitleCuesRef.current = [];
+      setSubtitleText("");
+
       if (proxiedSubtitle) {
-        const track =
-          document.createElement(
-            "track"
+        try {
+          const subtitleResponse =
+            await fetch(
+              subtitleProxyUrl(subtitleUrl),
+              {
+                cache: "no-store",
+                signal: undefined,
+              }
+            );
+
+          if (subtitleResponse.ok) {
+            const subtitleContent =
+              await subtitleResponse.text();
+
+            const cues =
+              parseSubtitleCues(
+                subtitleContent
+              );
+
+            if (localRequestId === requestIdRef.current) {
+              subtitleCuesRef.current = cues;
+            }
+          }
+        } catch (subtitleError) {
+          /*
+           * Subtitle tidak boleh membuat video gagal.
+           * Jika subtitle provider tertentu tidak bisa diambil,
+           * video tetap diputar tanpa subtitle.
+           */
+          console.warn(
+            "MeloShort subtitle overlay gagal dimuat:",
+            subtitleError
           );
-
-        track.kind = "subtitles";
-        track.label = "Indonesia";
-        track.srclang = "id";
-        track.src = proxiedSubtitle;
-        track.default = true;
-
-        video.appendChild(track);
+        }
       }
 
       // =======================================================
@@ -482,6 +655,22 @@ export default function WatchPage() {
         if (!video.paused) {
           setLoading(false);
         }
+      };
+
+      video.ontimeupdate = () => {
+        if (
+          localRequestId !==
+          requestIdRef.current
+        ) {
+          return;
+        }
+
+        setSubtitleText(
+          getActiveSubtitle(
+            subtitleCuesRef.current,
+            video.currentTime
+          )
+        );
       };
 
       // =======================================================
@@ -1364,6 +1553,23 @@ export default function WatchPage() {
               handleEnded
             }
           />
+
+          {subtitleText && (
+            <div
+              className="absolute left-1/2 bottom-[12%] z-30 w-[92%] -translate-x-1/2 text-center pointer-events-none px-2"
+              aria-live="polite"
+            >
+              <span
+                className="inline-block max-w-full whitespace-pre-line rounded-sm bg-black/55 px-2 py-0.5 text-[clamp(16px,2.2vw,30px)] font-semibold leading-[1.25] text-white"
+                style={{
+                  textShadow:
+                    "0 2px 3px rgba(0,0,0,.95), 0 -1px 2px rgba(0,0,0,.95), 1px 0 2px rgba(0,0,0,.95), -1px 0 2px rgba(0,0,0,.95)",
+                }}
+              >
+                {subtitleText}
+              </span>
+            </div>
+          )}
 
           {/* =================================================
               EPISODE BUTTON
