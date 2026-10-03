@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useWatchHistoryStore } from "@/hooks/useWatchHistory";
 
 interface Episode {
   id?: string | number;
@@ -29,6 +30,12 @@ interface Subtitle {
   format?: string;
   url?: string;
   [key: string]: any;
+}
+
+interface DramaMetadata {
+  title: string;
+  image: string;
+  totalEpisodes: number;
 }
 
 const WORKER_PROXY =
@@ -149,6 +156,97 @@ function sleep(ms: number) {
   );
 }
 
+function cleanText(value: any): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value).trim();
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = cleanText(item);
+
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  if (
+    value &&
+    typeof value === "object"
+  ) {
+    const preferredKeys = [
+      "id",
+      "ID",
+      "value",
+      "text",
+      "name",
+      "title",
+      "content",
+    ];
+
+    for (const key of preferredKeys) {
+      const text = cleanText(value?.[key]);
+
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return "";
+}
+
+function pickDramaText(
+  item: any,
+  fields: string[],
+  fallback = ""
+): string {
+  for (const field of fields) {
+    const value = item?.[field];
+
+    if (Array.isArray(value)) {
+      for (const candidate of value) {
+        const text = cleanText(candidate);
+
+        if (text) {
+          return text;
+        }
+      }
+    }
+
+    const text = cleanText(value);
+
+    if (text) {
+      return text;
+    }
+  }
+
+  return fallback;
+}
+
+function pickDramaCover(item: any): string {
+  return (
+    cleanText(item?.coverWap) ||
+    cleanText(item?.cover) ||
+    cleanText(item?.cover_url) ||
+    cleanText(item?.coverUrl) ||
+    cleanText(item?.book_pic) ||
+    cleanText(item?.bookPic) ||
+    cleanText(item?.cover_pic) ||
+    cleanText(item?.image) ||
+    cleanText(item?.imageUrl) ||
+    ""
+  );
+}
+
 export default function WatchPage() {
   const params = useParams();
 
@@ -173,6 +271,18 @@ export default function WatchPage() {
    */
   const episodesRef =
     useRef<Episode[]>([]);
+
+  /*
+   * Metadata drama disimpan di ref supaya playEpisode()
+   * selalu bisa memperbarui Watch History tanpa request
+   * detail API tambahan.
+   */
+  const dramaMetadataRef =
+    useRef<DramaMetadata>({
+      title: "Drama Pilihan",
+      image: "",
+      totalEpisodes: 0,
+    });
 
   /*
    * Batalkan request Video API sebelumnya ketika
@@ -620,7 +730,29 @@ export default function WatchPage() {
         );
       }
 
-      return list as Episode[];
+      const title = pickDramaText(
+        data,
+        [
+          "bookName",
+          "book_name",
+          "title",
+          "name",
+          "bookTitle",
+          "book_title",
+        ],
+        "Drama Pilihan"
+      );
+
+      const image = pickDramaCover(data);
+
+      return {
+        episodes: list as Episode[],
+        metadata: {
+          title,
+          image,
+          totalEpisodes: list.length,
+        },
+      };
     }, [bookId]);
 
   // =========================================================
@@ -689,6 +821,40 @@ export default function WatchPage() {
             currentUrl.toString()
           );
         }
+
+        /*
+         * FIX WATCH HISTORY:
+         * MeloShort memakai currentIndex + query parameter,
+         * sehingga Header tidak akan terpicu ulang saat episode
+         * berubah. Simpan langsung ke store setiap kali episode
+         * dimainkan agar judul dan nomor episode selalu benar.
+         */
+        const historyUrl =
+          typeof window !== "undefined"
+            ? window.location.href
+            : `/watch/meloshort/${bookId}?episode=${index + 1}`;
+
+        const metadata =
+          dramaMetadataRef.current;
+
+        useWatchHistoryStore
+          .getState()
+          .addItem({
+            id: `meloshort-${bookId}`,
+            title:
+              metadata.title ||
+              "Drama Pilihan",
+            image:
+              metadata.image ||
+              "",
+            platform: "MeloShort",
+            timestamp: Date.now(),
+            url: historyUrl,
+            episode: index + 1,
+            totalEpisodes:
+              metadata.totalEpisodes ||
+              list.length,
+          });
 
         setError("");
         setLoading(true);
@@ -995,7 +1161,7 @@ export default function WatchPage() {
         setLoading(true);
         setError("");
 
-        const list =
+        const detail =
           await loadDetail();
 
         if (
@@ -1004,6 +1170,12 @@ export default function WatchPage() {
         ) {
           return;
         }
+
+        const list =
+          detail.episodes;
+
+        dramaMetadataRef.current =
+          detail.metadata;
 
         /*
          * Simpan ke state dan ref.
