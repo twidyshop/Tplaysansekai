@@ -1,70 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import {useParams,useRouter} from "next/navigation";
 import Hls from "hls.js";
 
-interface Episode {
-  id: string;
-  number: number;
-  title: string;
-  [key: string]: any;
-}
+function arr(v:any):any[]{if(Array.isArray(v))return v;if(!v||typeof v!=="object")return[];for(const k of["data","episodes","list","rows","results","items","chapters"]){if(Array.isArray(v[k]))return v[k];const n=arr(v[k]);if(n.length)return n}return[]}
+function pick(v:any,keys:string[],fallback=""){for(const k of keys){const x=v?.[k];if(typeof x==="string"&&x.trim())return x.trim()}return fallback}
+function stream(v:any){const s=v?.data??v?.result??v;return{url:pick(s,["hlsUrl","hls","m3u8"],""),sub:s?.subtitles||s?.subtitle||s?.subtitlesList||[]}}
+function rewrite(s:string){return s.replace(/https?:\/\/[^\s"'\\]+/g,u=>/\.(ts|m3u8)(\?|$)/i.test(u)?"/api/iqiyi/proxy?url="+encodeURIComponent(u):u)}
 
-function findArray(value: any): any[] {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== "object") return [];
-  for (const key of ["data", "episodes", "list", "rows", "results", "items", "chapters"]) {
-    if (Array.isArray(value[key])) return value[key];
-    const nested = findArray(value[key]);
-    if (nested.length) return nested;
-  }
-  return [];
-}
-
-function text(value: any, keys: string[], fallback = "") {
-  for (const key of keys) {
-    const v = value?.[key];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return fallback;
-}
-
-function getEpisode(item: any, index: number): Episode {
-  return {
-    id: text(item, ["id", "episodeId", "episode_id", "chapterId", "chapter_id"], String(index + 1)),
-    number: Number(item?.episode ?? item?.episodeNumber ?? item?.episode_index ?? item?.index ?? index + 1) || index + 1,
-    title: text(item, ["title", "name", "episodeTitle", "chapterName", "chapter_name"], "Episode " + (index + 1)),
-    ...item,
-  };
-}
-
-function findStream(value: any): { hlsUrl: string; subtitles: any[] } {
-  const source = value?.data ?? value?.result ?? value;
-  const hlsUrl =
-    (typeof source?.hlsUrl === "string" && source.hlsUrl) ||
-    (typeof source?.hls === "string" && source.hls) ||
-    (typeof source?.m3u8 === "string" && source.m3u8) ||
-    "";
-
-  const subtitles =
-    source?.subtitles ||
-    source?.subtitle ||
-    source?.subtitlesList ||
-    [];
-
-  return {
-    hlsUrl,
-    subtitles: Array.isArray(subtitles) ? subtitles : [],
-  };
-}
-
-function rewriteHlsManifest(manifest: string) {
-  return manifest.replace(/https?:\/\/[^\s"'\\]+/g, (url) => {
-    if (/\.ts(?:\?|$)/i.test(url) || /\.m3u8(?:\?|$)/i.test(url)) {
-      return "/api/iqiyi/proxy?url=" + encodeURIComponent(url);
-    }
-    return url;
-  });
+export default function IqiyiWatchPage(){
+ const {id}=useParams();const router=useRouter();const dramaId=String(id||"");
+ const video=useRef<HTMLVideoElement|null>(null);const hls=useRef<Hls|null>(null);
+ const [episodes,setEpisodes]=useState<any[]>([]);const [title,setTitle]=useState("iQIYI");const [selected,setSelected]=useState(1);
+ const [source,setSource]=useState("");const [loading,setLoading]=useState(true);const [playing,setPlaying]=useState(false);const [error,setError]=useState("");
+ const load=useCallback(async()=>{if(!dramaId)return;setLoading(true);try{const [a,b]=await Promise.all([fetch("/api/iqiyi?action=episodes&id="+encodeURIComponent(dramaId)+"&lang=id"),fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(dramaId)+"&lang=id")]);const aj=await a.json(),bj=await b.json();if(!a.ok)throw new Error(aj?.error||"Gagal memuat episode");const list=arr(aj).map((x:any,i:number)=>({id:pick(x,["id","episodeId","episode_id"],String(i+1)),number:Number(x?.episode??x?.episodeNumber??x?.episode_index??i+1)||i+1,title:pick(x,["title","name","episodeTitle"],"Episode "+(i+1))}));setEpisodes(list);if(list[0])setSelected(list[0].number);const d=bj?.data?.detail??bj?.data?.drama??bj?.data??bj;setTitle(pick(d,["title","name","bookName","albumName"],"iQIYI"))}catch(e){setError(e instanceof Error?e.message:"Gagal memuat episode")}finally{setLoading(false)}},[dramaId]);
+ useEffect(()=>{void load()},[load]);
+ const play=useCallback(async(n:number)=>{setSelected(n);setPlaying(false);setError("");setSource("");try{const r=await fetch("/api/iqiyi?action=play&id="+encodeURIComponent(dramaId)+"&episode="+n+"&lang=id");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal mengambil video");const s=stream(j);if(!s.url)throw new Error("Hoshiyomi tidak mengembalikan hlsUrl.");setSource(s.url)}catch(e){setError(e instanceof Error?e.message:"Gagal memutar video")}},[dramaId]);
+ useEffect(()=>{if(!source||!video.current)return;const v=video.current;hls.current?.destroy();const instance=new Hls();hls.current=instance;let blob="";let url=source;
+ const start=async()=>{try{if(/^https?:\/\//i.test(url))url="/api/iqiyi/proxy?url="+encodeURIComponent(url);else if(url.startsWith("#EXTM3U")||url.includes("#EXT-X-")){blob=URL.createObjectURL(new Blob([rewrite(url)],{type:"application/vnd.apple.mpegurl"}));url=blob}
+ if(v.canPlayType("application/vnd.apple.mpegurl")){v.src=url;await v.play().catch(()=>{})}else if(Hls.isSupported()){instance.loadSource(url);instance.attachMedia(v);instance.on(Hls.Events.MANIFEST_PARSED,()=>void v.play().catch(()=>{}));instance.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)setError("Video gagal dimuat oleh CDN iQIYI.")})}else setError("Browser tidak mendukung HLS.")}catch(e){setError(e instanceof Error?e.message:"Gagal menyiapkan player")}};void start();
+ return()=>{instance.destroy();hls.current=null;v.removeAttribute("src");v.load();if(blob)URL.revokeObjectURL(blob)}} , [source]);
+ useEffect(()=>{if(episodes.length&&!source&&!playing)void play(selected||episodes[0].number)},[episodes,play,selected,source,playing]);
+ const next=episodes[episodes.findIndex(x=>x.number===selected)+1];
+ return <main className="min-h-screen bg-[#0a0e27] text-white"><header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center justify-between px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button><Link href={"/detail/iqiyi/"+encodeURIComponent(dramaId)} className="text-sm text-white/70">Detail</Link></div></header>
+ <div className="container mx-auto max-w-6xl px-4 py-5"><div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} controls playsInline className="aspect-video w-full bg-black"/></div><h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}</p>{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}</div></main>
 }
