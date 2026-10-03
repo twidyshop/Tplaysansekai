@@ -664,6 +664,32 @@ export default function WatchPage() {
           ++requestIdRef.current;
 
         setCurrentIndex(index);
+
+        /*
+         * FIX HISTORY:
+         * Simpan episode aktif ke URL.
+         *
+         * Header membaca URL ini untuk mengetahui
+         * episode yang sedang ditonton.
+         */
+        if (typeof window !== "undefined") {
+          const currentUrl =
+            new URL(
+              window.location.href
+            );
+
+          currentUrl.searchParams.set(
+            "episode",
+            String(index + 1)
+          );
+
+          window.history.replaceState(
+            window.history.state,
+            "",
+            currentUrl.toString()
+          );
+        }
+
         setError("");
         setLoading(true);
         setPlaying(false);
