@@ -44,6 +44,19 @@ export function Header() {
       return;
     }
 
+    /*
+     * MeloShort dikelola langsung oleh halaman player.
+     * Halaman detail MeloShort tidak boleh otomatis masuk
+     * ke Watch History, dan Header juga tidak boleh membuat
+     * item "Drama Pilihan" sebelum player benar-benar dibuka.
+     *
+     * History MeloShort akan dibuat/diperbarui oleh:
+     * /watch/meloshort/[bookId]/page.tsx
+     */
+    if (platform.toLowerCase() === "meloshort") {
+      return;
+    }
+
     const timer = setTimeout(() => {
       /*
        * ============================================
