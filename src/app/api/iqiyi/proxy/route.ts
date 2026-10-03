@@ -1,5 +1,21 @@
 import { NextResponse } from "next/server";
 
+function rewriteManifest(manifest: string, baseUrl: URL) {
+  return manifest
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return line;
+      try {
+        const absolute = new URL(trimmed, baseUrl).toString();
+        return "/api/iqiyi/proxy?url=" + encodeURIComponent(absolute);
+      } catch {
+        return line;
+      }
+    })
+    .join("\n");
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const target = searchParams.get("url");
@@ -24,10 +40,23 @@ export async function GET(request: Request) {
       cache: "no-store",
     });
 
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("mpegurl") || /\.m3u8(?:\?|$)/i.test(url.pathname + url.search)) {
+      const manifest = await response.text();
+      return new NextResponse(rewriteManifest(manifest, url), {
+        status: response.status,
+        headers: {
+          "Content-Type": "application/vnd.apple.mpegurl",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     return new NextResponse(await response.arrayBuffer(), {
       status: response.status,
       headers: {
-        "Content-Type": response.headers.get("content-type") || "application/octet-stream",
+        "Content-Type": contentType || "application/octet-stream",
         "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=86400",
       },
