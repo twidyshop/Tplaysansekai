@@ -105,3 +105,34 @@ export function useMeloShortDramas() {
     staleTime: 1000 * 60 * 5,
   });
 }
+export function useIqiyiSearch(query: string) {
+  const normalizedQuery = query.trim();
+
+  return useQuery({
+    queryKey: ["iqiyi-search", normalizedQuery],
+    queryFn: async () => {
+      if (!normalizedQuery) return [];
+      const res = await fetch(
+        "/api/iqiyi?action=search&query=" + encodeURIComponent(normalizedQuery),
+        { cache: "no-store" }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Gagal mencari IQIYI");
+
+      const findArray = (value: any): any[] => {
+        if (Array.isArray(value)) return value;
+        if (!value || typeof value !== "object") return [];
+        for (const key of ["data", "list", "rows", "results", "items", "books", "dramas"]) {
+          if (Array.isArray(value[key])) return value[key];
+          const nested = findArray(value[key]);
+          if (nested.length) return nested;
+        }
+        return [];
+      };
+
+      return findArray(json);
+    },
+    enabled: normalizedQuery.length > 0,
+    staleTime: 1000 * 60 * 2,
+  });
+}
