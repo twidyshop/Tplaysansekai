@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type Platform =
+  | "iqiyi"
   | "meloshort"
   | "pinedrama"
   | "dramabox"
@@ -15,6 +16,12 @@ export type Platform =
   | string;
 
 export const PLATFORMS = [
+  {
+    id: "iqiyi",
+    name: "iQIYI",
+    logo: "/iqiyi.svg",
+    apiBase: "/api/iqiyi",
+  },
   {
     id: "meloshort",
     name: "MeloShort",
@@ -95,6 +102,7 @@ export function usePlatform() {
     setPlatform,
     platforms: PLATFORMS,
     getPlatformInfo,
+    isIqiyi: currentPlatform === "iqiyi",
     isMeloShort: currentPlatform === "meloshort",
     isPineDrama: currentPlatform === "pinedrama",
     isDramaBox: currentPlatform === "dramabox",
