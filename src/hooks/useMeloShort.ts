@@ -1,119 +1,179 @@
 import { useQuery } from "@tanstack/react-query";
 
 function cleanText(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
+  return typeof value === "string" ? value.trim() : "";
 }
 
 /**
- * Mengambil teks Indonesia dari object/string multilingual.
+ * Menentukan apakah sebuah judul merupakan judul Indonesia.
  *
- * QuickPlay/MeloShort bisa mengirim data dengan nama field yang
- * berbeda-beda tergantung endpoint/versi API.
+ * MeloShort/QuickPlay dengan lang=id ternyata masih mengembalikan
+ * campuran judul Indonesia, Inggris, dan Arab.
+ *
+ * Karena response tidak menyediakan languageCode per item,
+ * kita filter berdasarkan karakter judul.
  */
-function pickIndonesianText(
-  item: any,
-  fields: string[],
-  fallbackFields: string[] = []
-): string {
-  // 1. Prioritaskan field yang secara eksplisit mengandung ID/Indonesia.
-  const indonesiaKeys = [
-    ...fields.map((key) => `${key}_id`),
-    ...fields.map((key) => `${key}Id`),
-    ...fields.map((key) => `${key}_ID`),
-    ...fields.map((key) => `${key}_indonesia`),
-    ...fields.map((key) => `${key}Indonesia`),
-    ...fields.map((key) => `${key}_id_id`),
+function isIndonesianTitle(title: string): boolean {
+  const text = cleanText(title);
+
+  if (!text) return false;
+
+  // Arab -> bukan Indonesia
+  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text)) {
+    return false;
+  }
+
+  // CJK -> bukan Indonesia
+  if (/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]/.test(text)) {
+    return false;
+  }
+
+  /*
+   * Judul MeloShort berbahasa Indonesia umumnya menggunakan
+   * karakter Latin dan mengandung kata-kata Indonesia.
+   *
+   * Kita beri prioritas tinggi untuk kata Indonesia umum.
+   */
+  const lower = text.toLowerCase();
+
+  const indonesianWords = [
+    "cinta",
+    "dalam",
+    "mencari",
+    "ketika",
+    "wajah",
+    "suami",
+    "istri",
+    "menikah",
+    "pernikahan",
+    "sebelum",
+    "setelah",
+    "balas",
+    "dendam",
+    "si",
+    "kecil",
+    "sejati",
+    "palsu",
+    "palsu",
+    "ternyata",
+    "miliarder",
+    "hati",
+    "air mata",
+    "cinta",
+    "kasih",
+    "keluarga",
+    "rahasia",
+    "takdir",
+    "nasib",
+    "pengantin",
+    "anak",
+    "ayah",
+    "ibu",
+    "bos",
+    "presiden",
+    "kehidupan",
+    "hidup",
+    "bahagia",
+    "terjebak",
+    "terlahir",
+    "kembali",
+    "pengganti",
+    "jodoh",
+    "cemburu",
+    "cinta sejati",
+    "cerita",
+    "gadis",
+    "wanita",
+    "pria",
+    "lelaki",
   ];
 
-  for (const key of indonesiaKeys) {
-    const value = cleanText(item?.[key]);
-    if (value) return value;
+  if (indonesianWords.some((word) => lower.includes(word))) {
+    return true;
   }
 
-  // 2. Kalau field-nya object multilingual:
-  //    { id: "...", en: "...", ar: "..." }
-  for (const key of fields) {
-    const value = item?.[key];
+  /*
+   * Kalau tidak mengandung kata Indonesia yang umum,
+   * kita tetap menerima judul Latin yang punya karakter khas
+   * bahasa Indonesia.
+   *
+   * Namun judul Inggris murni seperti:
+   * "Solely Mine"
+   * "Bound to the Reaper"
+   * "The Mermaid Baby Worth Millions"
+   * akan ditolak.
+   */
+  const englishWords = [
+    "the",
+    "a ",
+    "an ",
+    "and ",
+    "or ",
+    "to ",
+    "by ",
+    "with ",
+    "of ",
+    "mine",
+    "worth",
+    "million",
+    "millions",
+    "reaper",
+    "dragon",
+    "shadow",
+    "duke",
+    "baby",
+    "mafia",
+    "stepdad",
+    "heiress",
+    "impostor",
+    "trapped",
+    "wedding",
+    "scheme",
+    "solely",
+    "blood",
+    "holy",
+    "nanny",
+    "vampire",
+    "bond",
+    "deadly",
+    "love",
+    "revenge",
+    "reborn",
+    "broken",
+    "heart",
+    "tycoon",
+    "daughter",
+    "wife",
+    "husband",
+    "queen",
+    "king",
+    "secret",
+  ];
 
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const idValue =
-        value.id ??
-        value.ID ??
-        value.id_ID ??
-        value["id-ID"] ??
-        value.ind ??
-        value.indonesia ??
-        value.Indonesia;
-
-      const text = cleanText(idValue);
-      if (text) return text;
-    }
+  if (englishWords.some((word) => lower.includes(word))) {
+    return false;
   }
 
-  // 3. Beberapa API menggunakan array translations.
-  for (const key of fields) {
-    const value = item?.[key];
-
-    if (Array.isArray(value)) {
-      for (const translation of value) {
-        if (!translation || typeof translation !== "object") continue;
-
-        const language = String(
-          translation.language ??
-            translation.languageCode ??
-            translation.lang ??
-            translation.locale ??
-            ""
-        ).toLowerCase();
-
-        if (
-          language === "id" ||
-          language === "ind" ||
-          language === "indonesia" ||
-          language === "id-id" ||
-          language === "ind-id"
-        ) {
-          const text = cleanText(
-            translation.text ??
-              translation.value ??
-              translation.title ??
-              translation.name ??
-              translation.content
-          );
-
-          if (text) return text;
-        }
-      }
-    }
-  }
-
-  // 4. Field utama.
-  for (const key of fields) {
-    const text = cleanText(item?.[key]);
-    if (text) return text;
-  }
-
-  // 5. Fallback terakhir.
-  for (const key of fallbackFields) {
-    const text = cleanText(item?.[key]);
-    if (text) return text;
-  }
-
-  return "";
+  /*
+   * Untuk keamanan, judul yang hanya terdiri dari huruf Latin
+   * tetap boleh masuk jika bukan jelas-jelas Inggris/Arab.
+   *
+   * Ini menangani judul Indonesia yang tidak mengandung kata
+   * dari daftar di atas.
+   */
+  return /^[A-Za-zÀ-ÿ0-9\s.,!?'"“”‘’:&()\-…]+$/.test(text);
 }
 
 function pickCover(item: any): string {
   return (
-    cleanText(item?.coverWap) ||
     cleanText(item?.cover) ||
+    cleanText(item?.coverWap) ||
     cleanText(item?.cover_url) ||
     cleanText(item?.coverUrl) ||
     cleanText(item?.book_pic) ||
     cleanText(item?.bookPic) ||
     cleanText(item?.cover_pic) ||
     cleanText(item?.image) ||
-    cleanText(item?.imageUrl) ||
     ""
   );
 }
@@ -121,10 +181,9 @@ function pickCover(item: any): string {
 function pickTags(item: any): string[] {
   const source =
     item?.tags ??
+    item?.genres ??
     item?.tagNames ??
     item?.book_theme ??
-    item?.bookTheme ??
-    item?.themes ??
     [];
 
   if (!Array.isArray(source)) return [];
@@ -180,95 +239,65 @@ export function useMeloShortDramas() {
         );
       }
 
+      const list = Array.isArray(json?.data)
+        ? json.data
+        : [];
+
       /*
-       * Beberapa kemungkinan struktur response:
+       * ==========================================================
+       * FILTER BAHASA
+       * ==========================================================
        *
-       * data: [...]
-       * data: { list: [...] }
-       * data: { dramas: [...] }
-       * data: { books: [...] }
+       * API lang=id masih memberikan campuran bahasa.
+       * Jadi kita hanya memasukkan judul yang terdeteksi
+       * sebagai judul Indonesia/Latin non-Inggris.
        */
-      const rawData = json?.data;
+      const indonesianList = list.filter((item: any) => {
+        const title = cleanText(
+          item?.title ??
+            item?.bookName ??
+            item?.book_name ??
+            item?.name ??
+            ""
+        );
 
-      let list: any[] = [];
+        return isIndonesianTitle(title);
+      });
 
-      if (Array.isArray(rawData)) {
-        list = rawData;
-      } else if (rawData && typeof rawData === "object") {
-        const candidates = [
-          rawData.list,
-          rawData.dramas,
-          rawData.books,
-          rawData.items,
-          rawData.records,
-          rawData.data,
-        ];
-
-        const found = candidates.find(Array.isArray);
-
-        if (found) {
-          list = found;
-        }
-      }
-
-      return list
+      return indonesianList
         .map((item: any) => {
           const bookId = String(
-            item?.bookId ??
+            item?.id ??
+              item?.bookId ??
               item?.book_id ??
-              item?.id ??
               item?.quickplay_id ??
               item?.quickplayId ??
               ""
           ).trim();
 
-          /*
-           * PENTING:
-           * Jangan langsung menganggap item.title/item.bookName
-           * sebagai judul Indonesia.
-           *
-           * Kita prioritaskan semua kemungkinan field Indonesia
-           * terlebih dahulu.
-           */
-          const bookName =
-            pickIndonesianText(
-              item,
-              [
-                "bookName",
-                "book_name",
-                "title",
-                "name",
-                "bookTitle",
-                "book_title",
-              ],
-              [
-                "displayName",
-                "display_name",
-              ]
-            ) || "Untitled";
+          const bookName = cleanText(
+            item?.title ??
+              item?.bookName ??
+              item?.book_name ??
+              item?.name ??
+              "Untitled"
+          );
 
-          const introduction =
-            pickIndonesianText(
-              item,
-              [
-                "introduction",
-                "synopsis",
-                "description",
-                "desc",
-                "summary",
-                "bookIntroduction",
-                "book_introduction",
-                "bookSynopsis",
-                "book_synopsis",
-              ]
-            ) || "";
+          const introduction = cleanText(
+            item?.synopsis ??
+              item?.introduction ??
+              item?.description ??
+              item?.desc ??
+              item?.summary ??
+              ""
+          );
 
           const cover = pickCover(item);
 
           const chapterCount = Number(
-            item?.chapterCount ??
+            item?.chapters ??
+              item?.chapterCount ??
               item?.chapter_count ??
-              item?.chapters ??
               item?.total_episodes ??
               item?.totalEpisodes ??
               item?.episodeCount ??
@@ -282,7 +311,6 @@ export function useMeloShortDramas() {
             id: bookId,
             bookId,
 
-            // Judul yang akan digunakan DramaCard.
             title: bookName,
             bookName,
 
@@ -294,15 +322,9 @@ export function useMeloShortDramas() {
 
             tags,
 
-            author:
-              cleanText(item?.author) ||
-              cleanText(item?.writer) ||
-              "",
+            author: cleanText(item?.author),
 
-            status:
-              cleanText(item?.status) ||
-              cleanText(item?.bookStatus) ||
-              "",
+            status: cleanText(item?.status),
 
             views:
               item?.views ??
@@ -314,15 +336,12 @@ export function useMeloShortDramas() {
             chapterCount,
 
             inLibrary: Boolean(item?.inLibrary ?? false),
-
-            // Simpan data asli kalau nanti diperlukan.
-            _raw: item,
           };
         })
         .filter(
           (item: any) =>
-            Boolean(item.bookId) &&
-            Boolean(item.bookName) &&
+            item.bookId &&
+            item.bookName &&
             item.bookName !== "Untitled"
         );
     },
