@@ -1,1176 +1,1159 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 
-type Episode = {
+interface Episode {
   id?: string | number;
+  chapter_id?: string | number;
   chapterId?: string | number;
-  episodeId?: string | number;
   title?: string;
   name?: string;
-  episode?: string | number;
-  chapter?: string | number;
-  index?: number;
+  episode?: number;
   episode_index?: number;
+  index?: number;
   [key: string]: any;
-};
+}
 
-type Stream = {
-  url?: string;
+interface Stream {
   quality?: string;
   resolution?: string;
-  type?: string;
-  mimeType?: string;
-  contentType?: string;
-  format?: string;
-  headers?: Record<string, string> | null;
-  streamHeaders?: Record<string, string> | null;
+  url?: string;
   [key: string]: any;
-};
+}
 
-type Subtitle = {
-  url: string;
+interface Subtitle {
   language?: string;
   languageCode?: string;
   format?: string;
-  label?: string;
+  url?: string;
   [key: string]: any;
-};
-
-type DetailResponse = {
-  success?: boolean;
-  data?: any;
-};
-
-type VideoResponse = {
-  success?: boolean;
-  data?: {
-    streams?: Stream[];
-    subtitles?: Subtitle[];
-    streamHeaders?: Record<string, string> | null;
-    title?: string;
-    duration?: number;
-    episode_index?: number;
-    total_episodes?: number;
-    next_video_id?: string;
-    prev_video_id?: string;
-    [key: string]: any;
-  };
-};
-
-function getEpisodeId(episode: Episode) {
-  return String(
-    episode.chapterId ??
-      episode.episodeId ??
-      episode.id ??
-      episode.chapter ??
-      episode.episode ??
-      ""
-  );
 }
 
-function getEpisodeTitle(
-  episode: Episode,
-  index: number
-) {
-  return (
-    episode.title ||
-    episode.name ||
-    (episode.episode != null
-      ? `Episode ${episode.episode}`
-      : episode.chapter != null
-      ? `Episode ${episode.chapter}`
-      : `Episode ${index + 1}`)
-  );
+interface VideoData {
+  streams?: Stream[];
+  subtitles?: Subtitle[];
+  subs?: Subtitle[];
+  episode_index?: number;
+  total_episodes?: number;
+  title?: string;
+  duration?: number;
+  next_video_id?: string;
+  prev_video_id?: string;
+  [key: string]: any;
 }
 
-function getStreamHeaders(
-  stream: Stream,
-  videoData: VideoResponse["data"]
-) {
-  const headers =
-    stream.headers ||
-    stream.streamHeaders ||
-    videoData?.streamHeaders ||
-    {};
+const WORKER_PROXY =
+  "https://tplay-proxy.3twidy.workers.dev/?url=";
 
-  if (
-    headers &&
-    typeof headers === "object" &&
-    !Array.isArray(headers)
-  ) {
-    return headers as Record<string, string>;
-  }
-
-  return {};
-}
-
-function isProbablyVideoStream(stream: Stream) {
-  const url = String(stream.url || "").toLowerCase();
-
-  const mime = String(
-    stream.mimeType ||
-      stream.contentType ||
-      stream.type ||
-      stream.format ||
-      ""
-  ).toLowerCase();
-
-  const resolution = String(
-    stream.resolution || ""
-  ).toLowerCase();
-
-  const quality = String(
-    stream.quality || ""
-  ).toLowerCase();
-
-  // Jangan pernah memilih stream yang jelas audio-only.
-  if (
-    mime.includes("audio/") ||
-    mime.includes("audio") ||
-    url.includes(".mp3") ||
-    url.includes(".aac") ||
-    url.includes(".m4a") ||
-    url.includes(".opus") ||
-    url.includes(".weba")
-  ) {
-    return false;
-  }
-
-  // Prioritas stream video.
-  if (
-    url.includes(".m3u8") ||
-    url.includes(".mp4") ||
-    mime.includes("video/") ||
-    mime.includes("mpegurl") ||
-    mime.includes("m3u8") ||
-    resolution.includes("x") ||
-    /\d+p/i.test(quality)
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-function makeProxyUrl(
-  url: string,
-  headers: Record<string, string>
-) {
-  return (
-    "/api/meloshort/stream?url=" +
-    encodeURIComponent(url) +
-    "&headers=" +
-    encodeURIComponent(JSON.stringify(headers))
-  );
-}
-
-function makeSubtitleProxyUrl(
-  url: string,
-  headers: Record<string, string>
-) {
-  return (
-    "/api/meloshort/stream?subtitle=1&url=" +
-    encodeURIComponent(url) +
-    "&headers=" +
-    encodeURIComponent(JSON.stringify(headers))
-  );
-}
-
-export default function WatchMeloShortPage() {
+export default function WatchPage() {
   const params = useParams();
-  const router = useRouter();
-
   const bookId = String(params.bookId || "");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<any>(null);
+  const currentStreamRef = useRef("");
+  const currentSubtitleRef = useRef("");
 
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  const [cover, setCover] = useState("");
-  const [dramaTitle, setDramaTitle] = useState("");
-
-  const [videoLoading, setVideoLoading] = useState(true);
-  const [videoError, setVideoError] = useState("");
-  const [episodeLoading, setEpisodeLoading] =
-    useState(true);
-
-  const [subtitles, setSubtitles] = useState<
-    Subtitle[]
-  >([]);
+  const [dramaTitle, setDramaTitle] = useState("TPLAY");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [episodeLoading, setEpisodeLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const currentEpisode = episodes[currentIndex];
+  // =========================================================
+  // LOAD DETAIL
+  // =========================================================
 
-  const currentEpisodeId = useMemo(() => {
-    if (!currentEpisode) return "";
-
-    return getEpisodeId(currentEpisode);
-  }, [currentEpisode]);
-
-  /*
-   * Bersihkan HLS sepenuhnya.
-   */
-  const destroyHls = useCallback(() => {
+  const loadDetail = useCallback(async () => {
     try {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
+      setError("");
+
+      const url =
+        `/api/meloshort?path=/api/v2/detail` +
+        `&category_p=meloshort` +
+        `&id=${encodeURIComponent(bookId)}` +
+        `&lang=id`;
+
+      const response = await fetch(url, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Detail API error ${response.status}`);
       }
-    } catch (error) {
-      console.warn(
-        "Gagal destroy HLS:",
-        error
-      );
+
+      const json = await response.json();
+
+      const data = json?.data || json;
+
+      const foundEpisodes =
+        data?.chapters ||
+        data?.episodes ||
+        data?.list ||
+        [];
+
+      if (!Array.isArray(foundEpisodes) || foundEpisodes.length === 0) {
+        throw new Error("Episode tidak ditemukan.");
+      }
+
+      setEpisodes(foundEpisodes);
+
+      const title =
+        data?.bookName ||
+        data?.title ||
+        data?.name ||
+        "TPLAY";
+
+      setDramaTitle(title);
+
+      return foundEpisodes as Episode[];
+    } catch (err: any) {
+      console.error("DETAIL ERROR:", err);
+      setError(err?.message || "Gagal memuat drama.");
+      throw err;
+    }
+  }, [bookId]);
+
+  // =========================================================
+  // DESTROY HLS
+  // =========================================================
+
+  const destroyPlayer = useCallback(() => {
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.destroy();
+      } catch {}
 
       hlsRef.current = null;
     }
+
+    const video = videoRef.current;
+
+    if (video) {
+      video.pause();
+      video.removeAttribute("src");
+
+      while (video.firstChild) {
+        video.removeChild(video.firstChild);
+      }
+
+      try {
+        video.load();
+      } catch {}
+    }
   }, []);
 
-  /*
-   * Ambil detail drama.
-   */
+  // =========================================================
+  // PLAY STREAM
+  // =========================================================
+
+  const playStream = useCallback(
+    async (
+      streamUrl: string,
+      subtitleUrl?: string,
+      autoplay = true
+    ) => {
+      const video = videoRef.current;
+
+      if (!video || !streamUrl) {
+        throw new Error("Video player belum siap.");
+      }
+
+      destroyPlayer();
+
+      currentStreamRef.current = streamUrl;
+      currentSubtitleRef.current = subtitleUrl || "";
+
+      const playableUrl =
+        WORKER_PROXY + encodeURIComponent(streamUrl);
+
+      const proxiedSubtitle = subtitleUrl
+        ? WORKER_PROXY + encodeURIComponent(subtitleUrl)
+        : "";
+
+      // -------------------------------------------------------
+      // SUBTITLE
+      // -------------------------------------------------------
+
+      if (proxiedSubtitle) {
+        const track = document.createElement("track");
+
+        track.kind = "subtitles";
+        track.label = "Indonesia";
+        track.srclang = "id";
+        track.src = proxiedSubtitle;
+        track.default = true;
+
+        video.appendChild(track);
+      }
+
+      // -------------------------------------------------------
+      // HLS.JS
+      // -------------------------------------------------------
+
+      try {
+        const HlsModule = await import("hls.js");
+        const Hls = HlsModule.default;
+
+        if (
+          Hls &&
+          Hls.isSupported() &&
+          streamUrl.includes(".m3u8")
+        ) {
+          const hls = new Hls({
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            enableWorker: true,
+            lowLatencyMode: false,
+            backBufferLength: 90,
+          });
+
+          hlsRef.current = hls;
+
+          hls.loadSource(playableUrl);
+          hls.attachMedia(video);
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (autoplay) {
+              video.play().catch(() => {});
+            }
+          });
+
+          hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
+            console.error("HLS ERROR:", data);
+
+            if (!data?.fatal) return;
+
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                try {
+                  hls.startLoad();
+                } catch {}
+                break;
+
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                try {
+                  hls.recoverMediaError();
+                } catch {}
+                break;
+
+              default:
+                try {
+                  hls.destroy();
+                } catch {}
+
+                hlsRef.current = null;
+
+                // Native fallback
+                video.src = playableUrl;
+
+                if (autoplay) {
+                  video.play().catch(() => {});
+                }
+
+                break;
+            }
+          });
+
+          return;
+        }
+      } catch (err) {
+        console.warn("HLS.js gagal dimuat:", err);
+      }
+
+      // -------------------------------------------------------
+      // NATIVE HLS FALLBACK
+      // -------------------------------------------------------
+
+      video.src = playableUrl;
+
+      if (autoplay) {
+        video.play().catch(() => {});
+      }
+    },
+    [destroyPlayer]
+  );
+
+  // =========================================================
+  // LOAD EPISODE
+  // =========================================================
+
+  const playEpisode = useCallback(
+    async (
+      index: number,
+      episodeList?: Episode[]
+    ) => {
+      const list = episodeList || episodes;
+      const episode = list[index];
+
+      if (!episode) return;
+
+      try {
+        setEpisodeLoading(true);
+        setError("");
+        setCurrentIndex(index);
+
+        const chapterId =
+          episode.id ??
+          episode.chapterId ??
+          episode.chapter_id ??
+          episode.episode ??
+          index + 1;
+
+        const url =
+          `/api/meloshort?path=/api/v2/video` +
+          `&category_p=meloshort` +
+          `&id=${encodeURIComponent(bookId)}` +
+          `&chapterId=${encodeURIComponent(String(chapterId))}` +
+          `&lang=id`;
+
+        const response = await fetch(url, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Video API error ${response.status}`);
+        }
+
+        const json = await response.json();
+
+        const data: VideoData =
+          json?.data ||
+          json;
+
+        const streams =
+          data?.streams ||
+          data?.urls ||
+          [];
+
+        if (!Array.isArray(streams) || streams.length === 0) {
+          throw new Error("Stream video tidak tersedia.");
+        }
+
+        // Prioritas kualitas tinggi
+        const stream =
+          streams.find((item) =>
+            /1080/i.test(item?.quality || "")
+          ) ||
+          streams.find((item) =>
+            /720/i.test(item?.quality || "")
+          ) ||
+          streams.find((item) =>
+            /480/i.test(item?.quality || "")
+          ) ||
+          streams.find((item) =>
+            /360/i.test(item?.quality || "")
+          ) ||
+          streams[0];
+
+        if (!stream?.url) {
+          throw new Error("URL stream tidak ditemukan.");
+        }
+
+        const subtitles =
+          data?.subtitles ||
+          data?.subs ||
+          [];
+
+        // Prioritaskan subtitle Indonesia
+        const indonesiaSubtitle =
+          subtitles.find(
+            (sub) =>
+              sub?.languageCode === "id" ||
+              /indonesia/i.test(sub?.language || "")
+          ) ||
+          subtitles[0];
+
+        await playStream(
+          stream.url,
+          indonesiaSubtitle?.url,
+          true
+        );
+
+        setDrawerOpen(false);
+      } catch (err: any) {
+        console.error("PLAY ERROR:", err);
+
+        setError(
+          err?.message ||
+            "Gagal memutar episode."
+        );
+      } finally {
+        setEpisodeLoading(false);
+        setLoading(false);
+      }
+    },
+    [bookId, episodes, playStream]
+  );
+
+  // =========================================================
+  // AUTO NEXT EPISODE
+  // =========================================================
+
+  const handleVideoEnded = useCallback(() => {
+    const nextIndex = currentIndex + 1;
+
+    if (nextIndex < episodes.length) {
+      playEpisode(nextIndex);
+    }
+  }, [currentIndex, episodes.length, playEpisode]);
+
+  // =========================================================
+  // INITIAL LOAD
+  // =========================================================
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadDetail() {
+    async function start() {
       try {
-        setEpisodeLoading(true);
-
-        const response = await fetch(
-          `/api/meloshort?path=/api/v2/detail&id=${encodeURIComponent(
-            bookId
-          )}&lang=id`,
-          {
-            cache: "no-store",
-          }
-        );
-
-        const json: DetailResponse =
-          await response.json();
+        const list = await loadDetail();
 
         if (cancelled) return;
 
-        console.log(
-          "========== MELOSHORT DETAIL ==========",
-          json
+        // Ambil episode dari query ?episode=
+        const searchParams = new URLSearchParams(
+          window.location.search
         );
 
-        const data = json?.data || {};
-
-        const list =
-          data.episodes ||
-          data.chapters ||
-          data.chapterList ||
-          data.videoList ||
-          data.list ||
-          [];
-
-        const normalizedEpisodes =
-          Array.isArray(list)
-            ? list
-            : [];
-
-        setEpisodes(normalizedEpisodes);
-
-        setCover(
-          data.coverWap ||
-            data.cover ||
-            data.coverUrl ||
-            data.poster ||
-            ""
+        const requestedEpisode = Number(
+          searchParams.get("episode") || "1"
         );
 
-        setDramaTitle(
-          data.bookName ||
-            data.title ||
-            data.name ||
-            ""
-        );
+        let initialIndex = requestedEpisode - 1;
 
-        setEpisodeLoading(false);
-      } catch (error: any) {
-        console.error(
-          "MELOSHORT DETAIL ERROR:",
-          error
-        );
+        if (
+          !Number.isFinite(initialIndex) ||
+          initialIndex < 0
+        ) {
+          initialIndex = 0;
+        }
 
+        if (initialIndex >= list.length) {
+          initialIndex = 0;
+        }
+
+        await playEpisode(initialIndex, list);
+      } catch (err) {
         if (!cancelled) {
-          setVideoError(
-            error?.message ||
-              "Gagal mengambil daftar episode."
-          );
-
-          setEpisodeLoading(false);
+          setLoading(false);
         }
       }
     }
 
     if (bookId) {
-      loadDetail();
+      start();
     }
 
     return () => {
       cancelled = true;
-    };
-  }, [bookId]);
-
-  /*
-   * Ambil video + subtitle setiap kali episode berubah.
-   */
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadVideo() {
-      if (!bookId || !currentEpisodeId) {
-        return;
-      }
-
-      setVideoLoading(true);
-      setVideoError("");
-      setSubtitles([]);
-
-      destroyHls();
-
-      const video = videoRef.current;
-
-      if (video) {
-        try {
-          video.pause();
-        } catch {}
-
-        video.removeAttribute("src");
-        video.load();
-      }
-
-      try {
-        const response = await fetch(
-          `/api/meloshort?path=/api/v2/video&id=${encodeURIComponent(
-            bookId
-          )}&chapterId=${encodeURIComponent(
-            currentEpisodeId
-          )}&lang=id`,
-          {
-            cache: "no-store",
-          }
-        );
-
-        const json: VideoResponse =
-          await response.json();
-
-        if (cancelled) return;
-
-        console.log(
-          "========== MELOSHORT VIDEO RAW ==========",
-          JSON.stringify(json, null, 2)
-        );
-
-        const videoData = json?.data;
-
-        if (!videoData) {
-          throw new Error(
-            "Data video tidak ditemukan."
-          );
-        }
-
-        /*
-         * SUBTITLE
-         */
-        const subtitleList = Array.isArray(
-          videoData.subtitles
-        )
-          ? videoData.subtitles.filter(
-              (item) =>
-                item &&
-                typeof item.url === "string" &&
-                item.url.trim()
-            )
-          : [];
-
-        setSubtitles(subtitleList);
-
-        /*
-         * STREAM
-         */
-        const streams = Array.isArray(
-          videoData.streams
-        )
-          ? videoData.streams
-          : [];
-
-        console.log(
-          "MELOSHORT STREAMS:",
-          streams
-        );
-
-        const videoStreams =
-          streams.filter(
-            isProbablyVideoStream
-          );
-
-        if (!videoStreams.length) {
-          throw new Error(
-            "API tidak mengembalikan stream video."
-          );
-        }
-
-        /*
-         * Prioritas:
-         * 1. m3u8
-         * 2. resolusi tertinggi
-         * 3. kualitas tertinggi
-         */
-        const sortedStreams = [
-          ...videoStreams,
-        ].sort((a, b) => {
-          const aM3u8 = String(
-            a.url || ""
-          )
-            .toLowerCase()
-            .includes(".m3u8");
-
-          const bM3u8 = String(
-            b.url || ""
-          )
-            .toLowerCase()
-            .includes(".m3u8");
-
-          if (aM3u8 !== bM3u8) {
-            return aM3u8 ? -1 : 1;
-          }
-
-          const parseResolution = (
-            value: string
-          ) => {
-            const match =
-              value.match(
-                /(\d{3,5})x(\d{3,5})/
-              );
-
-            if (!match) return 0;
-
-            return (
-              Number(match[1]) *
-              Number(match[2])
-            );
-          };
-
-          const aRes =
-            parseResolution(
-              String(
-                a.resolution || ""
-              )
-            );
-
-          const bRes =
-            parseResolution(
-              String(
-                b.resolution || ""
-              )
-            );
-
-          return bRes - aRes;
-        });
-
-        const selectedStream =
-          sortedStreams[0];
-
-        const originalUrl = String(
-          selectedStream.url || ""
-        );
-
-        if (!originalUrl) {
-          throw new Error(
-            "URL stream kosong."
-          );
-        }
-
-        const streamHeaders =
-          getStreamHeaders(
-            selectedStream,
-            videoData
-          );
-
-        const proxiedUrl =
-          makeProxyUrl(
-            originalUrl,
-            streamHeaders
-          );
-
-        console.log(
-          "SELECTED VIDEO STREAM:",
-          selectedStream
-        );
-
-        console.log(
-          "PROXIED VIDEO URL:",
-          proxiedUrl
-        );
-
-        if (cancelled) return;
-
-        const videoElement =
-          videoRef.current;
-
-        if (!videoElement) {
-          throw new Error(
-            "Video element belum tersedia."
-          );
-        }
-
-        /*
-         * Kalau MP4 langsung, browser bisa play.
-         */
-        const isM3u8 =
-          originalUrl
-            .toLowerCase()
-            .includes(".m3u8");
-
-        if (!isM3u8) {
-          videoElement.src = proxiedUrl;
-          videoElement.load();
-
-          try {
-            await videoElement.play();
-          } catch {}
-
-          if (!cancelled) {
-            setVideoLoading(false);
-          }
-
-          return;
-        }
-
-        /*
-         * HLS
-         */
-        const nativeHls =
-          videoElement.canPlayType(
-            "application/vnd.apple.mpegurl"
-          );
-
-        /*
-         * Safari/iOS biasanya bisa native HLS.
-         */
-        if (nativeHls) {
-          videoElement.src =
-            proxiedUrl;
-
-          videoElement.load();
-
-          const onLoaded = async () => {
-            try {
-              await videoElement.play();
-            } catch {}
-
-            if (!cancelled) {
-              setVideoLoading(false);
-            }
-          };
-
-          videoElement.addEventListener(
-            "loadedmetadata",
-            onLoaded,
-            { once: true }
-          );
-
-          return;
-        }
-
-        /*
-         * Chrome/Android/Desktop:
-         * gunakan HLS.js.
-         */
-        const HlsModule =
-          await import("hls.js");
-
-        if (cancelled) return;
-
-        const Hls =
-          HlsModule.default;
-
-        if (!Hls.isSupported()) {
-          /*
-           * Jangan memaksa fallback aneh.
-           * Kalau browser memang tidak support HLS,
-           * baru coba src langsung.
-           */
-          videoElement.src =
-            proxiedUrl;
-
-          videoElement.load();
-
-          try {
-            await videoElement.play();
-          } catch {}
-
-          if (!cancelled) {
-            setVideoLoading(false);
-          }
-
-          return;
-        }
-
-        const hls = new Hls({
-          enableWorker: true,
-
-          /*
-           * Penting untuk playlist MeloShort
-           * yang kadang mempunyai master/variant
-           * playlist berbeda antar episode.
-           */
-          lowLatencyMode: false,
-
-          /*
-           * Biarkan HLS memilih level video.
-           */
-          startLevel: -1,
-
-          /*
-           * Jangan batasi resolusi berdasarkan
-           * ukuran container.
-           */
-          capLevelToPlayerSize: false,
-
-          /*
-           * Recovery kalau manifest/segment
-           * mengalami error sementara.
-           */
-          manifestLoadingMaxRetry: 3,
-          levelLoadingMaxRetry: 3,
-          fragLoadingMaxRetry: 3,
-
-          manifestLoadingRetryDelay: 1000,
-          levelLoadingRetryDelay: 1000,
-          fragLoadingRetryDelay: 1000,
-
-          maxBufferLength: 30,
-          backBufferLength: 30,
-        });
-
-        hlsRef.current = hls;
-
-        hls.attachMedia(
-          videoElement
-        );
-
-        hls.on(
-          Hls.Events.MEDIA_ATTACHED,
-          () => {
-            if (cancelled) return;
-
-            console.log(
-              "HLS MEDIA ATTACHED"
-            );
-
-            hls.loadSource(
-              proxiedUrl
-            );
-          }
-        );
-
-        hls.on(
-          Hls.Events.MANIFEST_PARSED,
-          async (_event: any, data: any) => {
-            if (cancelled) return;
-
-            console.log(
-              "HLS MANIFEST PARSED:",
-              data
-            );
-
-            /*
-             * Pastikan player memilih
-             * level yang memiliki video.
-             */
-            const levels =
-              hls.levels || [];
-
-            console.log(
-              "HLS LEVELS:",
-              levels.map(
-                (level: any) => ({
-                  width:
-                    level.width,
-                  height:
-                    level.height,
-                  bitrate:
-                    level.bitrate,
-                  codecs:
-                    level.codecs,
-                })
-              )
-            );
-
-            /*
-             * Pilih level tertinggi yang
-             * benar-benar memiliki dimensi video.
-             */
-            const videoLevels =
-              levels
-                .map(
-                  (
-                    level: any,
-                    index: number
-                  ) => ({
-                    level,
-                    index,
-                  })
-                )
-                .filter(
-                  ({
-                    level,
-                  }: any) =>
-                    Number(
-                      level.width
-                    ) > 0 &&
-                    Number(
-                      level.height
-                    ) > 0
-                );
-
-            if (
-              videoLevels.length
-            ) {
-              const highest =
-                videoLevels.sort(
-                  (a: any, b: any) =>
-                    b.level.width *
-                      b.level.height -
-                    a.level.width *
-                      a.level.height
-                )[0];
-
-              hls.currentLevel =
-                highest.index;
-
-              console.log(
-                "HLS SELECTED VIDEO LEVEL:",
-                highest.level
-              );
-            }
-
-            try {
-              await videoElement.play();
-            } catch (error) {
-              console.log(
-                "Autoplay diblokir browser:",
-                error
-              );
-            }
-
-            if (!cancelled) {
-              setVideoLoading(false);
-            }
-          }
-        );
-
-        hls.on(
-          Hls.Events.ERROR,
-          (
-            _event: any,
-            data: any
-          ) => {
-            console.error(
-              "========== HLS ERROR ==========",
-              data
-            );
-
-            if (
-              data?.fatal
-            ) {
-              if (
-                data.type ===
-                Hls.ErrorTypes.NETWORK_ERROR
-              ) {
-                console.warn(
-                  "HLS network error, mencoba recover..."
-                );
-
-                try {
-                  hls.startLoad();
-                } catch {}
-              } else if (
-                data.type ===
-                Hls.ErrorTypes.MEDIA_ERROR
-              ) {
-                console.warn(
-                  "HLS media error, mencoba recover..."
-                );
-
-                try {
-                  hls.recoverMediaError();
-                } catch {}
-              } else {
-                setVideoError(
-                  "Stream video episode ini gagal diputar. Cek console untuk detail HLS."
-                );
-
-                try {
-                  hls.destroy();
-                } catch {}
-
-                hlsRef.current =
-                  null;
-              }
-            }
-          }
-        );
-      } catch (error: any) {
-        console.error(
-          "MELOSHORT VIDEO ERROR:",
-          error
-        );
-
-        if (!cancelled) {
-          setVideoError(
-            error?.message ||
-              "Gagal memuat video."
-          );
-
-          setVideoLoading(false);
-        }
-      }
-    }
-
-    loadVideo();
-
-    return () => {
-      cancelled = true;
-      destroyHls();
+      destroyPlayer();
     };
   }, [
     bookId,
-    currentEpisodeId,
-    destroyHls,
+    loadDetail,
+    playEpisode,
+    destroyPlayer,
   ]);
 
-  /*
-   * Cleanup ketika meninggalkan halaman.
-   */
+  // =========================================================
+  // KEYBOARD
+  // =========================================================
+
   useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
     return () => {
-      destroyHls();
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
     };
-  }, [destroyHls]);
+  }, []);
 
-  const selectEpisode = (
-    index: number
-  ) => {
-    if (
-      index < 0 ||
-      index >= episodes.length
-    ) {
-      return;
-    }
-
-    destroyHls();
-
-    setCurrentIndex(index);
-    setDrawerOpen(false);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const previousEpisode = () => {
-    if (currentIndex > 0) {
-      selectEpisode(
-        currentIndex - 1
-      );
-    }
-  };
-
-  const nextEpisode = () => {
-    if (
-      currentIndex <
-      episodes.length - 1
-    ) {
-      selectEpisode(
-        currentIndex + 1
-      );
-    }
-  };
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/10 bg-black/95 px-4 backdrop-blur">
-        <button
-          onClick={() =>
-            router.push("/")
-          }
-          className="flex items-center gap-2 text-sm font-semibold"
-        >
-          <span className="text-lg">
-            ←
-          </span>
+    <main className="watchPage">
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
 
+      <header className="topHeader">
+        <Link href="/" className="brand">
+          <span className="brandIcon">▶</span>
           <span>TPLAY</span>
-        </button>
+        </Link>
 
-        <button
-          onClick={() =>
-            setDrawerOpen(true)
-          }
-          className="rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold transition hover:bg-white/20"
-        >
-          ☰ Episode
-        </button>
+        <Link href="/" className="homeButton">
+          Home
+        </Link>
       </header>
 
-      {/* PLAYER */}
-      <section className="w-full bg-black">
-        <div className="relative aspect-video w-full overflow-hidden bg-black">
+      {/* =====================================================
+          PLAYER
+      ====================================================== */}
+
+      <section className="playerSection">
+        <div className="player">
+
           <video
             ref={videoRef}
+            className="video"
             controls
             playsInline
             preload="metadata"
-            poster={cover || undefined}
-            className="h-full w-full bg-black object-contain"
+            onEnded={handleVideoEnded}
+          />
+
+          {/* HAMBURGER — SELALU TERLIHAT */}
+          <button
+            type="button"
+            className="episodeButton"
+            aria-label="Daftar episode"
+            onClick={() =>
+              setDrawerOpen(true)
+            }
           >
-            {subtitles.map(
-              (
-                subtitle,
-                index
-              ) => {
-                const headers =
-                  {};
+            <span />
+            <span />
+            <span />
+          </button>
 
-                const src =
-                  makeSubtitleProxyUrl(
-                    subtitle.url,
-                    headers
-                  );
+          {/* LOADING */}
+          {(loading || episodeLoading) && (
+            <div className="loadingOverlay">
+              <div className="spinner" />
+            </div>
+          )}
 
-                const languageCode =
-                  subtitle.languageCode ||
-                  `sub${index}`;
+          {/* ERROR */}
+          {error && !loading && (
+            <div className="errorOverlay">
+              <div className="errorBox">
+                <div>Gagal memutar video</div>
 
-                const label =
-                  subtitle.language ||
-                  subtitle.label ||
-                  subtitle.languageCode ||
-                  `Subtitle ${index + 1}`;
-
-                return (
-                  <track
-                    key={`${subtitle.url}-${index}`}
-                    kind="subtitles"
-                    src={src}
-                    srcLang={
-                      languageCode
-                    }
-                    label={label}
-                    default={
-                      index === 0
-                    }
-                  />
-                );
-              }
-            )}
-          </video>
-
-          {videoLoading && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-
-                <span className="text-xs text-white/70">
-                  Memuat video...
-                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    playEpisode(currentIndex)
+                  }
+                >
+                  Coba lagi
+                </button>
               </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* INFO */}
-      <section className="border-b border-white/10 bg-zinc-950 px-4 py-4">
-        <div className="mx-auto max-w-5xl">
-          <div className="flex items-start gap-3">
-            {cover && (
-              <img
-                src={cover}
-                alt={dramaTitle}
-                className="h-20 w-14 rounded-md object-cover"
-              />
-            )}
+      {/* =====================================================
+          EPISODE DRAWER
+      ====================================================== */}
 
-            <div className="min-w-0 flex-1">
-              <h1 className="line-clamp-2 text-base font-bold">
-                {dramaTitle ||
-                  "TPLAY"}
-              </h1>
-
-              <p className="mt-1 text-xs text-white/50">
-                {currentEpisode
-                  ? getEpisodeTitle(
-                      currentEpisode,
-                      currentIndex
-                    )
-                  : "Memuat episode..."}
-              </p>
-
-              {subtitles.length >
-                0 && (
-                <p className="mt-2 text-[11px] text-white/40">
-                  CC tersedia ·{" "}
-                  {subtitles
-                    .map(
-                      (item) =>
-                        item.language ||
-                        item.languageCode
-                    )
-                    .join(", ")}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {videoError && (
-            <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-              {videoError}
-            </div>
-          )}
-
-          {/* PREV NEXT */}
-          <div className="mt-4 flex gap-2">
-            <button
-              disabled={
-                currentIndex <= 0
-              }
-              onClick={
-                previousEpisode
-              }
-              className="flex-1 rounded-lg bg-white/10 px-4 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              ← Sebelumnya
-            </button>
-
-            <button
-              disabled={
-                currentIndex >=
-                episodes.length - 1
-              }
-              onClick={nextEpisode}
-              className="flex-1 rounded-lg bg-white/10 px-4 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              Berikutnya →
-            </button>
-          </div>
-
-          <button
-            onClick={() =>
-              setDrawerOpen(true)
-            }
-            className="mt-2 w-full rounded-lg bg-white px-4 py-2.5 text-xs font-bold text-black"
-          >
-            ☰ Pilih Episode
-          </button>
-        </div>
-      </section>
-
-      {/* EPISODE DRAWER */}
       {drawerOpen && (
         <div
-          className="fixed inset-0 z-[100] bg-black/70"
+          className="drawerBackdrop"
           onClick={() =>
             setDrawerOpen(false)
           }
         >
           <aside
-            className="absolute right-0 top-0 h-full w-[88%] max-w-md overflow-y-auto border-l border-white/10 bg-zinc-950 p-4 shadow-2xl"
+            className="episodeDrawer"
             onClick={(event) =>
               event.stopPropagation()
             }
           >
-            <div className="mb-5 flex items-center justify-between">
+            <div className="drawerHeader">
               <div>
-                <h2 className="text-lg font-bold">
-                  Episode
-                </h2>
-
-                <p className="text-xs text-white/40">
+                <strong>Episode</strong>
+                <small>
                   {episodes.length} episode
-                </p>
+                </small>
               </div>
 
               <button
+                type="button"
+                className="closeButton"
                 onClick={() =>
                   setDrawerOpen(false)
                 }
-                className="rounded-full bg-white/10 px-3 py-2 text-sm"
+                aria-label="Tutup"
               >
-                ✕
+                ×
               </button>
             </div>
 
-            {episodeLoading ? (
-              <div className="flex justify-center py-10">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-              </div>
-            ) : episodes.length ===
-              0 ? (
-              <div className="py-10 text-center text-sm text-white/40">
-                Episode tidak ditemukan.
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                {episodes.map(
-                  (
-                    episode,
-                    index
-                  ) => {
-                    const active =
-                      index ===
-                      currentIndex;
+            <div className="episodeList">
+              {episodes.map(
+                (episode, index) => {
+                  const episodeNumber =
+                    episode.episode ??
+                    episode.episode_index ??
+                    episode.index ??
+                    index + 1;
 
-                    return (
-                      <button
-                        key={`${getEpisodeId(
-                          episode
-                        )}-${index}`}
-                        onClick={() =>
-                          selectEpisode(
-                            index
-                          )
-                        }
-                        className={`rounded-lg px-2 py-3 text-xs font-semibold transition ${
-                          active
-                            ? "bg-white text-black"
-                            : "bg-white/10 text-white hover:bg-white/20"
-                        }`}
-                      >
-                        {getEpisodeTitle(
-                          episode,
+                  const title =
+                    episode.title ||
+                    episode.name ||
+                    `Episode ${episodeNumber}`;
+
+                  const active =
+                    index === currentIndex;
+
+                  return (
+                    <button
+                      key={`${String(
+                        episode.id ??
+                          episode.chapter_id ??
                           index
-                        ).replace(
-                          /^Episode\s*/i,
-                          "EP "
-                        )}
-                      </button>
-                    );
-                  }
-                )}
-              </div>
-            )}
+                      )}-${index}`}
+                      type="button"
+                      className={`episodeItem ${
+                        active
+                          ? "active"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        playEpisode(index)
+                      }
+                    >
+                      <span className="episodeNumber">
+                        {String(
+                          episodeNumber
+                        ).padStart(2, "0")}
+                      </span>
+
+                      <span className="episodeName">
+                        {title}
+                      </span>
+
+                      {active && (
+                        <span className="playingDot">
+                          ●
+                        </span>
+                      )}
+                    </button>
+                  );
+                }
+              )}
+            </div>
           </aside>
         </div>
       )}
+
+      <style jsx>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        .watchPage {
+          min-height: 100vh;
+          margin: 0;
+          padding: 0;
+          background: #05070b;
+          color: #fff;
+        }
+
+        /* =====================================================
+           HEADER
+        ====================================================== */
+
+        .topHeader {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+
+          width: 100%;
+          height: 58px;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          padding: 0 18px;
+
+          background: rgba(5, 7, 11, 0.96);
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.07);
+
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+        }
+
+        .brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+
+          color: #fff;
+          text-decoration: none;
+
+          font-size: 20px;
+          font-weight: 900;
+          letter-spacing: -0.5px;
+        }
+
+        .brandIcon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          width: 27px;
+          height: 27px;
+
+          border-radius: 8px;
+
+          background: #fff;
+          color: #05070b;
+
+          font-size: 11px;
+        }
+
+        .homeButton {
+          color: rgba(255, 255, 255, 0.7);
+          text-decoration: none;
+
+          font-size: 13px;
+          font-weight: 600;
+
+          transition: color 0.2s ease;
+        }
+
+        .homeButton:hover {
+          color: #fff;
+        }
+
+        /* =====================================================
+           PLAYER
+        ====================================================== */
+
+        .playerSection {
+          width: 100%;
+          margin: 0;
+          padding: 0;
+        }
+
+        .player {
+          position: relative;
+
+          width: 100%;
+          aspect-ratio: 16 / 9;
+
+          background: #000;
+
+          overflow: hidden;
+        }
+
+        .video {
+          display: block;
+
+          width: 100%;
+          height: 100%;
+
+          object-fit: contain;
+
+          background: #000;
+        }
+
+        /* =====================================================
+           HAMBURGER
+        ====================================================== */
+
+        .episodeButton {
+          position: absolute;
+          top: 14px;
+          right: 14px;
+          z-index: 10;
+
+          width: 42px;
+          height: 42px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+
+          padding: 0;
+
+          border: 1px solid
+            rgba(255, 255, 255, 0.18);
+
+          border-radius: 12px;
+
+          background: rgba(0, 0, 0, 0.62);
+          color: #fff;
+
+          cursor: pointer;
+
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+
+          transition:
+            background 0.2s ease,
+            transform 0.2s ease;
+        }
+
+        .episodeButton:hover {
+          background: rgba(0, 0, 0, 0.82);
+        }
+
+        .episodeButton:active {
+          transform: scale(0.94);
+        }
+
+        .episodeButton span {
+          display: block;
+
+          width: 18px;
+          height: 2px;
+
+          border-radius: 99px;
+
+          background: #fff;
+        }
+
+        /* =====================================================
+           LOADING
+        ====================================================== */
+
+        .loadingOverlay {
+          position: absolute;
+          inset: 0;
+
+          z-index: 5;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          pointer-events: none;
+        }
+
+        .spinner {
+          width: 34px;
+          height: 34px;
+
+          border: 3px solid
+            rgba(255, 255, 255, 0.2);
+
+          border-top-color: #fff;
+
+          border-radius: 50%;
+
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        /* =====================================================
+           ERROR
+        ====================================================== */
+
+        .errorOverlay {
+          position: absolute;
+          inset: 0;
+
+          z-index: 7;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          background: rgba(0, 0, 0, 0.55);
+
+          pointer-events: none;
+        }
+
+        .errorBox {
+          pointer-events: auto;
+
+          text-align: center;
+
+          color: #fff;
+
+          font-size: 14px;
+        }
+
+        .errorBox button {
+          margin-top: 12px;
+
+          padding: 9px 16px;
+
+          border: 0;
+          border-radius: 8px;
+
+          background: #fff;
+          color: #000;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        /* =====================================================
+           DRAWER BACKDROP
+        ====================================================== */
+
+        .drawerBackdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 100;
+
+          background: rgba(0, 0, 0, 0.58);
+
+          backdrop-filter: blur(2px);
+          -webkit-backdrop-filter: blur(2px);
+        }
+
+        /* =====================================================
+           DRAWER
+        ====================================================== */
+
+        .episodeDrawer {
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+
+          width: min(360px, 88vw);
+
+          display: flex;
+          flex-direction: column;
+
+          background: #0b0e14;
+
+          border-left: 1px solid
+            rgba(255, 255, 255, 0.08);
+
+          box-shadow:
+            -15px 0 50px
+            rgba(0, 0, 0, 0.45);
+
+          animation: drawerIn 0.22s ease-out;
+        }
+
+        @keyframes drawerIn {
+          from {
+            transform: translateX(100%);
+          }
+
+          to {
+            transform: translateX(0);
+          }
+        }
+
+        .drawerHeader {
+          flex-shrink: 0;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          padding: 18px;
+
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.07);
+        }
+
+        .drawerHeader strong {
+          display: block;
+
+          font-size: 17px;
+          font-weight: 800;
+        }
+
+        .drawerHeader small {
+          display: block;
+
+          margin-top: 3px;
+
+          color: rgba(255, 255, 255, 0.45);
+
+          font-size: 12px;
+        }
+
+        .closeButton {
+          width: 36px;
+          height: 36px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border: 0;
+          border-radius: 10px;
+
+          background: rgba(
+            255,
+            255,
+            255,
+            0.07
+          );
+
+          color: #fff;
+
+          font-size: 25px;
+          line-height: 1;
+
+          cursor: pointer;
+        }
+
+        .episodeList {
+          flex: 1;
+
+          overflow-y: auto;
+
+          padding: 10px;
+        }
+
+        .episodeItem {
+          width: 100%;
+
+          display: flex;
+          align-items: center;
+
+          min-height: 52px;
+
+          margin-bottom: 4px;
+          padding: 8px 10px;
+
+          border: 0;
+          border-radius: 10px;
+
+          background: transparent;
+          color: rgba(255, 255, 255, 0.72);
+
+          text-align: left;
+
+          cursor: pointer;
+
+          transition:
+            background 0.18s ease,
+            color 0.18s ease;
+        }
+
+        .episodeItem:hover {
+          background: rgba(
+            255,
+            255,
+            255,
+            0.06
+          );
+
+          color: #fff;
+        }
+
+        .episodeItem.active {
+          background: rgba(
+            255,
+            255,
+            255,
+            0.1
+          );
+
+          color: #fff;
+        }
+
+        .episodeNumber {
+          flex: 0 0 42px;
+
+          font-size: 12px;
+          font-weight: 800;
+
+          color: rgba(255, 255, 255, 0.4);
+        }
+
+        .episodeItem.active
+          .episodeNumber {
+          color: #fff;
+        }
+
+        .episodeName {
+          flex: 1;
+
+          overflow: hidden;
+
+          white-space: nowrap;
+          text-overflow: ellipsis;
+
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .playingDot {
+          flex: 0 0 auto;
+
+          margin-left: 8px;
+
+          font-size: 9px;
+
+          color: #fff;
+        }
+
+        /* =====================================================
+           MOBILE
+        ====================================================== */
+
+        @media (max-width: 600px) {
+          .topHeader {
+            height: 54px;
+            padding: 0 14px;
+          }
+
+          .brand {
+            font-size: 18px;
+          }
+
+          .brandIcon {
+            width: 25px;
+            height: 25px;
+          }
+
+          .homeButton {
+            font-size: 12px;
+          }
+
+          .episodeButton {
+            top: 10px;
+            right: 10px;
+
+            width: 38px;
+            height: 38px;
+
+            border-radius: 10px;
+          }
+
+          .episodeButton span {
+            width: 16px;
+          }
+
+          .episodeDrawer {
+            width: min(340px, 90vw);
+          }
+        }
+      `}</style>
     </main>
   );
 }
