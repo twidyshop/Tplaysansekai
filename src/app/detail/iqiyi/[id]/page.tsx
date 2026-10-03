@@ -30,7 +30,9 @@ function number(value:any,keys:string[]){
 }
 
 export default function IqiyiDetailPage(){
-  const params=useParams(),router=useRouter(),id=String(params.id||"");
+  const params=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),id=String(params.id||"");
+  const quickTitle=search.get("title")||"iQIYI";
+  const quickCover=search.get("cover")||"";
   const {data,isLoading,error}=useQuery({
     queryKey:["iqiyi-detail",id],
     queryFn:async()=>{
@@ -43,11 +45,11 @@ export default function IqiyiDetailPage(){
     staleTime:300000,
   });
 
-  if(isLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Memuat detail...</div>;
-  if(error||!data) return <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-5 text-center"><p className="text-red-400 font-semibold mb-4">Drama IQIYI tidak ditemukan.</p><button onClick={()=>router.back()} className="rounded-xl bg-white px-5 py-2.5 text-black font-semibold">Kembali</button></div>;
+  if(isLoading) return <div className="min-h-screen bg-[#0a0e27] text-white"><div className="container mx-auto max-w-5xl px-4 py-8"><div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]"><div className="aspect-[3/4] animate-pulse rounded-2xl bg-white/5"/><div className="space-y-4 pt-2"><div className="h-4 w-20 animate-pulse rounded bg-white/5"/><div className="h-10 w-3/4 animate-pulse rounded bg-white/5"/><div className="h-24 w-full animate-pulse rounded bg-white/5"/><div className="h-12 w-44 animate-pulse rounded-xl bg-white/5"/></div></div></div></div>;
+  if(error&&!data) return <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-5 text-center"><p className="text-red-400 font-semibold mb-4">Detail iQIYI gagal dimuat.</p><button onClick={()=>router.back()} className="rounded-xl bg-white px-5 py-2.5 text-black font-semibold">Kembali</button></div>;
 
-  const title=text(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],"iQIYI");
-  const cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],"");
+  const title=text(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
+  const cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
   const description=text(data,["description","synopsis","introduction","desc","summary","shotDesc"],"");
   const episodes=number(data,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"]);
 
