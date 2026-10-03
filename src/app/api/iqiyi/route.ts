@@ -5,60 +5,16 @@ const HOSHIYOMI_API =
 
 const ACTIONS = new Set(["home", "search", "detail", "episodes", "play"]);
 
-function buildUrl(path: string, params: URLSearchParams) {
+function apiUrl(path: string, params: Record<string, string | undefined>) {
   const url = new URL(path, HOSHIYOMI_API);
-  params.forEach((value, key) => {
-    if (key !== "action") url.searchParams.set(key, value);
-  });
+  for (const [key, value] of Object.entries(params)) {
+    if (value) url.searchParams.set(key, value);
+  }
   return url;
 }
 
-function candidates(action: string, params: URLSearchParams) {
-  const id = params.get("id") || params.get("dramaId") || "";
-  const episode = params.get("episode") || params.get("ep") || "1";
-  const query = params.get("query") || params.get("q") || params.get("keyword") || "";
-
-  switch (action) {
-    case "home":
-      return [
-        buildUrl("/api/iqiyi/home", params),
-        buildUrl("/api/iqiyi/trending", params),
-        buildUrl("/api/iqiyi", params),
-      ];
-    case "search":
-      return [
-        buildUrl("/api/iqiyi/search", new URLSearchParams({ query })),
-        buildUrl("/api/iqiyi/search", new URLSearchParams({ q: query })),
-        buildUrl("/api/iqiyi/search", new URLSearchParams({ keyword: query })),
-      ];
-    case "detail":
-      return [
-        buildUrl("/api/iqiyi/detail", new URLSearchParams({ id })),
-        new URL("/api/iqiyi/detail/" + encodeURIComponent(id), HOSHIYOMI_API),
-      ];
-    case "episodes":
-      return [
-        buildUrl("/api/iqiyi/episodes", new URLSearchParams({ id })),
-        new URL("/api/iqiyi/episodes/" + encodeURIComponent(id), HOSHIYOMI_API),
-      ];
-    case "play":
-      return [
-        buildUrl("/api/iqiyi/play", new URLSearchParams({ id, episode })),
-        new URL(
-          "/api/iqiyi/play/" + encodeURIComponent(id) + "/" + encodeURIComponent(episode),
-          HOSHIYOMI_API
-        ),
-        buildUrl("/api/iqiyi/video", new URLSearchParams({ id, episode })),
-      ];
-    default:
-      return [];
-  }
-}
-
 function isUsableJson(data: any) {
-  if (!data || typeof data !== "object") return false;
-  if (data.success === false || data.status === "error" || data.error) return false;
-  return true;
+  return !!data && typeof data === "object" && data.success !== false && !data.error;
 }
 
 export async function GET(request: Request) {
@@ -70,7 +26,6 @@ export async function GET(request: Request) {
   }
 
   const apiKey = process.env.HOSHIYOMI_API_KEY;
-
   if (!apiKey) {
     return NextResponse.json(
       { error: "HOSHIYOMI_API_KEY belum dikonfigurasi di environment Vercel." },
@@ -78,50 +33,92 @@ export async function GET(request: Request) {
     );
   }
 
-  let lastStatus = 502;
-  let lastError = "Hoshiyomi request failed";
+  const id = searchParams.get("id") || "";
+  const albumId = searchParams.get("albumId") || "";
+  const query = searchParams.get("query") || searchParams.get("q") || "";
+  const ep = searchParams.get("ep") || searchParams.get("episode") || "1";
+  const lang = searchParams.get("lang") || "id";
 
-  for (const targetUrl of candidates(action, searchParams)) {
-    try {
-      const response = await fetch(targetUrl.toString(), {
-        headers: {
-          "X-API-Key": apiKey,
-          Accept: "application/json",
-          "User-Agent": "TPLAY+/1.0",
-        },
-        cache: "no-store",
-      });
+  let target: URL;
 
-      lastStatus = response.status;
-      const text = await response.text();
-      let data: any;
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        lastError = "Hoshiyomi returned non-JSON response (HTTP " + response.status + ")";
-        continue;
+  switch (action) {
+    case "home":
+      target = apiUrl("/api/iqiyi/trending", { lang });
+      break;
+    case "search":
+      if (!query) {
+        return NextResponse.json({ error: "Parameter query wajib diisi." }, { status: 400 });
       }
-
-      if (!response.ok || !isUsableJson(data)) {
-        lastError =
-          data?.message ||
-          data?.error ||
-          "Hoshiyomi request failed (HTTP " + response.status + ")";
-        continue;
+      target = apiUrl("/api/iqiyi/search", { q: query, lang });
+      break;
+    case "detail":
+      if (!id) {
+        return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
       }
-
-      return NextResponse.json(data, {
-        status: response.status,
-        headers: { "Cache-Control": "no-store" },
+      target = apiUrl("/api/iqiyi/detail", { id, albumId: albumId || undefined, lang });
+      break;
+    case "episodes":
+      if (!id) {
+        return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
+      }
+      target = apiUrl("/api/iqiyi/allepisode", { id, albumId: albumId || undefined, lang });
+      break;
+    case "play":
+      if (!id) {
+        return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
+      }
+      target = apiUrl("/api/iqiyi/episode", {
+        id,
+        ep,
+        albumId: albumId || undefined,
+        lang,
       });
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : "Hoshiyomi request failed";
-    }
+      break;
+    default:
+      return NextResponse.json({ error: "Invalid IQIYI action" }, { status: 400 });
   }
 
-  return NextResponse.json(
-    { error: lastError, status: lastStatus, action },
-    { status: lastStatus >= 400 ? lastStatus : 502 }
-  );
+  try {
+    const response = await fetch(target.toString(), {
+      headers: {
+        "X-API-Key": apiKey,
+        Accept: "application/json",
+        "User-Agent": "TPLAY+/1.0",
+      },
+      cache: "no-store",
+    });
+
+    const raw = await response.text();
+    let data: any;
+
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return NextResponse.json(
+        { error: "Hoshiyomi mengembalikan response non-JSON.", status: response.status },
+        { status: response.ok ? 502 : response.status }
+      );
+    }
+
+    if (!response.ok || !isUsableJson(data)) {
+      return NextResponse.json(
+        {
+          error: data?.message || data?.error || "Hoshiyomi request failed",
+          status: response.status,
+          action,
+        },
+        { status: response.status }
+      );
+    }
+
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Hoshiyomi request failed", action },
+      { status: 502 }
+    );
+  }
 }
