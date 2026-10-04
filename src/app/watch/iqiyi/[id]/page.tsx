@@ -3,7 +3,6 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useParams,useRouter} from "next/navigation";
-import Hls from "hls.js";
 import {useIqiyiDetail,useIqiyiEpisodes,useIqiyiPlay} from "@/hooks/useIqiyi";
 
 function arr(v:any):any[]{
@@ -44,7 +43,7 @@ function findStream(v:any):string{
 
 export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
-  const video=useRef<HTMLVideoElement|null>(null),hls=useRef<Hls|null>(null);
+  const video=useRef<HTMLVideoElement|null>(null),player=useRef<any>(null);
   const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false);
   const detailQuery=useIqiyiDetail(dramaId,albumId);
   const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
@@ -86,147 +85,142 @@ export default function IqiyiWatchPage(){
   },[]);
 
   useEffect(()=>{
-    if(!source||!video.current) return;
-    const v=video.current;
-    hls.current?.destroy();
-    let instance:Hls|null=null,blob="";
-    let url=source;
+    let cancelled=false;
 
-    const fail=()=>{setPlaying(false);setError("Video iQIYI gagal dimuat. Player sudah mencoba pemulihan otomatis; coba episode lagi jika CDN sedang bermasalah.");};
-    const makeProxyUrl=(target:string)=>"/api/iqiyi/proxy?url="+encodeURIComponent(target);
-    const isDirect=/^https?:\/\//i.test(source);
-    const isInlineManifest=!isDirect&&(source.startsWith("#EXTM3U")||source.includes("#EXT-X-"));
+    const loadVideoJs=async()=>{
+      if((window as any).videojs) return;
+      if(!document.querySelector('link[data-tplay-videojs]')){
+        const link=document.createElement('link');
+        link.rel='stylesheet';
+        link.href='https://vjs.zencdn.net/8.24.1/video-js.min.css';
+        link.dataset.tplayVideojs='1';
+        document.head.appendChild(link);
+      }
+      if((window as any).videojs) return;
 
-    // Hoshiyomi may return the HLS manifest itself instead of an .m3u8 URL.
-    // Rewrite every media/playlist URL through our same-origin proxy before
-    // creating the Blob. Otherwise the browser requests iQIYI .ts segments
-    // directly and they can fail because of CDN/CORS/header restrictions.
-    const proxyInlineManifest=(manifest:string)=>{
-      const baseUrl=window.location.href;
-      return manifest.split(/\r?\n/).map(line=>{
-        const trimmed=line.trim();
-        if(!trimmed) return line;
-
-        const rewrite=(raw:string)=>{
-          try{
-            const absolute=new URL(raw,baseUrl).toString();
-            return makeProxyUrl(absolute);
-          }catch{
-            return raw;
-          }
-        };
-
-        if(trimmed.startsWith("#")){
-          return line.replace(/URI="([^"]+)"/g,(_,raw)=>`URI="${rewrite(raw)}"`);
+      await new Promise<void>((resolve,reject)=>{
+        const existing=document.querySelector('script[data-tplay-videojs]') as HTMLScriptElement|null;
+        if(existing){
+          existing.addEventListener('load',()=>resolve(),{once:true});
+          existing.addEventListener('error',()=>reject(new Error('Video.js gagal dimuat.')),{once:true});
+          return;
         }
-
-        return rewrite(trimmed);
-      }).join("\n");
+        const script=document.createElement('script');
+        script.src='https://vjs.zencdn.net/8.24.1/video.min.js';
+        script.async=true;
+        script.dataset.tplayVideojs='1';
+        script.onload=()=>resolve();
+        script.onerror=()=>reject(new Error('Video.js gagal dimuat.'));
+        document.head.appendChild(script);
+      });
     };
 
-    const start=async()=>{
-      try{
-        if(isInlineManifest){
-          const proxiedManifest=proxyInlineManifest(source);
-          blob=URL.createObjectURL(new Blob([proxiedManifest],{type:"application/vnd.apple.mpegurl"}));
+    void loadVideoJs().then(()=>{
+      if(cancelled||!video.current||!source) return;
+      const videojs=(window as any).videojs;
+      if(!videojs) throw new Error('Engine Video.js tidak tersedia.');
 
-          if(v.canPlayType("application/vnd.apple.mpegurl")){
-            v.src=blob;
-            v.addEventListener("error",fail,{once:true});
-            await v.play().catch(()=>{});
-            setPlaying(true);
-            return;
+      player.current?.dispose?.();
+      player.current=null;
+
+      const v=video.current;
+      const makeProxyUrl=(target:string)=>'/api/iqiyi/proxy?url='+encodeURIComponent(target);
+      const isDirect=/^https?:\/\//i.test(source);
+      const isInlineManifest=!isDirect&&(source.startsWith('#EXTM3U')||source.includes('#EXT-X-'));
+      let blob='';
+
+      const proxyInlineManifest=(manifest:string)=>{
+        const baseUrl=window.location.href;
+        return manifest.split(/\r?\n/).map(line=>{
+          const trimmed=line.trim();
+          if(!trimmed) return line;
+
+          const rewrite=(raw:string)=>{
+            try{return makeProxyUrl(new URL(raw,baseUrl).toString());}
+            catch{return raw;}
+          };
+
+          if(trimmed.startsWith('#')){
+            return line.replace(/URI="([^"]+)"/g,(_,raw)=>'URI="'+rewrite(raw)+'"');
           }
+          return rewrite(trimmed);
+        }).join('\n');
+      };
 
-          if(Hls.isSupported()){
-            instance=new Hls({
-              enableWorker:true,
-              lowLatencyMode:false,
-              backBufferLength:90,
-              maxBufferLength:30,
-              maxBufferSize:60*1000*1000,
-              manifestLoadingMaxRetry:2,
-              levelLoadingMaxRetry:3,
-              fragLoadingMaxRetry:4,
-              manifestLoadingRetryDelay:500,
-              levelLoadingRetryDelay:500,
-              fragLoadingRetryDelay:500,
-              enableSoftwareAES:true,
-            });
-            hls.current=instance;
-            instance.loadSource(blob);
-            instance.attachMedia(v);
-            instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
-            instance.on(Hls.Events.ERROR,(_,d)=>{
-              if(!d.fatal) return;
-              if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
-                instance?.startLoad();
-                return;
-              }
-              if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
-                instance?.recoverMediaError();
-                return;
-              }
-              fail();
-            });
-            return;
-          }
+      let playbackSource=source;
+      if(isInlineManifest){
+        const manifest=proxyInlineManifest(source);
+        blob=URL.createObjectURL(new Blob([manifest],{type:'application/vnd.apple.mpegurl'}));
+        playbackSource=blob;
+      }else if(isDirect){
+        playbackSource=makeProxyUrl(source);
+      }else{
+        setError('Format video iQIYI tidak dikenali.');
+        return;
+      }
 
-          setError("Browser tidak mendukung HLS.");
+      let recoveryCount=0;
+      const instance=videojs(v,{
+        controls:true,
+        responsive:true,
+        fluid:true,
+        preload:'auto',
+        playsinline:true,
+        playbackRates:[0.5,0.75,1,1.25,1.5,2],
+        html5:{
+          vhs:{
+            overrideNative:true,
+            withCredentials:false,
+            enableLowInitialPlaylist:false,
+          },
+          nativeAudioTracks:false,
+          nativeVideoTracks:false,
+        },
+        controlBar:{
+          pictureInPictureToggle:true,
+          fullscreenToggle:true,
+          remainingTimeDisplay:true,
+          playbackRateMenuButton:true,
+        },
+      });
+      player.current=instance;
+
+      instance.src({src:playbackSource,type:'application/x-mpegURL'});
+      instance.on('playing',()=>{setPlaying(true);setError('');});
+      instance.on('waiting',()=>setPlaying(false));
+      instance.on('error',()=>{
+        const mediaError=instance.error();
+        if(recoveryCount<3){
+          recoveryCount++;
+          window.setTimeout(()=>{
+            if(cancelled||!player.current) return;
+            try{
+              const pos=instance.currentTime();
+              instance.reset();
+              instance.src({src:playbackSource,type:'application/x-mpegURL'});
+              instance.one('loadedmetadata',()=>{if(pos>0) try{instance.currentTime(pos);}catch{}});
+              void instance.play().catch(()=>{});
+            }catch{}
+          },800*recoveryCount);
           return;
         }
+        setPlaying(false);
+        setError(mediaError?.message||'Video iQIYI gagal dimuat. Video.js sudah mencoba pemulihan beberapa kali.');
+      });
 
-        if(!isDirect){
-          setError("Format video iQIYI tidak dikenali.");
-          return;
-        }
+      instance.ready(()=>{
+        if(cancelled) return;
+        void instance.play().catch(()=>{});
+      });
+    }).catch(e=>{
+      if(!cancelled) setError(e instanceof Error?e.message:'Gagal memuat Video.js');
+    });
 
-        const proxiedUrl=makeProxyUrl(url);
-
-        if(v.canPlayType("application/vnd.apple.mpegurl")){
-          v.src=proxiedUrl;
-          v.addEventListener("error",fail,{once:true});
-          await v.play().catch(()=>{});
-          setPlaying(true);
-          return;
-        }
-
-        if(Hls.isSupported()){
-          instance=new Hls({
-            enableWorker:true,
-            lowLatencyMode:false,
-            backBufferLength:90,
-            maxBufferLength:30,
-            maxBufferSize:60*1000*1000,
-            manifestLoadingMaxRetry:2,
-            levelLoadingMaxRetry:3,
-            fragLoadingMaxRetry:4,
-            manifestLoadingRetryDelay:500,
-            levelLoadingRetryDelay:500,
-            fragLoadingRetryDelay:500,
-            enableSoftwareAES:true,
-          });
-          hls.current=instance;
-          instance.loadSource(proxiedUrl);instance.attachMedia(v);
-          instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
-          instance.on(Hls.Events.ERROR,(_,d)=>{
-            if(!d.fatal) return;
-            if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
-              instance?.startLoad();
-              return;
-            }
-            if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
-              instance?.recoverMediaError();
-              return;
-            }
-            fail();
-          });
-        }else setError("Browser tidak mendukung HLS.");
-      }catch(e){setPlaying(false);setError(e instanceof Error?e.message:"Gagal menyiapkan player");}
+    return()=>{
+      cancelled=true;
+      player.current?.dispose?.();
+      player.current=null;
     };
-
-    void start();
-    return()=>{instance?.destroy();hls.current=null;v.removeAttribute("src");v.load();if(blob)URL.revokeObjectURL(blob)};
   },[source]);
 
   const next=episodes[episodes.findIndex(x=>x.number===selected)+1];
@@ -234,7 +228,7 @@ export default function IqiyiWatchPage(){
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center justify-between px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button><Link href={"/detail/iqiyi/"+encodeURIComponent(dramaId)} className="text-sm text-white/70">Detail</Link></div></header>
     <div className="container mx-auto max-w-6xl px-4 py-5">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} controls playsInline preload="metadata" className="aspect-video w-full bg-black"/></div>
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} id="iqiyi-video-player" className="video-js vjs-big-play-centered vjs-fluid" playsInline preload="auto"/></div>
       <h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}{playing?" • Playing":""}</p>
       {playLoading&&<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Menyiapkan video iQIYI...</div>}{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">Episode belum berhasil dimuat. Player tetap bisa dicoba.</div>}
       {loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}
