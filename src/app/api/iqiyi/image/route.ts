@@ -17,7 +17,9 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: Request) {
-  const target = new URL(request.url).searchParams.get("url");
+  const requestUrl = new URL(request.url);
+  const target = requestUrl.searchParams.get("url");
+  const format = requestUrl.searchParams.get("format") || "jpg";
   if (!target) return NextResponse.json({ error: "Parameter url wajib diisi." }, { status: 400, headers: cors() });
 
   let url: URL;
@@ -37,18 +39,33 @@ export async function GET(request: Request) {
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
     };
 
+    // Force a broadly compatible raster format. Safari/iOS can be picky
+    // about some WebP/AVIF variants returned by image CDNs.
+    if (format === "jpg" || format === "jpeg") {
+      const cdn = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
+      const cdnResponse = await fetch(cdn, {
+        headers: { Accept: "image/jpeg,image/*;q=0.8" },
+        redirect: "follow",
+        cache: "no-store",
+      });
+      if (cdnResponse.ok) {
+        const headers = new Headers(cors());
+        headers.set("Content-Type", "image/jpeg");
+        headers.set("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
+        return new NextResponse(cdnResponse.body, { status: 200, headers });
+      }
+    }
+
     let upstream = await fetch(url.toString(), {
       headers: fetchHeaders,
       redirect: "follow",
       cache: "no-store",
     });
 
-    // Some iQIYI image hosts reject Vercel/server-side fetches. Use an
-    // image CDN fallback so Safari/Chrome receive a normal image response.
     if (!upstream.ok) {
-      const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString());
+      const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
       upstream = await fetch(fallback, {
-        headers: { Accept: "image/avif,image/webp,image/*,*/*;q=0.8" },
+        headers: { Accept: "image/jpeg,image/*;q=0.8" },
         redirect: "follow",
         cache: "no-store",
       });
