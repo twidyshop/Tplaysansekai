@@ -16,6 +16,7 @@ import { FlickReelsHome } from "@/components/FlickReelsHome";
 import { PineDramaHome } from "@/components/PineDramaHome";
 import { MeloShortHome } from "@/components/MeloShortHome";
 import { IqiyiHome } from "@/components/IqiyiHome";
+import { WetvHome } from "@/components/WetvHome";
 import { InfiniteDramaSection } from "@/components/InfiniteDramaSection";
 import { PlatformSelector } from "@/components/PlatformSelector";
 import { useLatestDramas, useTrendingDramas, useDubindoDramas } from "@/hooks/useDramas";
@@ -68,7 +69,7 @@ function deepPick(value: any, keys: string[], fallback = "", depth = 0): string 
 export default function HomeContent() {
   const {
     isMeloShort, isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort,
-    isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels, isIqiyi
+    isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels, isIqiyi, isWetv
   } = usePlatform();
 
   // DramaBox data is only queried when DramaBox is selected.
@@ -167,6 +168,7 @@ export default function HomeContent() {
       </div>
 
       {isIqiyi && <div className="container mx-auto px-4 py-6 space-y-8"><IqiyiHome /></div>}
+      {isWetv && <div className="container mx-auto px-4 py-6 space-y-8"><WetvHome /></div>}
 
       {isMeloShort && <div className="container mx-auto px-4 py-6 space-y-8"><MeloShortHome /></div>}
       {isPineDrama && <div className="container mx-auto px-4 py-6 space-y-8"><PineDramaHome /></div>}
