@@ -34,58 +34,43 @@ export default function WetvWatchPage(){
  useEffect(()=>{if(episodes.length&&selected===1&&!episodes.some((x:any)=>x.number===1))setSelected(episodes[0].number);},[episodes,selected]);
  useEffect(()=>{
   let cancelled=false;
-  let removeSubtitleListener:(()=>void)|null=null;
-  let subtitleOverlay:HTMLDivElement|null=null;
-  let subtitleCues:{start:number,end:number,text:string}[]=[];
-  const load=async()=>{
-   if((window as any).videojs)return;
-   const loadScript=(src:string)=>new Promise<void>((resolve,reject)=>{const s=document.createElement("script");s.src=src;s.async=true;s.dataset.tplayVideojs="1";const t=window.setTimeout(()=>{s.remove();reject(new Error("timeout"));},10000);s.onload=()=>{window.clearTimeout(t);(window as any).videojs?resolve():reject(new Error("Video.js engine tidak ditemukan."));};s.onerror=()=>{window.clearTimeout(t);s.remove();reject(new Error("CDN gagal"));};document.head.appendChild(s);});
-   if(!document.querySelector('link[data-tplay-videojs]')){const l=document.createElement("link");l.rel="stylesheet";l.href="https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video-js.min.css";l.dataset.tplayVideojs="1";document.head.appendChild(l);}
-   try{await loadScript("https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video.min.js");}catch{await loadScript("https://unpkg.com/video.js@8.24.1/dist/video.min.js");}
-   if(!(window as any).videojs)throw new Error("Video.js gagal dimuat.");
-  };
-  const parseVtt=(vtt:string)=>{
-    const clean=vtt.replace(/^\uFEFF/,"").replace(/\r/g,"");
-    const blocks=clean.split(/\n\s*\n/);
-    const cues:{start:number,end:number,text:string}[]=[];
-    const time=(s:string)=>{const p=s.trim().split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];};
-    for(const block of blocks){const lines=block.split("\n");const ti=lines.findIndex(x=>x.includes("-->"));if(ti<0)continue;const parts=lines[ti].split("-->");if(parts.length<2)continue;const start=time(parts[0].replace(/^[^0-9]*/,""));const end=time(parts[1].trim().split(/\s+/)[0]);const text=lines.slice(ti+1).join("\n").replace(/<[^>]+>/g,"").trim();if(text)cues.push({start,end,text});}
-    return cues;
-  };
-  const loadSubtitles=async(instance:any)=>{
-    try{
-      const sr=await fetch("/api/wetv/subtitle?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected)),{cache:"no-store"});
-      if(!sr.ok)return;
-      const sj=await sr.json(),tracks=Array.isArray(sj?.tracks)?sj.tracks:[];
-      const idTrack=tracks.find((x:any)=>String(x?.language||"").toLowerCase()==="id")||tracks.find((x:any)=>/indonesia/i.test(String(x?.label||"")))||tracks[0];
-      if(idTrack?.src){const tr=await fetch(idTrack.src,{cache:"no-store"});if(tr.ok)subtitleCues=parseVtt(await tr.text());}
-      const hasId=tracks.some((x:any)=>String(x?.language||"").toLowerCase()==="id"||/indonesia/i.test(String(x?.label||"")));
-      tracks.forEach((track:any,index:number)=>{if(!track?.src)return;try{const lang=String(track.language||"und").toLowerCase(),isId=lang==="id"||/indonesia/i.test(String(track.label||""));instance.addRemoteTextTrack({kind:"subtitles",src:track.src,srclang:isId?"id":lang,language:isId?"id":lang,label:isId?"Indonesia":String(track.label||"Subtitle"),default:hasId?isId:index===0},false);}catch{}});
-    }catch{}
-  };
-
-  void load().then(()=>{
-   if(cancelled||!video.current||!source)return;
-   const videojs=(window as any).videojs;player.current?.dispose?.();player.current=null;
-   const isDirect=/^https?:\/\//i.test(source),inline=!isDirect&&(source.startsWith("#EXTM3U")||source.includes("#EXT-X-"));
-   const playback="/api/wetv/stream?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected));
-   // Hoshiyomi WeTV returns HLS streaming; the proxy endpoint normalizes it to HLS.
-   const type="application/x-mpegURL";
-   const instance=videojs(video.current,{controls:true,responsive:true,fluid:true,preload:"auto",playsinline:true,playbackRates:[0.5,0.75,1,1.25,1.5,2],html5:{vhs:{overrideNative:true,withCredentials:false,enableLowInitialPlaylist:false},nativeAudioTracks:false,nativeVideoTracks:false},controlBar:{pictureInPictureToggle:true,fullscreenToggle:true,remainingTimeDisplay:true,playbackRateMenuButton:true,subsCapsButton:true,skipButtons:{backward:10,forward:10}}});
-   subtitleOverlay=document.createElement("div");
-   subtitleOverlay.style.cssText="position:absolute;left:5%;right:5%;bottom:8%;z-index:20;text-align:center;color:#fff;font-size:clamp(16px,2.2vw,28px);font-weight:700;line-height:1.35;text-shadow:0 2px 4px #000,0 0 8px #000;pointer-events:none;display:none;white-space:pre-line";
-   video.current.parentElement?.appendChild(subtitleOverlay);
-   void loadSubtitles(instance);
-   const syncVisualSubtitle=()=>{if(!subtitleOverlay||!video.current)return;const t=video.current.currentTime||0;const cue=subtitleCues.find(x=>t>=x.start&&t<=x.end);subtitleOverlay.textContent=cue?.text||"";subtitleOverlay.style.display=cue?"block":"none";};
-   video.current.addEventListener("timeupdate",syncVisualSubtitle);
-   removeSubtitleListener=()=>video.current?.removeEventListener("timeupdate",syncVisualSubtitle);
+  let instance:any=null;
+  let overlay:HTMLDivElement|null=null;
+  const loadScript=(src:string)=>new Promise<void>((resolve,reject)=>{const s=document.createElement("script");s.src=src;s.async=true;s.dataset.tplayVideojs="1";const t=window.setTimeout(()=>{s.remove();reject(new Error("timeout"));},10000);s.onload=()=>{window.clearTimeout(t);(window as any).videojs?resolve():reject(new Error("Video.js engine tidak ditemukan."));};s.onerror=()=>{window.clearTimeout(t);s.remove();reject(new Error("CDN gagal"));};document.head.appendChild(s);});
+  const boot=async()=>{
+   if(!video.current||!document.body.contains(video.current))return;
+   if(!(window as any).videojs){if(!document.querySelector('link[data-tplay-videojs]')){const l=document.createElement("link");l.rel="stylesheet";l.href="https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video-js.min.css";l.dataset.tplayVideojs="1";document.head.appendChild(l);}try{await loadScript("https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video.min.js");}catch{await loadScript("https://unpkg.com/video.js@8.24.1/dist/video.min.js");}}
+   if(cancelled||!video.current||!document.body.contains(video.current))return;
+   const videojs=(window as any).videojs;
+   if((video.current as any).player_)return;
+   instance=videojs(video.current,{controls:true,responsive:true,fluid:true,preload:"auto",playsinline:true,playbackRates:[0.5,0.75,1,1.25,1.5,2],html5:{vhs:{overrideNative:true,withCredentials:false,enableLowInitialPlaylist:false},nativeAudioTracks:false,nativeVideoTracks:false},controlBar:{pictureInPictureToggle:true,fullscreenToggle:true,remainingTimeDisplay:true,playbackRateMenuButton:true,subsCapsButton:true,skipButtons:{backward:10,forward:10}}});
    player.current=instance;
-   // Subtitle tracks and the visual Indonesian overlay both use /api/wetv/subtitle.\n   instance.src({src:playback,type});
-   instance.on("playing",()=>{setPlaying(true);setError("");});instance.on("waiting",()=>setPlaying(false));
-   let recovery=0;instance.on("error",()=>{if(recovery<3){recovery++;window.setTimeout(()=>{if(cancelled||!player.current)return;try{const pos=instance.currentTime();instance.reset();instance.src({src:playback,type});instance.one("loadedmetadata",()=>{if(pos>0)try{instance.currentTime(pos)}catch{}});void instance.play().catch(()=>{});}catch{}},800*recovery);return;}setPlaying(false);setError(instance.error()?.message||"Video WeTV gagal dimuat.");});
-   instance.ready(()=>{if(!cancelled)void instance.play().catch(()=>{});});
-  }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:"Gagal memuat Video.js");});
-  return()=>{cancelled=true;removeSubtitleListener?.();subtitleOverlay?.remove();subtitleOverlay=null;subtitleCues=[];player.current?.dispose?.();player.current=null;};
+   instance.on("playing",()=>{setPlaying(true);setError("");});
+   instance.on("waiting",()=>setPlaying(false));
+   instance.on("error",()=>{setPlaying(false);const e=instance.error();if(e)setError(e.message||"Video WeTV gagal dimuat.");});
+  };
+  void boot().catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:"Gagal memuat Video.js");});
+  return()=>{cancelled=true;try{instance?.dispose?.();}catch{}if(player.current===instance)player.current=null;};
+ },[dramaId]);
+
+ useEffect(()=>{
+  let cancelled=false;
+  const instance=player.current;
+  if(!instance||!source)return;
+  const playback="/api/wetv/stream?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected));
+  const overlay=document.createElement("div");
+  overlay.style.cssText="position:absolute;left:5%;right:5%;bottom:8%;z-index:20;text-align:center;color:#fff;font-size:clamp(16px,2.2vw,28px);font-weight:700;line-height:1.35;text-shadow:0 2px 4px #000,0 0 8px #000;pointer-events:none;display:none;white-space:pre-line";
+  video.current?.parentElement?.appendChild(overlay);
+  const parseVtt=(vtt:string)=>{const clean=vtt.replace(/^\\uFEFF/,"").replace(/\\r/g,"");const cues:{start:number,end:number,text:string}[]=[];const time=(s:string)=>{const p=s.trim().split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];};for(const block of clean.split(/\\n\\s*\\n/)){const lines=block.split("\\n"),ti=lines.findIndex(x=>x.includes("-->"));if(ti<0)continue;const parts=lines[ti].split("-->");if(parts.length<2)continue;const st=time(parts[0].replace(/^[^0-9]*/,"")),en=time(parts[1].trim().split(/\\s+/)[0]),tx=lines.slice(ti+1).join("\\n").replace(/<[^>]+>/g,"").trim();if(tx)cues.push({start:st,end:en,text:tx});}return cues;};
+  let cues:{start:number,end:number,text:string}[]=[];
+  const sync=()=>{if(!video.current)return;const t=video.current.currentTime||0;const cue=cues.find(x=>t>=x.start&&t<=x.end);overlay.textContent=cue?.text||"";overlay.style.display=cue?"block":"none";};
+  const loadSubs=async()=>{try{const sr=await fetch("/api/wetv/subtitle?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected)),{cache:"no-store"});if(!sr.ok||cancelled)return;const sj=await sr.json(),tracks=Array.isArray(sj?.tracks)?sj.tracks:[];const idTrack=tracks.find((x:any)=>String(x?.language||"").toLowerCase()==="id")||tracks.find((x:any)=>/indonesia/i.test(String(x?.label||"")))||tracks[0];if(idTrack?.src){const tr=await fetch(idTrack.src,{cache:"no-store"});if(tr.ok&&!cancelled)cues=parseVtt(await tr.text());}const hasId=tracks.some((x:any)=>String(x?.language||"").toLowerCase()==="id"||/indonesia/i.test(String(x?.label||"")));tracks.forEach((track:any,index:number)=>{if(!track?.src)return;try{const lang=String(track.language||"und").toLowerCase(),isId=lang==="id"||/indonesia/i.test(String(track.label||""));instance.addRemoteTextTrack({kind:"subtitles",src:track.src,srclang:isId?"id":lang,language:isId?"id":lang,label:isId?"Indonesia":String(track.label||"Subtitle"),default:hasId?isId:index===0},false);}catch{}});}catch{}};
+  video.current?.addEventListener("timeupdate",sync);
+  void loadSubs();
+  instance.pause();
+  instance.src({src:playback,type:"application/x-mpegURL"});
+  instance.ready(()=>{if(!cancelled)void instance.play().catch(()=>{});});
+  return()=>{cancelled=true;video.current?.removeEventListener("timeupdate",sync);overlay.remove();try{instance.removeRemoteTextTrack?.(instance.remoteTextTracks?.()[0]);}catch{}};
  },[source,selected,dramaId]);
  const next=episodes[episodes.findIndex(x=>x.number===selected)+1];
  const play=useCallback((n:number)=>{setSelected(n);setSource("");setError("");setPlaying(false);},[]);
