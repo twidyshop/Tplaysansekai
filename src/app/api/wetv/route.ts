@@ -52,6 +52,7 @@ export async function GET(request:Request) {
   const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 10000;
   const timeout = setTimeout(()=>controller.abort(),timeoutMs);
   try {
+    console.log(`[WeTV] ${action} -> ${target.pathname}${target.search}`);
     const response = await fetch(target.toString(),{
       headers:{"X-API-Key":key,Accept:"application/json","User-Agent":"TPLAY+/1.0"},
       ...(action === "play" ? {cache:"no-store" as const} : {next:{revalidate:600}}),
@@ -59,6 +60,7 @@ export async function GET(request:Request) {
     });
     clearTimeout(timeout);
     const raw = await response.text();
+    console.log(`[WeTV] ${action} <- ${response.status} (${raw.length} bytes)`);
     let data:any;
     try { data=JSON.parse(raw); } catch {
       return NextResponse.json({error:"Hoshiyomi mengembalikan response non-JSON.",status:response.status},{status:response.ok?502:response.status,headers:cacheHeaders(action)});
@@ -66,6 +68,9 @@ export async function GET(request:Request) {
     if (!response.ok || data?.success === false || data?.error) {
       if (action === "detail") return NextResponse.json({success:false,data:{},error:data?.message||data?.error||"Detail WeTV sementara tidak tersedia",action},{status:200,headers:cacheHeaders(action)});
       return NextResponse.json({error:data?.message||data?.error||"Hoshiyomi request failed",status:response.status,action},{status:response.status,headers:cacheHeaders(action)});
+    }
+    if (action === "home" && !Array.isArray(data) && !data?.data && !data?.list && !data?.results && !data?.items) {
+      console.warn(`[WeTV] home returned unexpected shape:`, Object.keys(data || {}));
     }
     return NextResponse.json(data,{status:response.status,headers:cacheHeaders(action)});
   } catch(error) {
