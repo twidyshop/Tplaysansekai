@@ -36,6 +36,26 @@ function pick(v: any, keys: string[], fallback = "") {
   return fallback;
 }
 
+function collectTagOptions(value: any, group: string, depth = 0): { value: string; label: string }[] {
+  if (depth > 8 || value == null || typeof value !== "object") return [];
+  const found: { value: string; label: string }[] = [];
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === "string" || typeof item === "number") { const s = String(item).trim(); if (s) found.push({value:s,label:s}); }
+      else if (item && typeof item === "object") {
+        const rawValue = item.value ?? item.code ?? item.id ?? item.key ?? item.slug ?? item.name ?? item.label;
+        const rawLabel = item.label ?? item.name ?? item.title ?? item.text ?? rawValue;
+        if (rawValue != null && String(rawValue).trim()) found.push({value:String(rawValue).trim(),label:String(rawLabel ?? rawValue).trim()});
+      }
+    }
+  } else for (const [key, child] of Object.entries(value)) {
+    if (key.toLowerCase().includes(group)) found.push(...collectTagOptions(child,group,depth+1));
+    if (typeof child === "object") found.push(...collectTagOptions(child,group,depth+1));
+  }
+  const seen=new Set<string>();
+  return found.filter(x=>{const k=x.value.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+}
+
 function mapItem(x: any, i: number) {
   const id = pick(x, ["id", "bookId", "dramaId", "videoId", "albumId"], String(i));
   const albumId = pick(x, ["albumId", "album_id", "albumID"], "");
@@ -156,6 +176,10 @@ const SNAPSHOT_KEY = "tplay-iqiyi-trending-id-v2";
 
 export function IqiyiHome() {
   const [snapshot, setSnapshot] = useState<any[]>([]);
+  const [region,setRegion]=useState("");
+  const [genre,setGenre]=useState("");
+  const [sort,setSort]=useState("");
+  const tags=useQuery({queryKey:["iqiyi-tags-id"],queryFn:()=>get("/api/iqiyi?action=tags&cid=4&lang=id"),staleTime:1800000,gcTime:3600000,retry:0});
 
   useEffect(() => {
     try {
@@ -182,19 +206,22 @@ export function IqiyiHome() {
     } catch {}
   }, [trending.data]);
 
+  const tagParams=new URLSearchParams({lang:"id"});
+  if(region) tagParams.set("region",region);
+  if(genre) tagParams.set("genre",genre);
+  if(sort) tagParams.set("sort",sort);
+
   const drama = useInfiniteQuery({
-    queryKey: ["iqiyi-drama-id"],
-    queryFn: ({ pageParam }) =>
-      get("/api/iqiyi?action=drama&page=" + pageParam + "&lang=id"),
+    queryKey: ["iqiyi-drama-id",region,genre,sort],
+    queryFn: ({ pageParam }) => get("/api/iqiyi?action=drama&page="+pageParam+"&"+tagParams.toString()),
     initialPageParam: 1,
     getNextPageParam: (last, pages) => (arr(last).length ? pages.length + 1 : undefined),
     staleTime: 600000,
   });
 
   const anime = useInfiniteQuery({
-    queryKey: ["iqiyi-anime-id"],
-    queryFn: ({ pageParam }) =>
-      get("/api/iqiyi?action=anime&page=" + pageParam + "&lang=id"),
+    queryKey: ["iqiyi-anime-id",region,genre,sort],
+    queryFn: ({ pageParam }) => get("/api/iqiyi?action=anime&page="+pageParam+"&"+tagParams.toString()),
     initialPageParam: 1,
     getNextPageParam: (last, pages) => (arr(last).length ? pages.length + 1 : undefined),
     staleTime: 600000,
@@ -204,6 +231,9 @@ export function IqiyiHome() {
   const trendingItems = liveTrendingItems.length ? liveTrendingItems : snapshot;
   const dramaItems = drama.data?.pages.flatMap(arr) ?? [];
   const animeItems = anime.data?.pages.flatMap(arr) ?? [];
+  const regionTags=collectTagOptions(tags.data,"region");
+  const genreTags=collectTagOptions(tags.data,"genre");
+  const sortTags=collectTagOptions(tags.data,"sort");
 
   if (!trendingItems.length && trending.isLoading) {
     return (
@@ -225,6 +255,8 @@ export function IqiyiHome() {
 
   return (
     <div className="space-y-10">
+      {(regionTags.length||genreTags.length||sortTags.length)>0&&<section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold text-white">Filter iQIYI</h2>{(region||genre||sort)&&<button onClick={()=>{setRegion("");setGenre("");setSort("");}} className="text-xs text-white/50 hover:text-white">Reset</button>}</div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{regionTags.length>0&&<select value={region} onChange={e=>setRegion(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Region</option>{regionTags.map(x=><option key={"r-"+x.value} value={x.value}>{x.label}</option>)}</select>}{genreTags.length>0&&<select value={genre} onChange={e=>setGenre(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Genre</option>{genreTags.map(x=><option key={"g-"+x.value} value={x.value}>{x.label}</option>)}</select>}{sortTags.length>0&&<select value={sort} onChange={e=>setSort(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Urutan Default</option>{sortTags.map(x=><option key={"s-"+x.value} value={x.value}>{x.label}</option>)}</select>}</div></section>}
+
       <Section title="Trending" data={trendingItems} loading={false} />
       <Section
         title="Drama"
