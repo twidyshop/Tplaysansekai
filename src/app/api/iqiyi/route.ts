@@ -164,7 +164,9 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      { error: error instanceof Error && error.name === "AbortError"\n        ? `Request iQIYI timeout setelah ${timeoutMs / 1000} detik.`\n        : error instanceof Error ? error.message : "Hoshiyomi request failed", action },
+      { error: error instanceof Error && error.name === "AbortError"
+        ? `Request iQIYI timeout setelah ${timeoutMs / 1000} detik.`
+        : error instanceof Error ? error.message : "Hoshiyomi request failed", action },
       { status: 502, headers: cacheHeaders(action) }
     );
   }
