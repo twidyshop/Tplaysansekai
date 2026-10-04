@@ -63,7 +63,7 @@ export default function IqiyiDetailPage(){
   const detail=unwrap(data);
   const title=deepText(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
   const cover=deepText(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
-  const description=deepText(data,["description","synopsis","introduction","desc","summary","shotDesc","storyline","plot","content"],quickDescription);
+  const description=deepText(data,["description","synopsis","introduction","intro","desc","summary","shotDesc","storyline","plot","content","brief","briefIntroduction","shortDescription","longDescription","descriptionText","descText","synopsisText","summaryText","story","storylineText","contentDesc","contentDescription"],quickDescription);
   const episodes=number(detail,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"])||Number(deepText(data,["episodes","episodeCount","totalEpisodes","chapterCount"],String(quickEpisodes)))||quickEpisodes;
 
   return <main className="min-h-screen bg-[#0a0e27] text-white">
