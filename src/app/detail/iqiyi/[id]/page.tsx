@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -5,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 
 function unwrap(value:any):any {
   let data=value?.data??value;
-  for(let i=0;i<8;i++){
+  for(let i=0;i<10;i++){
     if(!data||typeof data!=="object"||Array.isArray(data)) break;
     const next=data.detail??data.drama??data.album??data.video??data.item??data.result??data.data;
     if(!next||next===data||Array.isArray(next)) break;
@@ -18,6 +19,17 @@ function text(value:any,keys:string[],fallback=""){
     const v=value?.[key];
     if(typeof v==="string"&&v.trim()) return v.trim();
     if(typeof v==="number"&&Number.isFinite(v)) return String(v);
+  }
+  return fallback;
+}
+function deepText(value:any,keys:string[],fallback="",depth=0):string{
+  if(depth>8||value==null) return fallback;
+  const direct=text(value,keys,"");
+  if(direct) return direct;
+  if(typeof value!=="object") return fallback;
+  for(const key of Object.keys(value)){
+    const found=deepText(value[key],keys,"",depth+1);
+    if(found) return found;
   }
   return fallback;
 }
@@ -42,17 +54,17 @@ export default function IqiyiDetailPage(){
       const response=await fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(id)+(quickAlbumId?"&albumId="+encodeURIComponent(quickAlbumId):"")+"&lang=id");
       const json=await response.json();
       if(!response.ok) throw new Error(json?.error||"Gagal memuat detail IQIYI");
-      return unwrap(json);
+      return json;
     },
     enabled:Boolean(id),
     staleTime:300000,
   });
 
-
-  const title=text(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
-  const cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
-  const description=text(data,["description","synopsis","introduction","desc","summary","shotDesc"],quickDescription);
-  const episodes=number(data,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"])||quickEpisodes;
+  const detail=unwrap(data);
+  const title=deepText(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
+  const cover=deepText(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
+  const description=deepText(data,["description","synopsis","introduction","desc","summary","shotDesc","storyline","plot","content"],quickDescription);
+  const episodes=number(detail,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"])||Number(deepText(data,["episodes","episodeCount","totalEpisodes","chapterCount"],String(quickEpisodes)))||quickEpisodes;
 
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70 hover:text-white">‹&nbsp; Kembali</button></div></header>
@@ -62,8 +74,7 @@ export default function IqiyiDetailPage(){
         <section className="flex min-w-0 flex-col">
           <span className="mb-3 inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">iQIYI</span>
           <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>
-          {description&&<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>}
-{isLoading&&!description&&<p className="mb-5 text-xs text-white/35">Memuat sinopsis...</p>}
+          {description?<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>:isLoading?<p className="mb-5 text-xs text-white/35">Memuat sinopsis...</p>:null}
           {episodes>0&&<p className="mb-6 text-sm text-white/45">{episodes} episode</p>}
           <button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id)+(quickAlbumId?"?albumId="+encodeURIComponent(quickAlbumId):""))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button>
         </section>
