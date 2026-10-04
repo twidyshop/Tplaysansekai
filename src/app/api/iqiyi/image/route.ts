@@ -30,16 +30,29 @@ export async function GET(request: Request) {
   }
 
   try {
-    const upstream = await fetch(url.toString(), {
-      headers: {
-        Referer: "https://www.iq.com/",
-        Origin: "https://www.iq.com",
-        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
-      },
+    const fetchHeaders = {
+      Referer: "https://www.iq.com/",
+      Origin: "https://www.iq.com",
+      Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    };
+
+    let upstream = await fetch(url.toString(), {
+      headers: fetchHeaders,
       redirect: "follow",
       cache: "no-store",
     });
+
+    // Some iQIYI image hosts reject Vercel/server-side fetches. Use an
+    // image CDN fallback so Safari/Chrome receive a normal image response.
+    if (!upstream.ok) {
+      const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString());
+      upstream = await fetch(fallback, {
+        headers: { Accept: "image/avif,image/webp,image/*,*/*;q=0.8" },
+        redirect: "follow",
+        cache: "no-store",
+      });
+    }
 
     if (!upstream.ok) {
       return new NextResponse("Image upstream failed", { status: upstream.status, headers: cors() });
