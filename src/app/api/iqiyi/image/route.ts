@@ -19,7 +19,6 @@ export async function OPTIONS() {
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const target = requestUrl.searchParams.get("url");
-  const format = requestUrl.searchParams.get("format") || "jpg";
   if (!target) return NextResponse.json({ error: "Parameter url wajib diisi." }, { status: 400, headers: cors() });
 
   let url: URL;
@@ -48,13 +47,6 @@ export async function GET(request: Request) {
     });
 
     if (!upstream.ok) {
-      const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
-      upstream = await fetch(fallback, {
-        headers: { Accept: "image/jpeg,image/*;q=0.8" },
-        redirect: "follow",
-        cache: "no-store",
-      });
-    }    if (!upstream.ok) {
       const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
       upstream = await fetch(fallback, {
         headers: { Accept: "image/jpeg,image/*;q=0.8" },
