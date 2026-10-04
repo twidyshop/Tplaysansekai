@@ -51,7 +51,7 @@ function Section({title,items,loading=false}:{title:string,items:any[],loading?:
 export function WetvHome() {
   const [more,setMore]=useState(false);
   const trending=useQuery({queryKey:["wetv","home",more?2:1],queryFn:async()=>{const r=await fetch("/api/wetv?action=home&lang=id&page="+(more?2:1)+"&limit=30");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV");return arr(j);},staleTime:600000,gcTime:1800000});
-  const anime=useQuery({queryKey:["wetv","anime"],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&page=1&limit=30");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},staleTime:600000,gcTime:1800000});
+  const anime=useQuery({queryKey:["wetv","anime"],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&limit=30");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},staleTime:600000,gcTime:1800000});
   const trendingItems=trending.data?.map(mapItem).slice(0,30)||[];
   const animeItems=anime.data?.map(mapItem).slice(0,30)||[];
   if(trending.error&&!trendingItems.length) return <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">Gagal memuat WeTV: {trending.error instanceof Error?trending.error.message:"Request gagal"}</div>;
