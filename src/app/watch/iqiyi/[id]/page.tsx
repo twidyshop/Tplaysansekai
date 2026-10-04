@@ -14,7 +14,15 @@ function arr(v:any):any[]{
   }
   return [];
 }
-function deepText(value:any,keys:string[],fallback="",depth=0):string{\n  if(depth>8||value==null) return fallback;\n  const direct=pick(value,keys,"");\n  if(direct) return direct;\n  if(typeof value!=="object") return fallback;\n  for(const key of Object.keys(value)){ const found=deepText(value[key],keys,"",depth+1); if(found) return found; }\n  return fallback;\n}\nfunction pick(v:any,keys:string[],fallback=""){
+function deepText(value:any,keys:string[],fallback="",depth=0):string{
+  if(depth>8||value==null) return fallback;
+  const direct=pick(value,keys,"");
+  if(direct) return direct;
+  if(typeof value!=="object") return fallback;
+  for(const key of Object.keys(value)){ const found=deepText(value[key],keys,"",depth+1); if(found) return found; }
+  return fallback;
+}
+function pick(v:any,keys:string[],fallback=""){
   for(const k of keys){
     const x=v?.[k];
     if(typeof x==="string"&&x.trim()) return x.trim();
