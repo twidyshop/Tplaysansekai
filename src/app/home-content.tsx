@@ -78,7 +78,7 @@ export default function HomeContent() {
   const { data: trendingDramas, isLoading: loadingTrending, error: errorTrending, refetch: refetchTrending } = useTrendingDramas(isDramaBox);
   const { data: dubindoDramas, isLoading: loadingDubindo, error: errorDubindo, refetch: refetchDubindo } = useDubindoDramas(isDramaBox);
 
-  // Main hero uses iQIYI Trending. It is only requested when iQIYI is selected.
+  // Main hero uses iQIYI Trending and stays visible while switching platforms.
   const iqiyiTrending = useQuery({
     queryKey: ["iqiyi", "home", "banner"],
     queryFn: async () => {
@@ -87,7 +87,7 @@ export default function HomeContent() {
       if (!response.ok) throw new Error(json?.error || "Gagal memuat iQIYI Trending");
       return extractItems(json);
     },
-    enabled: isIqiyi,
+    enabled: true,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
@@ -128,25 +128,25 @@ export default function HomeContent() {
 
   return (
     <main className="min-h-screen pt-16 pb-20">
-      {isIqiyi && !iqiyiTrending.isLoading && heroBanner && heroBanner.image && (
-        <div className="w-full relative h-[55vh] md:h-[65vh] lg:h-[70vh] bg-black overflow-hidden">
+      {heroBanner && heroBanner.image && (
+        <div className="w-full relative aspect-[16/8] sm:aspect-[16/7] md:aspect-[16/5.5] lg:aspect-[16/4.5] max-h-[460px] min-h-[250px] bg-black overflow-hidden">
           <div className="absolute inset-0">
             <Image
               src={"/api/iqiyi/image?url=" + encodeURIComponent(heroBanner.image)}
               alt={heroBanner.title}
               fill
-              className="object-cover object-top opacity-55 scale-105 transform transition-transform duration-1000"
+              className="object-cover object-center opacity-55 scale-105 transform transition-transform duration-1000"
               priority
               unoptimized
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e27] via-[#0a0e27]/50 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#0a0e27] via-[#0a0e27]/40 to-transparent" />
           </div>
-          <div className="container mx-auto px-4 h-full relative flex items-end pb-8 md:pb-12">
-            <div className="max-w-2xl space-y-2 md:space-y-4">
+          <div className="container mx-auto px-4 h-full relative flex items-end pb-5 sm:pb-7 md:pb-10">
+            <div className="max-w-xl space-y-1.5 sm:space-y-2.5 md:space-y-4">
               {heroBanner.badge && <span className="inline-block px-3 py-0.5 md:py-1 text-[10px] md:text-xs font-semibold bg-primary text-primary-foreground rounded-full shadow-md">{heroBanner.badge}</span>}
-              <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-white drop-shadow-md line-clamp-2 leading-tight">{heroBanner.title}</h1>
-              <p className="text-xs sm:text-sm md:text-base text-gray-200 line-clamp-2 md:line-clamp-3 drop-shadow-sm font-normal">{heroBanner.description}</p>
+              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-extrabold text-white drop-shadow-md line-clamp-2 leading-tight">{heroBanner.title}</h1>
+              <p className="text-[11px] sm:text-xs md:text-sm lg:text-base text-gray-200 line-clamp-2 md:line-clamp-3 drop-shadow-sm font-normal">{heroBanner.description}</p>
               {heroBanner.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {heroBanner.tags.slice(0, 3).map((tag, idx) => (
@@ -154,7 +154,7 @@ export default function HomeContent() {
                   ))}
                 </div>
               )}
-              <div className="pt-2 md:pt-3">
+              <div className="pt-1.5 sm:pt-2 md:pt-3">
                 <Link href={heroBanner.url} className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-semibold shadow-lg transition-all transform active:scale-95">
                   <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" /> Mulai Nonton
                 </Link>
