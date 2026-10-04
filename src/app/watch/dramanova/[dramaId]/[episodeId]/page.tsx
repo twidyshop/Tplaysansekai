@@ -293,7 +293,7 @@ export default function DramaNovaWatchPage() {
               </button>
             </div>
             <div className="p-3 grid grid-cols-5 gap-2">
-              {dramaDetail.episodes?.map((episode, idx) => (
+              {dramaDetail.episodes?.map((episode: { id: string; episodeNumber?: number | string }, idx: number) => (
                 <button
                   key={episode.id}
                   onClick={() => handleEpisodeChange(idx)}
