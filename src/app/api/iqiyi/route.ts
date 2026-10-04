@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Tambahkan Edge Runtime agar Vercel tidak memutus API dalam 10-15 detik
+export const runtime = "edge";
+
 export const revalidate = 600;
 
 const BASE = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
@@ -98,7 +101,9 @@ export async function GET(request: Request) {
 
   const isPlay = action === "play";
   const controller = new AbortController();
-  const timeoutMs = action === "play" ? 15000 : action === "episodes" ? 20000 : 15000;
+  
+  // Waktu tunggu (timeout) diperpanjang: Play menjadi 45 detik, Episodes menjadi 30 detik
+  const timeoutMs = action === "play" ? 45000 : action === "episodes" ? 30000 : 15000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
