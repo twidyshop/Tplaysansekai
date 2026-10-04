@@ -15,7 +15,9 @@ export async function GET(request:Request){
   if(!ACTIONS.has(action)) return NextResponse.json({error:"Invalid IQIYI action"},{status:400});
   const key=process.env.HOSHIYOMI_API_KEY;
   if(!key) return NextResponse.json({error:"HOSHIYOMI_API_KEY belum dikonfigurasi di Vercel."},{status:500});
-  const id=p.get("id")||"", albumId=p.get("albumId")||undefined, lang=p.get("lang")||"id";
+  const id=p.get("id")||"", albumId=p.get("albumId")||undefined;
+  // TPLAY+ intentionally serves the Indonesian iQIYI catalog only.
+  const lang="id";
   let target:URL;
   switch(action){
     case "home": target=makeUrl("/api/iqiyi/trending",{lang}); break;
@@ -31,13 +33,24 @@ export async function GET(request:Request){
   }
   try{
     const isPlay=action==="play";
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000);
     const response=await fetch(target.toString(),{
       headers:{"X-API-Key":key,Accept:"application/json","User-Agent":"TPLAY+/1.0"},
-      ...(isPlay?{cache:"no-store" as const}:{next:{revalidate:300}})
+      ...(isPlay?{cache:"no-store" as const}:{next:{revalidate:600}}),
+      signal:controller.signal,
     });
+    clearTimeout(timeout);
     const raw=await response.text(); let data:any;
     try{data=JSON.parse(raw)}catch{return NextResponse.json({error:"Hoshiyomi mengembalikan response non-JSON.",status:response.status},{status:response.ok?502:response.status})}
-    if(!response.ok||data?.success===false||data?.error)return NextResponse.json({error:data?.message||data?.error||"Hoshiyomi request failed",status:response.status,action},{status:response.status});
+    if(!response.ok||data?.success===false||data?.error){
+      // Detail is enrichment only; never turn the detail page into a 502 screen.
+      if(action==="detail") return NextResponse.json({success:false,data:{},error:data?.message||data?.error||"Detail sementara tidak tersedia",action},{status:200,headers:{"Cache-Control":"public, s-maxage=60, stale-while-revalidate=300"}});
+      return NextResponse.json({error:data?.message||data?.error||"Hoshiyomi request failed",status:response.status,action},{status:response.status});
+    }
     return NextResponse.json(data,{status:response.status,headers:{"Cache-Control":isPlay?"no-store":"public, s-maxage=300, stale-while-revalidate=60"}});
-  }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Hoshiyomi request failed",action},{status:502})}
+  }catch(error){
+    if(action==="detail") return NextResponse.json({success:false,data:{},error:"Detail iQIYI sedang diperkaya di background.",action},{status:200,headers:{"Cache-Control":"public, s-maxage=30, stale-while-revalidate=120"}});
+    return NextResponse.json({error:error instanceof Error?error.message:"Hoshiyomi request failed",action},{status:502});
+  }
 }
