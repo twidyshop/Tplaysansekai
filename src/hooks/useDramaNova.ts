@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { fetchJson } from "@/lib/fetcher";
 
 function ex(v: any): any[] {
@@ -70,6 +70,24 @@ export function useDramaNovaForYou(page = 1) {
           `/api/dramanova?action=foryou&page=${page}&lang=id`
         )
       ),
+    staleTime: 600000,
+  });
+}
+
+export function useInfiniteDramaNovaHome() {
+  return useInfiniteQuery({
+    queryKey: ["dramanova", "infinite-home"],
+    queryFn: async ({ pageParam }) => {
+      const response = await fetchJson<any>(
+        `/api/dramanova?action=foryou&page=${pageParam}&lang=id`
+      );
+      return {
+        rows: ex(response),
+      };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.rows.length > 0 ? allPages.length + 1 : undefined,
     staleTime: 600000,
   });
 }
