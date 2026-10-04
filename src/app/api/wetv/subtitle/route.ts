@@ -57,6 +57,56 @@ function srtToVtt(s:string){
   for(const block of n.split(/\n{2,}/)){const lines=block.split("\n"),i=lines.findIndex(x=>x.includes("-->"));if(i<0)continue;const timing=lines[i].replace(/(\d{1,2}:\d{2}:\d{2}),(\d{1,3})/g,"$1.$2"),text=lines.slice(i+1).join("\n").trim();if(text)out.push(timing,text,"");}
   return out.join("\n");
 }
+function extractVttCues(text:string):string[]{
+  const n=text.replace(/^\uFEFF/,"").replace(/\r\n?/g,"\n").trim();
+  if(!n)return [];
+  return n.split(/\n{2,}/).map(block=>block.trim()).filter(block=>block.includes("-->"));
+}
+function headersForSubtitle(){
+  return {
+    Referer:"https://wetv.vip/",
+    Origin:"https://wetv.vip",
+    Accept:"text/vtt,text/plain,application/x-subrip,application/vnd.apple.mpegurl,*/*",
+    "Accept-Encoding":"identity",
+    "User-Agent":"Mozilla/5.0"
+  };
+}
+async function hlsVttToVtt(playlist:string,playlistUrl:string):Promise<string>{
+  const lines=playlist.replace(/^\uFEFF/,"").split(/\r?\n/);
+  const segmentUrls:string[]=[];
+  let expectVariant=false;
+  for(const line of lines){
+    const t=line.trim();
+    if(!t)continue;
+    if(t.startsWith("#EXT-X-STREAM-INF:")){expectVariant=true;continue;}
+    if(t.startsWith("#"))continue;
+    if(expectVariant){
+      expectVariant=false;
+      segmentUrls.push(new URL(t,new URL(playlistUrl)).toString());
+    } else {
+      segmentUrls.push(new URL(t,new URL(playlistUrl)).toString());
+    }
+  }
+  if(!segmentUrls.length)return "WEBVTT\n\n";
+  if(lines.some(x=>x.trim().startsWith("#EXT-X-STREAM-INF:"))){
+    const nested=await fetch(segmentUrls[0],{headers:headersForSubtitle(),redirect:"follow",cache:"no-store"});
+    if(!nested.ok)throw new Error("Gagal mengambil media playlist subtitle WeTV.");
+    return hlsVttToVtt(await nested.text(),nested.url||segmentUrls[0]);
+  }
+  const responses=await Promise.all(segmentUrls.map(async u=>{
+    const r=await fetch(u,{headers:headersForSubtitle(),redirect:"follow",cache:"no-store"});
+    if(!r.ok)return "";
+    return r.text();
+  }));
+  const seen=new Set<string>(),cues:string[]=[];
+  for(const text of responses){
+    for(const cue of extractVttCues(text)){
+      const key=cue.replace(/\s+/g," ").trim();
+      if(!seen.has(key)){seen.add(key);cues.push(cue);}
+    }
+  }
+  return "WEBVTT\n\n"+cues.join("\n\n")+"\n";
+}
 export async function OPTIONS(){return new NextResponse(null,{status:204,headers:cors});}
 export async function GET(request:Request){
   const p=new URL(request.url).searchParams,url=p.get("url");
@@ -64,10 +114,13 @@ export async function GET(request:Request){
     try{
       const target=new URL(url);
       if(!["http:","https:"].includes(target.protocol)) throw new Error("Protocol subtitle tidak diizinkan.");
-      const r=await fetch(target.toString(),{headers:{Referer:"https://wetv.vip/",Origin:"https://wetv.vip",Accept:"text/vtt,text/plain,application/x-subrip,*/*","Accept-Encoding":"identity","User-Agent":"Mozilla/5.0"},redirect:"follow",cache:"no-store"});
+      const r=await fetch(target.toString(),{headers:headersForSubtitle(),redirect:"follow",cache:"no-store"});
       const raw=await r.text();
       if(!r.ok)return new NextResponse(raw,{status:r.status,headers:{...cors,"Content-Type":"text/plain; charset=utf-8"}});
-      const ct=r.headers.get("content-type")||"",isSrt=/subrip|srt/i.test(ct)||/\.srt(?:[?#]|$)/i.test(r.url||target.toString()),body=isSrt?srtToVtt(raw):raw.replace(/^\uFEFF/,"");
+      const final=r.url||target.toString(),ct=r.headers.get("content-type")||"";
+      const isHls=/mpegurl/i.test(ct)||/\.m3u8(?:[?#]|$)/i.test(final)||/^\s*#EXTM3U/i.test(raw);
+      const isSrt=/subrip|srt/i.test(ct)||/\.srt(?:[?#]|$)/i.test(final);
+      const body=isHls?await hlsVttToVtt(raw,final):isSrt?srtToVtt(raw):raw.replace(/^\uFEFF/,"");
       return new NextResponse(body,{status:200,headers:{...cors,"Content-Type":"text/vtt; charset=utf-8","Cache-Control":"no-store"}});
     }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Gagal mengambil subtitle WeTV."},{status:502,headers:cors});}
   }
