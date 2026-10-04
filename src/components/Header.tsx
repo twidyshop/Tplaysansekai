@@ -342,6 +342,18 @@ export function Header() {
         !episode &&
         mode === "watch"
       ) {
+        const watchText = document.body?.innerText || "";
+        const watchEpisodeMatch = watchText.match(/(?:^|\n)Episode\s+(\d+)(?:\s|$)/i);
+        if (watchEpisodeMatch) {
+          const parsed = Number(watchEpisodeMatch[1]);
+          if (Number.isFinite(parsed) && parsed > 0) episode = parsed;
+        }
+      }
+
+      if (
+        !episode &&
+        mode === "watch"
+      ) {
         const selectors = [
           ".episode-active",
           "[data-active='true']",
