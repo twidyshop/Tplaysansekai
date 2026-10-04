@@ -89,30 +89,47 @@ export default function IqiyiWatchPage(){
 
     const loadVideoJs=async()=>{
       if((window as any).videojs) return;
+
+      const loadScript=(src:string)=>new Promise<void>((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src=src;
+        script.async=true;
+        script.dataset.tplayVideojs='1';
+        const timer=window.setTimeout(()=>{
+          script.remove();
+          reject(new Error('timeout'));
+        },10000);
+        script.onload=()=>{
+          window.clearTimeout(timer);
+          if((window as any).videojs) resolve();
+          else reject(new Error('Video.js engine tidak ditemukan.'));
+        };
+        script.onerror=()=>{
+          window.clearTimeout(timer);
+          script.remove();
+          reject(new Error('CDN gagal'));
+        };
+        document.head.appendChild(script);
+      });
+
       if(!document.querySelector('link[data-tplay-videojs]')){
         const link=document.createElement('link');
         link.rel='stylesheet';
-        link.href='https://vjs.zencdn.net/8.24.1/video-js.min.css';
+        link.href='https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video-js.min.css';
         link.dataset.tplayVideojs='1';
         document.head.appendChild(link);
       }
-      if((window as any).videojs) return;
 
-      await new Promise<void>((resolve,reject)=>{
-        const existing=document.querySelector('script[data-tplay-videojs]') as HTMLScriptElement|null;
-        if(existing){
-          existing.addEventListener('load',()=>resolve(),{once:true});
-          existing.addEventListener('error',()=>reject(new Error('Video.js gagal dimuat.')),{once:true});
-          return;
-        }
-        const script=document.createElement('script');
-        script.src='https://vjs.zencdn.net/8.24.1/video.min.js';
-        script.async=true;
-        script.dataset.tplayVideojs='1';
-        script.onload=()=>resolve();
-        script.onerror=()=>reject(new Error('Video.js gagal dimuat.'));
-        document.head.appendChild(script);
-      });
+      const failed=document.querySelectorAll('script[data-tplay-videojs]');
+      failed.forEach(node=>node.remove());
+
+      try{
+        await loadScript('https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video.min.js');
+      }catch{
+        await loadScript('https://unpkg.com/video.js@8.24.1/dist/video.min.js');
+      }
+
+      if(!(window as any).videojs) throw new Error('Video.js gagal dimuat dari CDN utama maupun cadangan.');
     };
 
     void loadVideoJs().then(()=>{
