@@ -59,6 +59,44 @@ export async function GET(request:Request) {
   const timeout = setTimeout(()=>controller.abort(),timeoutMs);
   try {
     console.log(`[WeTV] ${action} -> ${target.pathname}${target.search}`);
+    // Episode endpoint can be paginated. Collect several pages so the watch page
+    // does not stop at the first batch when Hoshiyomi returns paginated results.
+    if (action === "episodes") {
+      const merged:any[] = [];
+      const seen = new Set<string>();
+      let first:any = null;
+      let firstStatus = 200;
+      for (let page = 1; page <= 20; page++) {
+        const pageUrl = new URL(target.toString());
+        pageUrl.searchParams.set("page", String(page));
+        const response = await fetch(pageUrl.toString(), {
+          headers: {"X-API-Key":key,Accept:"application/json","User-Agent":"TPLAY+/1.0"},
+          cache:"no-store",
+          signal:controller.signal,
+        });
+        firstStatus = response.status;
+        const raw = await response.text();
+        let data:any;
+        try { data = JSON.parse(raw); } catch { break; }
+        if (!first) first = data;
+        if (!response.ok || data?.success === false || data?.error) break;
+        const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : Array.isArray(data?.episodes) ? data.episodes : Array.isArray(data?.data?.episodes) ? data.data.episodes : [];
+        let added = 0;
+        for (const item of list) {
+          const keyId = String(item?.id ?? item?.episodeId ?? item?.episode_id ?? item?.episode ?? item?.episodeNumber ?? JSON.stringify(item));
+          if (!seen.has(keyId)) { seen.add(keyId); merged.push(item); added++; }
+        }
+        if (!list.length || added === 0) break;
+      }
+      if (first) {
+        if (Array.isArray(first)) first = merged;
+        else if (Array.isArray(first.data)) first.data = merged;
+        else if (Array.isArray(first.episodes)) first.episodes = merged;
+        else first = {...first, data: merged};
+        return NextResponse.json(first,{status:firstStatus,headers:cacheHeaders(action)});
+      }
+    }
+
     const response = await fetch(target.toString(),{
       headers:{"X-API-Key":key,Accept:"application/json","User-Agent":"TPLAY+/1.0"},
       cache:"no-store",
