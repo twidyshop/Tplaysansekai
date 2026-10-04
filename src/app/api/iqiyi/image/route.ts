@@ -39,23 +39,8 @@ export async function GET(request: Request) {
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
     };
 
-    // Force a broadly compatible raster format. Safari/iOS can be picky
-    // about some WebP/AVIF variants returned by image CDNs.
-    if (format === "jpg" || format === "jpeg") {
-      const cdn = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
-      const cdnResponse = await fetch(cdn, {
-        headers: { Accept: "image/jpeg,image/*;q=0.8" },
-        redirect: "follow",
-        cache: "no-store",
-      });
-      if (cdnResponse.ok) {
-        const headers = new Headers(cors());
-        headers.set("Content-Type", "image/jpeg");
-        headers.set("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
-        return new NextResponse(cdnResponse.body, { status: 200, headers });
-      }
-    }
-
+    // Fetch the iQIYI image directly first. This keeps the browser request
+    // same-origin while preserving the source bytes/content-type.
     let upstream = await fetch(url.toString(), {
       headers: fetchHeaders,
       redirect: "follow",
@@ -63,6 +48,13 @@ export async function GET(request: Request) {
     });
 
     if (!upstream.ok) {
+      const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
+      upstream = await fetch(fallback, {
+        headers: { Accept: "image/jpeg,image/*;q=0.8" },
+        redirect: "follow",
+        cache: "no-store",
+      });
+    }    if (!upstream.ok) {
       const fallback = "https://wsrv.nl/?url=" + encodeURIComponent(url.toString()) + "&output=jpg&q=88&w=800";
       upstream = await fetch(fallback, {
         headers: { Accept: "image/jpeg,image/*;q=0.8" },
