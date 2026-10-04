@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     case "detail":
       if (!id) return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
       // iQIYI's Indonesian international metadata uses the id-id locale.
-      target = makeUrl("/api/iqiyi/detail", { id, albumId, lang: "idid" });
+      target = makeUrl("/api/iqiyi/detail", { id, albumId, lang: "idid", language: "id_id", region: "id" });
       break;
     case "episodes":
       if (!id) return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
