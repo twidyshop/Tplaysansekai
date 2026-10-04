@@ -19,6 +19,11 @@ export function DramaCard({
         ? `/detail/iqiyi/${drama.bookId}?title=${encodeURIComponent(drama.bookName || "")}&cover=${encodeURIComponent(drama.coverWap || drama.cover || "")}&description=${encodeURIComponent(drama.introduction || "")}`
         : `/detail/dramabox/${drama.bookId}`;
 
+  const coverUrl =
+    platform === "iqiyi"
+      ? `/api/iqiyi/image?url=${encodeURIComponent(drama.coverWap || drama.cover || "")}`
+      : drama.coverWap || drama.cover || "";
+
   return (
     <UnifiedMediaCard
       index={index}
