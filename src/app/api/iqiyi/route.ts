@@ -99,7 +99,7 @@ export async function GET(request: Request) {
   try {
     const isPlay = action === "play";
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 15000;\n    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(target.toString(), {
       headers: {
@@ -162,7 +162,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Hoshiyomi request failed", action },
+      { error: error instanceof Error && error.name === "AbortError"\n        ? `Request iQIYI timeout setelah ${timeoutMs / 1000} detik.`\n        : error instanceof Error ? error.message : "Hoshiyomi request failed", action },
       { status: 502, headers: cacheHeaders(action) }
     );
   }
