@@ -30,7 +30,7 @@ export default function WetvWatchPage(){
  void load().then(()=>{
   if(cancelled||!video.current||!source)return;
   const videojs=(window as any).videojs; player.current?.dispose?.(); player.current=null;
-  const isDirect=/^https?:\\/\\//i.test(source);
+  const isDirect=/^https?:\/\//i.test(source);
   const inline=!isDirect&&(source.startsWith("#EXTM3U")||source.includes("#EXT-X-"));
   const playback=inline?"/api/wetv/route?action=play&id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected)):"/api/wetv/proxy?url="+encodeURIComponent(source);
   const instance=videojs(video.current,{controls:true,responsive:true,fluid:true,preload:"auto",playsinline:true,playbackRates:[0.5,0.75,1,1.25,1.5,2],html5:{vhs:{overrideNative:true,withCredentials:false,enableLowInitialPlaylist:false},nativeAudioTracks:false,nativeVideoTracks:false},controlBar:{pictureInPictureToggle:true,fullscreenToggle:true,remainingTimeDisplay:true,playbackRateMenuButton:true,subsCapsButton:true,skipButtons:{backward:10,forward:10}}});
