@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
       Referer: IQIYI_REFERER,
       Origin: IQIYI_ORIGIN,
       Accept: "*/*",
+      "Accept-Encoding": "identity",
       "User-Agent": request.headers.get("user-agent") ||
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36",
     });
@@ -131,15 +132,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Important: stream media directly instead of buffering it into memory.
-    // Range/206 responses are preserved for fast seeking and playback.
+    // Stream media directly. Do NOT forward content-encoding/content-length from
+    // the upstream CDN because fetch() may transparently decode the body; forwarding
+    // those original headers can make Chrome/VHS wait forever for a TS segment.
     const headers = new Headers(corsHeaders());
     for (const key of [
       "content-type",
-      "content-length",
       "content-range",
       "accept-ranges",
-      "content-encoding",
       "etag",
       "last-modified",
     ]) {
