@@ -67,7 +67,7 @@ export async function GET(request:Request) {
       try { data=JSON.parse(raw); } catch { return NextResponse.json({episodes:[],error:"Hoshiyomi mengembalikan response non-JSON."},{status:502,headers:cacheHeaders(action)}); }
       if (!response.ok || data?.success === false || data?.error) return NextResponse.json({episodes:[],error:data?.message||data?.error||"Detail WeTV tidak tersedia."},{status:response.status||502,headers:cacheHeaders(action)});
       const episodeArrays:any[][]=[]; const seen=new Set<any>();
-      const walk=(v:any,d=0)=>{if(v==null||d>12||typeof v!=="object"||seen.has(v))return;seen.add(v);if(Array.isArray(v)){if(v.length&&v.some((x:any)=>x&&typeof x==="object"&&Object.keys(x).some((k:string)=>/episode|chapter/i.test(k))))episodeArrays.push(v);for(const x of v)walk(x,d+1);return;}for(const k of Object.keys(v))walk(v[k],d+1);};
+      const walk=(v:any,d=0)=>{if(v==null||d>12||typeof v!=="object"||seen.has(v))return;seen.add(v);if(Array.isArray(v)){if(v.length&&v.some((x:any)=>x&&typeof x==="object"&&Object.keys(x).some((k:string)=>/episode|chapter|video|number|seq/i.test(k))))episodeArrays.push(v);for(const x of v)walk(x,d+1);return;}for(const k of Object.keys(v))walk(v[k],d+1);};
       walk(data);
       let list:any[]=[]; for(const x of episodeArrays)if(x.length>list.length)list=x.filter((v:any)=>v&&typeof v==="object");
       const countKeys=["episodeCount","episode_count","totalEpisodes","total_episodes","episodeTotal","totalEpisode","episodesCount","chapterCount","totalChapters"];
