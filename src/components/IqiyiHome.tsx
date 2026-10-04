@@ -15,6 +15,18 @@ function arr(v: any): any[] {
   return [];
 }
 
+function deepPick(v: any, keys: string[], fallback = "", depth = 0): string {
+  if (depth > 8 || v == null) return fallback;
+  const direct = pick(v, keys, "");
+  if (direct) return direct;
+  if (typeof v !== "object") return fallback;
+  for (const k of Object.keys(v)) {
+    const found = deepPick(v[k], keys, "", depth + 1);
+    if (found) return found;
+  }
+  return fallback;
+}
+
 function pick(v: any, keys: string[], fallback = "") {
   for (const k of keys) {
     const x = v?.[k];
@@ -32,7 +44,7 @@ function mapItem(x: any, i: number) {
     albumId,
     title: pick(x, ["title", "name", "bookName", "albumName"], "Untitled"),
     cover: pick(x, ["cover", "poster", "image", "thumbnail", "coverUrl", "pic", "albumPic"], ""),
-    description: pick(x, ["description", "synopsis", "introduction", "desc", "summary", "shotDesc"], ""),
+    description: deepPick(x, ["description", "synopsis", "introduction", "intro", "desc", "summary", "shotDesc", "storyline", "plot", "content", "brief", "briefIntroduction", "shortDescription", "longDescription", "descriptionText", "descText", "synopsisText", "summaryText", "story", "storylineText", "contentDesc", "contentDescription"], ""),
     episodes: Number(x?.episodes ?? x?.episodeCount ?? x?.totalEpisodes ?? x?.chapterCount ?? 0),
   };
 }
