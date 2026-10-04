@@ -144,31 +144,16 @@ export default function IqiyiWatchPage(){
       const makeProxyUrl=(target:string)=>'/api/iqiyi/proxy?url='+encodeURIComponent(target);
       const isDirect=/^https?:\/\//i.test(source);
       const isInlineManifest=!isDirect&&(source.startsWith('#EXTM3U')||source.includes('#EXT-X-'));
-      let blob='';
 
-      const proxyInlineManifest=(manifest:string)=>{
-        const baseUrl=window.location.href;
-        return manifest.split(/\r?\n/).map(line=>{
-          const trimmed=line.trim();
-          if(!trimmed) return line;
-
-          const rewrite=(raw:string)=>{
-            try{return makeProxyUrl(new URL(raw,baseUrl).toString());}
-            catch{return raw;}
-          };
-
-          if(trimmed.startsWith('#')){
-            return line.replace(/URI="([^"]+)"/g,(_,raw)=>'URI="'+rewrite(raw)+'"');
-          }
-          return rewrite(trimmed);
-        }).join('\n');
-      };
-
+      // iQIYI sometimes returns the HLS manifest as inline text instead of an
+      // .m3u8 URL. Do not turn that text into a browser Blob: the server-side
+      // stream bridge fetches the manifest from Hoshiyomi and rewrites every
+      // segment/key/map URL through our proxy.
       let playbackSource=source;
       if(isInlineManifest){
-        const manifest=proxyInlineManifest(source);
-        blob=URL.createObjectURL(new Blob([manifest],{type:'application/vnd.apple.mpegurl'}));
-        playbackSource=blob;
+        playbackSource='/api/iqiyi/stream?id='+encodeURIComponent(dramaId)
+          +'&episode='+encodeURIComponent(String(selected))
+          +(albumId?'&albumId='+encodeURIComponent(albumId):'');
       }else if(isDirect){
         playbackSource=makeProxyUrl(source);
       }else{
