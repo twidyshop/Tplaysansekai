@@ -31,7 +31,8 @@ export async function GET(request:Request) {
       target = makeUrl("/api/wetv/trending",{lang:"id",page:p.get("page")||"1",limit:p.get("limit")||"30"});
       break;
     case "anime":
-      target = makeUrl("/api/wetv/trending",{lang:"id",type:"anime",page:p.get("page")||"1",limit:p.get("limit")||"30"});
+      // WeTV has 5 public endpoints in Hoshiyomi; build the anime shelf from its search endpoint.
+      target = makeUrl("/api/wetv/search",{q:p.get("q")||"anime",lang:"id",type:"anime",page:"1",limit:p.get("limit")||"30"});
       break;
     case "search": {
       const q = p.get("query") || p.get("q") || "";
@@ -45,7 +46,7 @@ export async function GET(request:Request) {
       break;
     case "episodes":
       if (!id) return NextResponse.json({error:"Parameter id wajib diisi."},{status:400});
-      target = makeUrl("/api/wetv/episodes",{id,lang:"id",page:p.get("page")||"1",limit:p.get("limit")||"100"});
+      target = makeUrl("/api/wetv/episodes",{id,lang:"id"});
       break;
     case "play":
       if (!id) return NextResponse.json({error:"Parameter id wajib diisi."},{status:400});
