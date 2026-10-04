@@ -43,7 +43,7 @@ function collect(v:any,out:any[]=[],seen=new Set<any>(),depth=0,subtitleContext=
   for(const k of Object.keys(v)){
     const child=v[k],lower=k.toLowerCase(),context=subtitleContext||/subtitle|caption|closed.?caption|text.?track|captiontrack/.test(lower);
     if(context)for(const item of (Array.isArray(child)?child:[child])){
-      const u=urlOf(item); if(u){const language=langOf(item),rawLabel=typeof item==="object"?String(item?.label||item?.name||item?.title||item?.languageName||item?.language_name||"").trim():"",inferred=language||langOf({language:rawLabel});out.push({url:u,language:inferred,label:rawLabel||label(inferred));} else if(context&&item&&typeof item==="object"&&!Array.isArray(item)){for(const [lk,lv] of Object.entries(item)){if(typeof lv==="string"&&/^https?:\/\//i.test(lv.trim())){const inferred=langOf({language:lk});out.push({url:lv.trim(),language:inferred,label:label(inferred,lk)});}}}
+      const u=urlOf(item); if(u){const language=langOf(item),rawLabel=typeof item==="object"?String(item?.label||item?.name||item?.title||item?.languageName||item?.language_name||"").trim():"",inferred=language||langOf({language:rawLabel});out.push({url:u,language:inferred,label:rawLabel||label(inferred)});} else if(context&&item&&typeof item==="object"&&!Array.isArray(item)){for(const [lk,lv] of Object.entries(item)){if(typeof lv==="string"&&/^https?:\/\//i.test(lv.trim())){const inferred=langOf({language:lk});out.push({url:lv.trim(),language:inferred,label:label(inferred,lk)});}}}
     }
     collect(child,out,seen,depth+1,context);
   }
