@@ -103,7 +103,7 @@ export async function GET(request: Request) {
   
   // Never wait tens of seconds for an upstream resolver. If Hoshiyomi is
   // stalled, fail fast instead of allowing Vercel to terminate the function.
-  const timeoutMs = action === "play" ? 12000 : action === "episodes" ? 10000 : 10000;
+  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 10000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
