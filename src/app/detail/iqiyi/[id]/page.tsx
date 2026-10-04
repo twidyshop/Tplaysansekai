@@ -63,14 +63,19 @@ export default function IqiyiDetailPage(){
   const detail=unwrap(data);
   const title=deepText(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
   const cover=deepText(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
-  const description=deepText(data,["description","synopsis","introduction","intro","desc","summary","shotDesc","storyline","plot","content","brief","briefIntroduction","shortDescription","longDescription","descriptionText","descText","synopsisText","summaryText","story","storylineText","contentDesc","contentDescription"],quickDescription);
+  const description=deepText(data,[
+    "description_id","descriptionId","description_id_id","synopsis_id","synopsisId","intro_id","introduction_id",
+    "description","synopsis","introduction","intro","desc","summary","shotDesc","storyline","plot","content","brief",
+    "briefIntroduction","shortDescription","longDescription","descriptionText","descText","synopsisText","summaryText",
+    "story","storylineText","contentDesc","contentDescription"
+  ],quickDescription);
   const episodes=number(detail,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"])||Number(deepText(data,["episodes","episodeCount","totalEpisodes","chapterCount"],String(quickEpisodes)))||quickEpisodes;
 
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70 hover:text-white">‹&nbsp; Kembali</button></div></header>
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]">
-        <div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={cover} alt={title} className="h-full w-full object-cover"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div>
+        <div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={"/api/iqiyi/image?url="+encodeURIComponent(cover)} alt={title} className="h-full w-full object-cover" referrerPolicy="no-referrer"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div>
         <section className="flex min-w-0 flex-col">
           <span className="mb-3 inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">iQIYI</span>
           <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>
