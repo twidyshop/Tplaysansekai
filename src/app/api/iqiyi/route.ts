@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-// Tambahkan Edge Runtime agar Vercel tidak memutus API dalam 10-15 detik
-export const runtime = "edge";
+// Edge runtime keeps the proxy lightweight; do not let upstream resolution exceed\n// the platform request window. A short timeout is intentional for visitor UX.\nexport const runtime = "edge";
 
 export const revalidate = 600;
 
@@ -102,8 +101,7 @@ export async function GET(request: Request) {
   const isPlay = action === "play";
   const controller = new AbortController();
   
-  // Waktu tunggu (timeout) diperpanjang: Play menjadi 45 detik, Episodes menjadi 30 detik
-  const timeoutMs = action === "play" ? 45000 : action === "episodes" ? 30000 : 15000;
+  // Never wait tens of seconds for an upstream resolver. If Hoshiyomi is\n  // stalled, fail fast instead of allowing Vercel to terminate the function.\n  const timeoutMs = action === "play" ? 12000 : action === "episodes" ? 10000 : 10000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
