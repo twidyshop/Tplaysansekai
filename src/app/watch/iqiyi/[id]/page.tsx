@@ -184,6 +184,7 @@ export default function IqiyiWatchPage(){
           remainingTimeDisplay:true,
           playbackRateMenuButton:true,
           subsCapsButton:true,
+          skipButtons:{backward:10,forward:10},
         },
       });
       player.current=instance;
@@ -257,7 +258,7 @@ export default function IqiyiWatchPage(){
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center justify-between px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button><Link href={"/detail/iqiyi/"+encodeURIComponent(dramaId)} className="text-sm text-white/70">Detail</Link></div></header>
     <div className="container mx-auto max-w-6xl px-4 py-5">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} id="iqiyi-video-player" className="video-js vjs-big-play-centered vjs-fluid" playsInline preload="auto"/></div>
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black" style={{height:"50vh",minHeight:"300px"}}><video ref={video} id="iqiyi-video-player" className="video-js vjs-big-play-centered !h-full !w-full" playsInline preload="auto"/></div>
       <h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}{playing?" • Playing":""}</p>
       {playLoading&&<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Menyiapkan video iQIYI...</div>}{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">Episode belum berhasil dimuat. Player tetap bisa dicoba.</div>}
       {loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}
