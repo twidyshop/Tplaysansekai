@@ -81,7 +81,11 @@ function Section({
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6">
-        {items.map((x, i) => (
+        {items.map((x, i) => {
+          const imageSrc = x.cover
+            ? "/api/iqiyi/image?url=" + encodeURIComponent(x.cover)
+            : "";
+          return (
           <Link
             key={x.id + "-" + i}
             href={
@@ -100,11 +104,24 @@ function Section({
             <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
               {x.cover ? (
                 <img
-                  src={x.cover}
+                  src={imageSrc}
                   alt={x.title}
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   loading="lazy"
                   decoding="async"
+                  referrerPolicy="no-referrer"
+                  onError={(event) => {
+                    const img = event.currentTarget;
+                    if (img.dataset.fallback === "1") {
+                      img.style.display = "none";
+                      return;
+                    }
+                    img.dataset.fallback = "1";
+                    img.src =
+                      "https://wsrv.nl/?url=" +
+                      encodeURIComponent(x.cover) +
+                      "&output=jpg&q=88&w=1200";
+                  }}
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-xs text-white/30">
@@ -121,7 +138,8 @@ function Section({
               {x.title}
             </h3>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
