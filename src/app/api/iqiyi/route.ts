@@ -96,10 +96,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Invalid IQIYI action" }, { status: 400 });
   }
 
+  const isPlay = action === "play";
+  const controller = new AbortController();
+  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 15000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const isPlay = action === "play";
-    const controller = new AbortController();
-    const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 15000;\n    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(target.toString(), {
       headers: {
