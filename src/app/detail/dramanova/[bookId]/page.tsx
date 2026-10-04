@@ -2,8 +2,7 @@
 
 import { UnifiedErrorDisplay } from "@/components/UnifiedErrorDisplay";
 import { useDramaNovaDetail } from "@/hooks/useDramaNova";
-import { Play, ChevronLeft, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { Play, ChevronLeft } from "lucide-react";
 import { createWatchToken } from "@/lib/watch-session";
 import { useRouter, useParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +20,7 @@ export default function DramaNovaDetailPage() {
   if (error || !drama) {
     return (
       <div className="min-h-screen pt-24 px-4">
-        <UnifiedErrorDisplay 
+        <UnifiedErrorDisplay
           title="Drama tidak ditemukan"
           message="Tidak dapat memuat detail drama. Silakan coba lagi."
           onRetry={() => router.push('/')}
@@ -33,14 +32,11 @@ export default function DramaNovaDetailPage() {
 
   const firstEpisode = drama.episodes?.[0];
   const firstEpisodeId = firstEpisode?.id;
-
   const rawPosterUrl = drama.posterImgUrl || drama.posterImg || "";
 
   return (
     <main className="min-h-screen pt-20">
-      {/* Hero Section */}
       <div className="relative">
-        {/* Background Blur */}
         <div className="absolute inset-0 overflow-hidden">
           <img
             src={optimizeBg(rawPosterUrl)}
@@ -72,7 +68,11 @@ export default function DramaNovaDetailPage() {
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-6">
                   <button
                     onClick={() => {
-                      const token = createWatchToken({ platform: 'dramanova', bookId: params.bookId, episodeId: firstEpisodeId });
+                      const token = createWatchToken({
+                        platform: "dramanova",
+                        bookId: params.bookId,
+                        episodeId: firstEpisodeId,
+                      });
                       router.push(`/watch/dramanova/${params.bookId}/${token}`);
                     }}
                     className="px-8 py-3 rounded-full bg-primary text-primary-foreground font-semibold flex items-center gap-2 hover:scale-105 transition-transform shadow-lg"
@@ -84,44 +84,45 @@ export default function DramaNovaDetailPage() {
               )}
             </div>
 
-            {/* Info */}
             <div className="space-y-6">
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold font-display gradient-text mb-4">
                   {drama.title}
                 </h1>
-                
+
                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                   <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5">
                     <Play className="w-4 h-4" />
                     <span>{drama.totalEpisodes} Episode</span>
                   </div>
                 </div>
 
-                 {drama.categories && drama.categories.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      {drama.categories.map((cat, idx) => (
-                        <span key={idx} className="tag-pill text-xs">
-                          {cat.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                {drama.categories && drama.categories.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {drama.categories.map((cat: { name: string }, idx: number) => (
+                      <span key={idx} className="tag-pill text-xs">
+                        {cat.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
-               {/* Description */}
-               <div className="glass rounded-xl p-4">
+              <div className="glass rounded-xl p-4">
                 <h3 className="font-semibold text-foreground mb-2">Sinopsis</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   {drama.synopsis || drama.description}
                 </p>
               </div>
 
-              {/* Watch Button */}
               {firstEpisodeId && (
                 <button
                   onClick={() => {
-                    const token = createWatchToken({ platform: 'dramanova', bookId: params.bookId, episodeId: firstEpisodeId });
+                    const token = createWatchToken({
+                      platform: "dramanova",
+                      bookId: params.bookId,
+                      episodeId: firstEpisodeId,
+                    });
                     router.push(`/watch/dramanova/${params.bookId}/${token}`);
                   }}
                   className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold text-primary-foreground transition-all hover:scale-105 shadow-lg"
@@ -131,10 +132,8 @@ export default function DramaNovaDetailPage() {
                   Mulai Menonton
                 </button>
               )}
-              
             </div>
           </div>
-
         </div>
       </div>
     </main>
