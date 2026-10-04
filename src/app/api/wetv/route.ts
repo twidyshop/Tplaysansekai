@@ -31,8 +31,7 @@ export async function GET(request:Request) {
       target = makeUrl("/api/wetv/trending",{lang:"id",page:p.get("page")||"1",limit:p.get("limit")||"30"});
       break;
     case "anime":
-      // WeTV has 5 public endpoints in Hoshiyomi; build the anime shelf from its search endpoint.
-      target = makeUrl("/api/wetv/search",{q:p.get("q")||"anime",lang:"id",type:"anime",page:"1",limit:p.get("limit")||"30"});
+      target = makeUrl("/api/wetv/anime",{lang:"id",page:p.get("page")||"1"});
       break;
     case "search": {
       const q = p.get("query") || p.get("q") || "";
