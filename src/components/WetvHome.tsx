@@ -49,11 +49,12 @@ function Section({title,items,loading=false}:{title:string,items:any[],loading?:
   </section>;
 }
 export function WetvHome() {
-  const [more,setMore]=useState(false);
+  const [more,setMore]=useState(false),[animeMore,setAnimeMore]=useState(false);
   const trending=useQuery({queryKey:["wetv","home",more?2:1],queryFn:async()=>{const r=await fetch("/api/wetv?action=home&lang=id&page="+(more?2:1)+"&limit=30");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV");return arr(j);},staleTime:600000,gcTime:1800000});
-  const anime=useQuery({queryKey:["wetv","anime"],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&limit=30");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},staleTime:600000,gcTime:1800000});
+  const anime=useQuery({queryKey:["wetv","anime",1],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&page=1");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},staleTime:600000,gcTime:1800000});
+  const animeMoreQ=useQuery({queryKey:["wetv","anime",2],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&page=2");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},enabled:animeMore,staleTime:600000,gcTime:1800000});
   const trendingItems=trending.data?.map(mapItem).slice(0,30)||[];
-  const animeItems=anime.data?.map(mapItem).slice(0,30)||[];
+  const animeItems=[...(anime.data||[]),...(animeMore?(animeMoreQ.data||[]):[])].map(mapItem).slice(0,60);
   if(trending.error&&!trendingItems.length) return <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">Gagal memuat WeTV: {trending.error instanceof Error?trending.error.message:"Request gagal"}</div>;
   return <div className="space-y-10">
     <Section title="Trending" items={trendingItems} loading={trending.isLoading&&!trendingItems.length}/>
@@ -61,5 +62,6 @@ export function WetvHome() {
       <button onClick={()=>setMore(v=>!v)} className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10">{more?"Tampilkan Trending Awal":"Lihat lebih banyak Trending"}</button>
     </div>
     <Section title="Anime" items={animeItems} loading={anime.isLoading&&!animeItems.length}/>
+    <div className="flex justify-center -mt-5"><button onClick={()=>setAnimeMore(v=>!v)} disabled={animeMore&&animeMoreQ.isLoading} className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10 disabled:opacity-50">{animeMore?(animeMoreQ.isLoading?"Memuat…":"Tampilkan Anime Awal"):"Lihat lebih banyak Anime"}</button></div>
   </div>;
 }
