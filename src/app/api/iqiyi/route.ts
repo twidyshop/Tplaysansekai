@@ -101,7 +101,9 @@ export async function GET(request: Request) {
   const isPlay = action === "play";
   const controller = new AbortController();
   
-  // Never wait tens of seconds for an upstream resolver. If Hoshiyomi is\n  // stalled, fail fast instead of allowing Vercel to terminate the function.\n  const timeoutMs = action === "play" ? 12000 : action === "episodes" ? 10000 : 10000;
+  // Never wait tens of seconds for an upstream resolver. If Hoshiyomi is
+  // stalled, fail fast instead of allowing Vercel to terminate the function.
+  const timeoutMs = action === "play" ? 12000 : action === "episodes" ? 10000 : 10000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
