@@ -23,7 +23,7 @@ function urlOf(v:any):string {
 }
 function langOf(v:any):string {
   if(!v || typeof v!=="object") return "";
-  for(const k of ["language","lang","srclang","languageCode","language_code","locale","langCode","lang_code","code"]){
+  for(const k of ["language","lang","srclang","languageCode","language_code","languageName","language_name","locale","langCode","lang_code","code","name","label","title"]){
     const x=String(v[k]||"").trim().toLowerCase();
     if(!x) continue;
     if(/^(id|in|ind|indonesia|id-id)$/.test(x)) return "id";
@@ -36,17 +36,16 @@ function langOf(v:any):string {
   return "";
 }
 function label(lang:string,fallback="Subtitle"){return lang==="id"?"Indonesia":lang==="en"?"English":lang==="zh"?"中文":lang==="ja"?"日本語":lang==="ko"?"한국어":fallback;}
-function collect(v:any,out:any[]=[],seen=new Set<any>(),depth=0):any[]{
-  if(v==null||depth>12||typeof v!=="object"||seen.has(v)) return out;
+function collect(v:any,out:any[]=[],seen=new Set<any>(),depth=0,subtitleContext=false):any[]{
+  if(v==null||depth>14||typeof v!=="object"||seen.has(v))return out;
   seen.add(v);
-  if(Array.isArray(v)){for(const x of v)collect(x,out,seen,depth+1);return out;}
+  if(Array.isArray(v)){for(const x of v)collect(x,out,seen,depth+1,subtitleContext);return out;}
   for(const k of Object.keys(v)){
-    const child=v[k], lower=k.toLowerCase();
-    if(/subtitle|caption|closed.?caption/.test(lower)){
-      if(Array.isArray(child)) for(const x of child){const u=urlOf(x);if(u)out.push({url:u,language:langOf(x),label:String(x?.label||x?.name||x?.title||label(langOf(x)))});collect(x,out,seen,depth+1);}
-      else {const u=urlOf(child);if(u)out.push({url:u,language:langOf(child),label:String(child?.label||child?.name||child?.title||label(langOf(child)))});collect(child,out,seen,depth+1);}
+    const child=v[k],lower=k.toLowerCase(),context=subtitleContext||/subtitle|caption|closed.?caption|text.?track|captiontrack/.test(lower);
+    if(context)for(const item of (Array.isArray(child)?child:[child])){
+      const u=urlOf(item); if(u){const language=langOf(item),rawLabel=typeof item==="object"?String(item?.label||item?.name||item?.title||item?.languageName||item?.language_name||"").trim():"",inferred=language||langOf({language:rawLabel});out.push({url:u,language:inferred,label:rawLabel||label(inferred)});}
     }
-    collect(child,out,seen,depth+1);
+    collect(child,out,seen,depth+1,context);
   }
   return out;
 }
@@ -81,7 +80,7 @@ export async function GET(request:Request){
     const r=await fetch(target.toString(),{headers:{"X-API-Key":key,Accept:"application/json","User-Agent":"TPLAY+/1.0"},cache:"no-store",signal:controller.signal});
     const raw=await r.text();let data:any;try{data=JSON.parse(raw);}catch{return NextResponse.json({tracks:[],error:"Response subtitle WeTV bukan JSON."},{status:502,headers:cors});}
     if(!r.ok||data?.success===false||data?.error)return NextResponse.json({tracks:[],error:data?.message||data?.error||"Subtitle WeTV tidak tersedia."},{status:r.status||502,headers:cors});
-    const seen=new Set<string>(),tracks=collect(data).filter(x=>{const k=x.url+"|"+x.language+"|"+x.label;if(seen.has(k))return false;seen.add(k);return true;}).map(x=>({label:x.language?label(x.language,x.label):x.label,language:x.language||"und",src:proxyUrl(request,x.url)}));
+    const seen=new Set<string>(),tracks=collect(data).filter(x=>{const k=x.url+"|"+x.language+"|"+x.label;if(seen.has(k))return false;seen.add(k);return true;}).map(x=>({label:x.language?label(x.language,x.label):x.label||"Subtitle",language:x.language||"und",src:proxyUrl(request,x.url)}));
     return NextResponse.json({tracks},{status:200,headers:{...cors,"Cache-Control":"no-store"}});
   }catch(e){clearTimeout(timer);return NextResponse.json({tracks:[],error:e instanceof Error&&e.name==="AbortError"?"Request subtitle WeTV timeout setelah 30 detik.":e instanceof Error?e.message:"Gagal mengambil subtitle WeTV."},{status:502,headers:cors});}
 }
