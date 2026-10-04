@@ -23,7 +23,7 @@ export function DramaCard({
     <UnifiedMediaCard
       index={index}
       title={drama.bookName}
-      cover={drama.coverWap || drama.cover || ""}
+      cover={coverUrl}
       link={detailLink}
       episodes={drama.chapterCount}
       topLeftBadge={
