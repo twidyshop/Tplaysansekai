@@ -24,16 +24,17 @@ function pick(v:any, keys:string[], fallback="") {
 }
 function findStream(v:any, depth=0):string {
   if (!v || depth>12 || typeof v!=="object") return "";
-  const media=(u:string)=>/^https?:\/\//i.test(u) && (/\.(?:m3u8|mp4|m4v|webm)(?:[?#]|$)/i.test(u) || /[?&](?:format|type)=(?:m3u8|mp4|hls)/i.test(u));
-  const direct=pick(v,["hardsubUrl","hardsub_url","hardSubUrl","hard_sub_url","hlsUrl","hls","m3u8","streamUrl","stream_url","playUrl","play_url","videoUrl","video_url"]);
-  if (media(direct) || direct.startsWith("#EXTM3U") || direct.includes("#EXT-X-")) return direct;
+  const http=(u:string)=>/^https?:\/\//i.test(u);
+  const media=(u:string)=>http(u)&&(/\.(?:m3u8|mp4|m4v|webm)(?:[?#]|$)/i.test(u) || /[?&](?:format|type)=(?:m3u8|mp4|hls)/i.test(u));
+  const direct=pick(v,["hardsubUrl","hardsub_url","hardSubUrl","hard_sub_url","hlsUrl","hls","m3u8","streamUrl","stream_url","playUrl","play_url","videoUrl","video_url","video","play","src"]);
+  if (http(direct) || direct.startsWith("#EXTM3U") || direct.includes("#EXT-X-")) return direct;
   if (Array.isArray(v)) {
     for (const x of v) { const f=findStream(x,depth+1); if(f) return f; }
     return "";
   }
   for (const k of Object.keys(v)) { const f=findStream(v[k],depth+1); if(f) return f; }
   const generic=pick(v,["url"]);
-  return media(generic) ? generic : "";
+  return http(generic) ? generic : "";
 }
 function rewriteManifest(text:string, base:URL, request:NextRequest) {
   return text.split(/\r?\n/).map(line=>{
