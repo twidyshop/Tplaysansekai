@@ -16,7 +16,7 @@ export function DramaCard({
     platform === "meloshort"
       ? `/detail/meloshort/${drama.bookId}`
       : platform === "iqiyi"
-        ? `/detail/iqiyi/${drama.bookId}`
+        ? `/detail/iqiyi/${drama.bookId}?title=${encodeURIComponent(drama.bookName || "")}&cover=${encodeURIComponent(drama.coverWap || drama.cover || "")}&description=${encodeURIComponent(drama.introduction || "")}`
         : `/detail/dramabox/${drama.bookId}`;
 
   return (
