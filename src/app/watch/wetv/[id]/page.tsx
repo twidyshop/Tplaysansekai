@@ -69,7 +69,8 @@ export default function WetvWatchPage(){
    const videojs=(window as any).videojs;player.current?.dispose?.();player.current=null;
    const isDirect=/^https?:\/\//i.test(source),inline=!isDirect&&(source.startsWith("#EXTM3U")||source.includes("#EXT-X-"));
    const playback="/api/wetv/stream?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected));
-   const type=source.includes("#EXTM3U")||source.includes("#EXT-X-")||/\.m3u8(?:[?#]|$)/i.test(source)?"application/x-mpegURL":/\.mp4(?:[?#]|$)/i.test(source)?"video/mp4":"application/x-mpegURL";
+   // Hoshiyomi WeTV returns HLS streaming; the proxy endpoint normalizes it to HLS.
+   const type="application/x-mpegURL";
    const instance=videojs(video.current,{controls:true,responsive:true,fluid:true,preload:"auto",playsinline:true,playbackRates:[0.5,0.75,1,1.25,1.5,2],html5:{vhs:{overrideNative:true,withCredentials:false,enableLowInitialPlaylist:false},nativeAudioTracks:false,nativeVideoTracks:false},controlBar:{pictureInPictureToggle:true,fullscreenToggle:true,remainingTimeDisplay:true,playbackRateMenuButton:true,subsCapsButton:true,skipButtons:{backward:10,forward:10}}});
    subtitleOverlay=document.createElement("div");
    subtitleOverlay.style.cssText="position:absolute;left:5%;right:5%;bottom:8%;z-index:20;text-align:center;color:#fff;font-size:clamp(16px,2.2vw,28px);font-weight:700;line-height:1.35;text-shadow:0 2px 4px #000,0 0 8px #000;pointer-events:none;display:none;white-space:pre-line";
