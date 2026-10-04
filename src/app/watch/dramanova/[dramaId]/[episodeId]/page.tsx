@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useDramaNovaDetail, useDramaNovaVideo } from "@/hooks/useDramaNova";
+import { useDramaNovaDetail, useDramaNovaPlay } from "@/hooks/useDramaNova";
 import { ChevronLeft, ChevronRight, Loader2, List, AlertCircle, Settings } from "lucide-react";
 import Link from "next/link";
 import {
@@ -48,39 +48,63 @@ export default function DramaNovaWatchPage() {
   }, [dramaDetail, currentEpisodeId]);
 
   const currentEpisodeDetails = currentEpisodeIndex !== -1 ? dramaDetail?.episodes[currentEpisodeIndex] : null;
-  const currentFileId = currentEpisodeDetails?.fileId || "";
+  const currentEpisodeNumber = Number(currentEpisodeDetails?.episodeNumber || (currentEpisodeIndex !== -1 ? currentEpisodeIndex + 1 : 0));
 
-  // Only execute video fetch if we have a valid fileId
-  const { data: streamData, isLoading: streamLoading, isFetching: streamFetching } = useDramaNovaVideo(currentFileId);
+  // DramaNova playback uses the drama id + episode number through the current Hoshiyomi hook.
+  const { data: streamData, isLoading: streamLoading, isFetching: streamFetching } = useDramaNovaPlay(
+    params.dramaId || "",
+    currentEpisodeNumber
+  );
 
-  // Process video qualities
+  // Hoshiyomi DramaNova playback responses can wrap the stream URL in different fields.
   const qualities = useMemo(() => {
-    if (!streamData?.PlayInfoList) return [];
-    
-    try {
-      const availableQualities: VideoQuality[] = [];
+    const found: VideoQuality[] = [];
+    const seen = new Set<string>();
 
-      streamData.PlayInfoList.forEach(info => {
-          if (info.MainPlayUrl) {
-              const proxiedUrl = `/api/proxy/video?url=${encodeURIComponent(info.MainPlayUrl)}`;
-              availableQualities.push({
-                  name: info.Definition || "Normal",
-                  url: proxiedUrl
-              });
+    const walk = (value: any, hint = "") => {
+      if (value == null) return;
+
+      if (typeof value === "string") {
+        const url = value.trim();
+        if (/^https?:\/\//i.test(url) && (url.includes(".m3u8") || url.includes(".mp4") || /video|play|stream|url|source/i.test(hint))) {
+          if (!seen.has(url)) {
+            seen.add(url);
+            found.push({
+              name: /1080/i.test(hint) ? "1080p" : /720/i.test(hint) ? "720p" : /480/i.test(hint) ? "480p" : "Normal",
+              url: `/api/dramanova/proxy?url=${encodeURIComponent(url)}`,
+            });
           }
-      });
+        }
+        return;
+      }
 
-      // Sort qualities from highest to lowest resolution
-      availableQualities.sort((a, b) => {
-        const parseRes = (name: string) => parseInt(name.replace(/[^0-9]/g, "")) || 0;
-        return parseRes(b.name) - parseRes(a.name);
-      });
+      if (Array.isArray(value)) {
+        value.forEach((item) => walk(item, hint));
+        return;
+      }
 
-      return availableQualities;
-    } catch (e) {
-      console.error("Error parsing video qualities", e);
-      return [];
+      if (typeof value === "object") {
+        for (const [key, child] of Object.entries(value)) walk(child, key);
+      }
+    };
+
+    walk(streamData);
+
+    const unique: VideoQuality[] = [];
+    const names = new Set<string>();
+    for (const item of found) {
+      if (!names.has(item.name)) {
+        names.add(item.name);
+        unique.push(item);
+      }
     }
+
+    unique.sort((a, b) => {
+      const parseRes = (name: string) => parseInt(name.replace(/[^0-9]/g, "")) || 0;
+      return parseRes(b.name) - parseRes(a.name);
+    });
+
+    return unique;
   }, [streamData]);
 
   // Set default quality
@@ -231,7 +255,7 @@ export default function DramaNovaWatchPage() {
             ) : (
                 // Fallback while initializing first time quality
                 <div className="w-full h-full flex items-center justify-center text-white/50">
-                    {streamLoading || !currentFileId ? "" : "Video unavailable"}
+                    {streamLoading || !currentEpisodeNumber ? "" : "Video unavailable"}
                 </div>
             )}
             
