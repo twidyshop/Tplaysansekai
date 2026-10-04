@@ -16,6 +16,8 @@ export const PLATFORMS = [
   { id: "melolo", name: "Melolo", logo: "/melolo.webp", apiBase: "/api/melolo" },
   { id: "freereels", name: "FreeReels", logo: "/freereels.webp", apiBase: "/api/freereels" },
   { id: "flickreels", name: "FlickReels", logo: "/flickreels.webp", apiBase: "/api/flickreels" },
+  { id: "dramanova", name: "DramaNova", logo: "/dramanova.svg", apiBase: "/api/dramanova" },
+  { id: "moboreels", name: "MoboReels", logo: "/moboreels.svg", apiBase: "/api/moboreels" },
 ];
 
 interface PlatformState {
@@ -47,5 +49,6 @@ export function usePlatform() {
     isDramaNova: currentPlatform === "dramanova",
     isGoodShort: currentPlatform === "goodshort",
     isFlickReels: currentPlatform === "flickreels",
+    isMoboReels: currentPlatform === "moboreels",
   };
 }
