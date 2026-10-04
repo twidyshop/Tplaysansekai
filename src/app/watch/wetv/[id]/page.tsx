@@ -22,6 +22,8 @@ export default function WetvWatchPage(){
  useEffect(()=>{
   let cancelled=false;
   let removeSubtitleListener:(()=>void)|null=null;
+  let subtitleOverlay:HTMLDivElement|null=null;
+  let subtitleCues:{start:number,end:number,text:string}[]=[];
   const load=async()=>{
    if((window as any).videojs)return;
    const loadScript=(src:string)=>new Promise<void>((resolve,reject)=>{const s=document.createElement("script");s.src=src;s.async=true;s.dataset.tplayVideojs="1";const t=window.setTimeout(()=>{s.remove();reject(new Error("timeout"));},10000);s.onload=()=>{window.clearTimeout(t);(window as any).videojs?resolve():reject(new Error("Video.js engine tidak ditemukan."));};s.onerror=()=>{window.clearTimeout(t);s.remove();reject(new Error("CDN gagal"));};document.head.appendChild(s);});
@@ -29,8 +31,6 @@ export default function WetvWatchPage(){
    try{await loadScript("https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video.min.js");}catch{await loadScript("https://unpkg.com/video.js@8.24.1/dist/video.min.js");}
    if(!(window as any).videojs)throw new Error("Video.js gagal dimuat.");
   };
-  let subtitleOverlay:HTMLDivElement|null=null;
-  let subtitleCues:{start:number,end:number,text:string}[]=[];
   const parseVtt=(vtt:string)=>{
     const clean=vtt.replace(/^\uFEFF/,"").replace(/\r/g,"");
     const blocks=clean.split(/\n\s*\n/);
