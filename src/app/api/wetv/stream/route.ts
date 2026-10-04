@@ -96,9 +96,19 @@ export async function GET(request:NextRequest) {
     const upstream=await fetch(url.toString(),{headers:h,redirect:"follow",cache:"no-store"});
     const type=upstream.headers.get("content-type")||"";
     const final=upstream.url||url.toString();
-    const manifest=type.includes("mpegurl") || /\.m3u8(?:\?|$)/i.test(final);
+    let manifest=type.includes("mpegurl") || /\.m3u8(?:\?|$)/i.test(final);
+    let manifestBody:string|null=null;
+    if(!manifest && upstream.ok) {
+      try {
+        const probe=await upstream.clone().text();
+        if(/^\s*#EXTM3U/i.test(probe) || /#EXT-X-(?:VERSION|STREAM-INF|TARGETDURATION|MEDIA-SEQUENCE)/i.test(probe)) {
+          manifest=true;
+          manifestBody=probe;
+        }
+      } catch {}
+    }
     if(manifest) {
-      const body=await upstream.text();
+      const body=manifestBody??await upstream.text();
       return new NextResponse(upstream.ok?rewriteManifest(body,new URL(final),request):body,{
         status:upstream.status,
         headers:{...cors(),"Content-Type":type||"application/vnd.apple.mpegurl","Cache-Control":"no-store"}
