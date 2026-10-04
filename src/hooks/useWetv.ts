@@ -18,7 +18,7 @@ export function useWetvDetail(id:string){
   return useQuery({queryKey:["wetv","detail",id],queryFn:()=>fetchJson<any>("/api/wetv?action=detail&"+new URLSearchParams({id,lang:"id"}).toString()),enabled:!!id,staleTime:1800000,gcTime:3600000,retry:1});
 }
 export function useWetvEpisodes(id:string){
-  return useQuery({queryKey:["wetv","episodes",id],queryFn:()=>fetchJson<any>("/api/wetv?action=episodes&"+qs(id,undefined,1,100).toString()),enabled:!!id,staleTime:600000,gcTime:1800000,retry:1});
+  return useQuery({queryKey:["wetv","episodes",id],queryFn:()=>fetchJson<any>("/api/wetv?action=episodes&"+new URLSearchParams({id,lang:"id"}).toString()),enabled:!!id,staleTime:600000,gcTime:1800000,retry:1});
 }
 export function useWetvPlay(id:string,episode:number){
   return useQuery({queryKey:["wetv","play",id,episode],queryFn:()=>fetchJson<any>("/api/wetv?action=play&"+new URLSearchParams({id,ep:String(episode),lang:"id"}).toString()),enabled:!!id&&episode>0,staleTime:60000,retry:0});
