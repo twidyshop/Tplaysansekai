@@ -10,18 +10,16 @@ function pick(v:any,keys:string[],fallback=""){for(const k of keys){const x=v?.[
 function deep(v:any,keys:string[],fallback="",depth=0):string{if(depth>8||v==null)return fallback;const d=pick(v,keys,"");if(d)return d;if(typeof v!=="object")return fallback;for(const k of Object.keys(v)){const f=deep(v[k],keys,"",depth+1);if(f)return f;}return fallback;}
 function findStream(v:any,depth=0):string{
  if(!v||depth>12||typeof v!=="object")return "";
- const media=(u:string)=>{
-  if(!/^https?:\/\//i.test(u))return false;
-  return /\.(?:m3u8|mp4|m4v|webm)(?:[?#]|$)/i.test(u)||/[?&](?:format|type)=(?:m3u8|mp4|hls)/i.test(u);
- };
+ const http=(u:string)=>/^https?:\/\//i.test(u);
+ const media=(u:string)=>http(u)&&(/\.(?:m3u8|mp4|m4v|webm)(?:[?#]|$)/i.test(u)||/[?&](?:format|type)=(?:m3u8|mp4|hls)/i.test(u));
  const hard=pick(v,["hardsubUrl","hardsub_url","hardSubUrl","hard_sub_url"]);
- if(media(hard)||hard.startsWith("#EXTM3U")||hard.includes("#EXT-X-"))return hard;
- const direct=pick(v,["hlsUrl","hls","m3u8","streamUrl","stream_url","playUrl","play_url","videoUrl","video_url"]);
- if(media(direct)||direct.startsWith("#EXTM3U")||direct.includes("#EXT-X-"))return direct;
+ if(http(hard)||hard.startsWith("#EXTM3U")||hard.includes("#EXT-X-"))return hard;
+ const direct=pick(v,["hlsUrl","hls","m3u8","streamUrl","stream_url","playUrl","play_url","videoUrl","video_url","video","play","src"]);
+ if(http(direct)||direct.startsWith("#EXTM3U")||direct.includes("#EXT-X-"))return direct;
  if(Array.isArray(v)){for(const x of v){const f=findStream(x,depth+1);if(f)return f;}return "";}
  for(const k of Object.keys(v)){const f=findStream(v[k],depth+1);if(f)return f;}
  const generic=pick(v,["url"]);
- if(media(generic))return generic;
+ if(http(generic))return generic;
  return "";
 }
 
@@ -70,7 +68,7 @@ export default function WetvWatchPage(){
    if(cancelled||!video.current||!source)return;
    const videojs=(window as any).videojs;player.current?.dispose?.();player.current=null;
    const isDirect=/^https?:\/\//i.test(source),inline=!isDirect&&(source.startsWith("#EXTM3U")||source.includes("#EXT-X-"));
-   const playback=inline?"/api/wetv/stream?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected)):"/api/wetv/proxy?url="+encodeURIComponent(source);
+   const playback="/api/wetv/stream?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected));
    const type=source.includes("#EXTM3U")||source.includes("#EXT-X-")||/\.m3u8(?:[?#]|$)/i.test(source)?"application/x-mpegURL":/\.mp4(?:[?#]|$)/i.test(source)?"video/mp4":"application/x-mpegURL";
    const instance=videojs(video.current,{controls:true,responsive:true,fluid:true,preload:"auto",playsinline:true,playbackRates:[0.5,0.75,1,1.25,1.5,2],html5:{vhs:{overrideNative:true,withCredentials:false,enableLowInitialPlaylist:false},nativeAudioTracks:false,nativeVideoTracks:false},controlBar:{pictureInPictureToggle:true,fullscreenToggle:true,remainingTimeDisplay:true,playbackRateMenuButton:true,subsCapsButton:true,skipButtons:{backward:10,forward:10}}});
    subtitleOverlay=document.createElement("div");
