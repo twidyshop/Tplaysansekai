@@ -17,6 +17,7 @@ export const PLATFORMS = [
   { id: "freereels", name: "FreeReels", logo: "/freereels.webp", apiBase: "/api/freereels" },
   { id: "flickreels", name: "FlickReels", logo: "/flickreels.webp", apiBase: "/api/flickreels" },
   { id: "dramanova", name: "DramaNova", logo: "/dramanova.svg", apiBase: "/api/dramanova" },
+  { id: "goodshort", name: "GoodShort", logo: "/goodshort.webp", apiBase: "/api/goodshort" },
   { id: "moboreels", name: "MoboReels", logo: "/moboreels.svg", apiBase: "/api/moboreels" },
 ];
 
