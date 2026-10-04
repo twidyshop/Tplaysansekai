@@ -1,0 +1,25 @@
+"use client";
+
+import {useEffect,useMemo,useRef,useState} from "react";
+import Link from "next/link";
+import {useParams,useRouter} from "next/navigation";
+import {useWetvDetail,useWetvEpisodes,useWetvPlay} from "@/hooks/useWetv";
+
+function arr(v:any):any[]{if(Array.isArray(v))return v;if(!v||typeof v!=="object")return [];for(const k of ["data","episodes","episodeList","episode_list","episodeData","episode_data","list","rows","results","items","chapters","videos","result"]){if(Array.isArray(v[k]))return v[k];const n=arr(v[k]);if(n.length)return n;}return [];}
+function pick(v:any,keys:string[],fallback=""){for(const k of keys){const x=v?.[k];if(typeof x==="string"&&x.trim())return x.trim();if(typeof x==="number"&&Number.isFinite(x))return String(x);}return fallback;}
+function deep(v:any,keys:string[],fallback="",depth=0):string{if(depth>8||v==null)return fallback;const d=pick(v,keys,"");if(d)return d;if(typeof v!=="object")return fallback;for(const k of Object.keys(v)){const f=deep(v[k],keys,"",depth+1);if(f)return f;}return fallback;}
+function findStream(v:any,depth=0):string{if(!v||depth>10||typeof v!=="object")return "";const direct=pick(v,["hlsUrl","hls","m3u8","streamUrl","stream_url","playUrl","play_url","videoUrl","video_url","url"],"");if(/^https?:\/\//i.test(direct)||direct.startsWith("#EXTM3U")||direct.includes("#EXT-X-"))return direct;for(const k of Object.keys(v)){const f=findStream(v[k],depth+1);if(f)return f;}return "";}
+
+export default function WetvWatchPage(){
+ const {id}=useParams(),router=useRouter(),dramaId=String(id||"");
+ const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState("");
+ const video=useRef<HTMLVideoElement|null>(null);
+ const detail=useWetvDetail(dramaId),episodesQ=useWetvEpisodes(dramaId),playQ=useWetvPlay(dramaId,selected);
+ const episodes=useMemo(()=>arr(episodesQ.data).map((x:any,i:number)=>({id:pick(x,["id","episodeId","episode_id"],String(i+1)),number:Number(x?.episode??x?.episodeNumber??x?.episode_index??i+1)||i+1,title:pick(x,["title","name","episodeTitle"],"Episode "+(i+1))})),[episodesQ.data]);
+ const title=deep(detail.data,["title","name","bookName","albumName","displayName","videoName"],"WeTV");
+ useEffect(()=>{const s=findStream(playQ.data);if(s){setSource(s);setError("");}else if(playQ.isError)setError(playQ.error instanceof Error?playQ.error.message:"Gagal memutar WeTV");},[playQ.data,playQ.isError,playQ.error]);
+ useEffect(()=>{if(episodes.length&&selected===1&&episodes[0].number!==1)setSelected(episodes[0].number);},[episodes,selected]);
+ useEffect(()=>{if(!video.current||!source)return;const target=source.startsWith("#EXTM3U")||source.includes("#EXT-X-")?source:"/api/wetv/proxy?url="+encodeURIComponent(source);if(target.startsWith("#")){setError("WeTV mengembalikan manifest inline yang tidak bisa diputar langsung.");return;}video.current.src=target;video.current.load();void video.current.play().catch(()=>{});return()=>{if(video.current){video.current.pause();video.current.removeAttribute("src");video.current.load();}};},[source]);
+ const next=episodes[episodes.findIndex(x=>x.number===selected)+1];
+ return <main className="min-h-screen bg-[#0a0e27] text-white"><header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center justify-between px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button><Link href={"/detail/wetv/"+encodeURIComponent(dramaId)} className="text-sm text-white/70">Detail</Link></div></header><div className="container mx-auto max-w-6xl px-4 py-5"><div className="overflow-hidden rounded-2xl border border-white/10 bg-black" style={{height:"50vh",minHeight:"300px"}}><video ref={video} className="h-full w-full" controls playsInline preload="auto"/></div><h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}</p>{playQ.isLoading&&<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Menyiapkan video WeTV...</div>}{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}<section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>{setSelected(next.number);setSource("");}} className="rounded-lg bg-teal-400 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div>{episodesQ.isLoading?<p className="text-sm text-white/45">Memuat episode...</p>:<div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>{setSelected(x.number);setSource("");setError("");}} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-teal-300 bg-teal-400 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div>}</section></div></main>;
+}
