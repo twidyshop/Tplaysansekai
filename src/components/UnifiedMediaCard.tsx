@@ -42,6 +42,10 @@ export function UnifiedMediaCard({
     fontFamily: "inherit"
   };
 
+  const imageSrc = cover.startsWith("/api/iqiyi/image")
+    ? cover
+    : optimizeCover(cover);
+
   return (
     <Link
       href={link}
@@ -51,7 +55,7 @@ export function UnifiedMediaCard({
       {/* Visual Container */}
       <div className="aspect-[2/3] relative overflow-hidden rounded-xl bg-muted/20">
         <img
-          src={optimizeCover(cover)}
+          src={imageSrc}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           loading={cover.startsWith("/api/iqiyi/image") ? "eager" : "lazy"}
