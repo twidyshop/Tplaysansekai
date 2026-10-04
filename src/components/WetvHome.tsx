@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 function arr(v:any):any[] {
   if(Array.isArray(v)) return v;
   if(!v||typeof v!=="object") return [];
-  for(const k of ["data","list","rows","results","items","books","dramas","albums"]) {
+  for(const k of ["data","list","rows","results","items","books","dramas","albums","records","contents","videos","programs"]) {
     if(Array.isArray(v[k])) return v[k];
     const n=arr(v[k]); if(n.length) return n;
   }
@@ -37,7 +37,7 @@ export function WetvHome() {
   });
   const items=(q.data||[]).slice(0,30).map(mapItem);
   if(q.isLoading&&!items.length) return <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">{Array.from({length:12}).map((_,i)=><div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-white/5"/>)}</div>;
-  if(q.error&&!items.length) return <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">Gagal memuat WeTV. Pastikan HOSHIYOMI_API_KEY mendukung WeTV.</div>;
+  if(q.error&&!items.length) return <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">Gagal memuat WeTV: {q.error instanceof Error ? q.error.message : "Request gagal"}</div>;
   return <section className="space-y-4">
     <div className="flex items-center justify-between"><h2 className="text-xl font-bold text-white">Trending</h2><span className="text-xs text-white/35">WeTV</span></div>
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6">
