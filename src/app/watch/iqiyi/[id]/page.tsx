@@ -8,7 +8,7 @@ import Hls from "hls.js";
 function arr(v:any):any[]{
   if(Array.isArray(v)) return v;
   if(!v||typeof v!=="object") return [];
-  for(const k of ["data","episodes","list","rows","results","items","chapters"]){
+  for(const k of ["data","episodes","episodeList","episode_list","episodeData","episode_data","list","rows","results","items","chapters","videos","result"]){
     if(Array.isArray(v[k])) return v[k];
     const n=arr(v[k]); if(n.length) return n;
   }
@@ -44,7 +44,7 @@ function findStream(v:any):string{
 export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
   const video=useRef<HTMLVideoElement|null>(null),hls=useRef<Hls|null>(null);
-  const [episodes,setEpisodes]=useState<any[]>([]),[title,setTitle]=useState("iQIYI"),[selected,setSelected]=useState(1),[source,setSource]=useState(""),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[error,setError]=useState("");
+  const [episodes,setEpisodes]=useState<any[]>([]),[title,setTitle]=useState("iQIYI"),[selected,setSelected]=useState(1),[source,setSource]=useState(""),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[error,setError]=useState(""),[episodeError,setEpisodeError]=useState("");
 
   const play=useCallback(async(n:number)=>{
     setSelected(n);setPlaying(false);setError("");setSource("");
@@ -60,7 +60,7 @@ export default function IqiyiWatchPage(){
 
   const load=useCallback(async()=>{
     if(!dramaId) return;
-    setLoading(true);setError("");
+    setLoading(true);setError("");setEpisodeError("");
 
     // Start the first episode request immediately; do not wait for metadata.
     void play(1);
@@ -86,7 +86,7 @@ export default function IqiyiWatchPage(){
       }));
       setEpisodes(list);
       if(list.length&&list[0].number!==1) setSelected(list[0].number);
-    }catch(e){setError(e instanceof Error && e.name === "AbortError" ? "Request episode iQIYI timeout. Coba muat ulang halaman." : e instanceof Error?e.message:"Gagal memuat episode")}
+    }catch(e){setEpisodeError(e instanceof Error && e.name === "AbortError" ? "Episode belum berhasil dimuat. Player tetap bisa dicoba." : e instanceof Error?e.message:"Episode belum berhasil dimuat.")}
     finally{setLoading(false)}
   },[dramaId,play]);
 
@@ -208,7 +208,7 @@ export default function IqiyiWatchPage(){
     <div className="container mx-auto max-w-6xl px-4 py-5">
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} controls playsInline preload="metadata" className="aspect-video w-full bg-black"/></div>
       <h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}</p>
-      {error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}
+      {error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">{episodeError}</div>}
       {loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}
     </div>
   </main>;
