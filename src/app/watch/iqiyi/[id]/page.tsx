@@ -183,9 +183,36 @@ export default function IqiyiWatchPage(){
           fullscreenToggle:true,
           remainingTimeDisplay:true,
           playbackRateMenuButton:true,
+          subsCapsButton:true,
         },
       });
       player.current=instance;
+
+      void fetch('/api/iqiyi/subtitle?id='+encodeURIComponent(dramaId)
+        +'&episode='+encodeURIComponent(String(selected))
+        +(albumId?'&albumId='+encodeURIComponent(albumId):''))
+        .then(r=>r.ok?r.json():{tracks:[]})
+        .then(payload=>{
+          if(cancelled||!player.current) return;
+          const tracks=Array.isArray(payload?.tracks)?payload.tracks:[];
+          const hasId=tracks.some((x:any)=>String(x?.language||'').toLowerCase()==='id');
+          tracks.forEach((track:any,index:number)=>{
+            if(!track?.src) return;
+            try{
+              instance.addRemoteTextTrack({
+                kind:'subtitles',
+                src:track.src,
+                srclang:track.language||'und',
+                language:track.language||'und',
+                label:track.label||'Subtitle',
+                default:hasId
+                  ? String(track.language||'').toLowerCase()==='id'
+                  : index===0,
+              },false);
+            }catch{}
+          });
+        })
+        .catch(()=>{});
 
       instance.src({src:playbackSource,type:'application/x-mpegURL'});
       instance.on('playing',()=>{setPlaying(true);setError('');});
