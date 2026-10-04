@@ -91,24 +91,97 @@ export default function IqiyiWatchPage(){
     hls.current?.destroy();
     let instance:Hls|null=null,blob="";
     let url=source;
-    let usingProxy=false;
 
     const fail=()=>{setPlaying(false);setError("Video iQIYI gagal dimuat. Player sudah mencoba pemulihan otomatis; coba episode lagi jika CDN sedang bermasalah.");};
     const makeProxyUrl=(target:string)=>"/api/iqiyi/proxy?url="+encodeURIComponent(target);
     const isDirect=/^https?:\/\//i.test(source);
+    const isInlineManifest=!isDirect&&(source.startsWith("#EXTM3U")||source.includes("#EXT-X-"));
+
+    // Hoshiyomi may return the HLS manifest itself instead of an .m3u8 URL.
+    // Rewrite every media/playlist URL through our same-origin proxy before
+    // creating the Blob. Otherwise the browser requests iQIYI .ts segments
+    // directly and they can fail because of CDN/CORS/header restrictions.
+    const proxyInlineManifest=(manifest:string)=>{
+      const baseUrl=window.location.href;
+      return manifest.split(/\r?\n/).map(line=>{
+        const trimmed=line.trim();
+        if(!trimmed) return line;
+
+        const rewrite=(raw:string)=>{
+          try{
+            const absolute=new URL(raw,baseUrl).toString();
+            return makeProxyUrl(absolute);
+          }catch{
+            return raw;
+          }
+        };
+
+        if(trimmed.startsWith("#")){
+          return line.replace(/URI="([^"]+)"/g,(_,raw)=>`URI="${rewrite(raw)}"`);
+        }
+
+        return rewrite(trimmed);
+      }).join("\n");
+    };
 
     const start=async()=>{
       try{
+        if(isInlineManifest){
+          const proxiedManifest=proxyInlineManifest(source);
+          blob=URL.createObjectURL(new Blob([proxiedManifest],{type:"application/vnd.apple.mpegurl"}));
+
+          if(v.canPlayType("application/vnd.apple.mpegurl")){
+            v.src=blob;
+            v.addEventListener("error",fail,{once:true});
+            await v.play().catch(()=>{});
+            setPlaying(true);
+            return;
+          }
+
+          if(Hls.isSupported()){
+            instance=new Hls({
+              enableWorker:true,
+              lowLatencyMode:false,
+              backBufferLength:90,
+              maxBufferLength:30,
+              maxBufferSize:60*1000*1000,
+              manifestLoadingMaxRetry:2,
+              levelLoadingMaxRetry:3,
+              fragLoadingMaxRetry:4,
+              manifestLoadingRetryDelay:500,
+              levelLoadingRetryDelay:500,
+              fragLoadingRetryDelay:500,
+              enableSoftwareAES:true,
+            });
+            hls.current=instance;
+            instance.loadSource(blob);
+            instance.attachMedia(v);
+            instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
+            instance.on(Hls.Events.ERROR,(_,d)=>{
+              if(!d.fatal) return;
+              if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
+                instance?.startLoad();
+                return;
+              }
+              if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
+                instance?.recoverMediaError();
+                return;
+              }
+              fail();
+            });
+            return;
+          }
+
+          setError("Browser tidak mendukung HLS.");
+          return;
+        }
+
         if(!isDirect){
-          if(source.startsWith("#EXTM3U")||source.includes("#EXT-X-")){
-            blob=URL.createObjectURL(new Blob([source],{type:"application/vnd.apple.mpegurl"}));
-            v.src=blob;await v.play().catch(()=>{});setPlaying(true);
-          }else setError("Format video iQIYI tidak dikenali.");
+          setError("Format video iQIYI tidak dikenali.");
           return;
         }
 
         const proxiedUrl=makeProxyUrl(url);
-        usingProxy=true;
 
         if(v.canPlayType("application/vnd.apple.mpegurl")){
           v.src=proxiedUrl;
@@ -145,23 +218,6 @@ export default function IqiyiWatchPage(){
             if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
               instance?.recoverMediaError();
               return;
-            }
-            if(usingProxy){
-              usingProxy=false;
-              instance?.destroy();instance=null;
-              try{
-                instance=new Hls({
-                  enableWorker:true,lowLatencyMode:false,backBufferLength:90,maxBufferLength:30,
-                  maxBufferSize:60*1000*1000,manifestLoadingMaxRetry:2,levelLoadingMaxRetry:3,
-                  fragLoadingMaxRetry:4,manifestLoadingRetryDelay:500,levelLoadingRetryDelay:500,
-                  fragLoadingRetryDelay:500,enableSoftwareAES:true,
-                });
-                hls.current=instance;
-                instance.loadSource(url);instance.attachMedia(v);
-                instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
-                instance.on(Hls.Events.ERROR,(_,fallbackError)=>{if(fallbackError.fatal) fail();});
-                return;
-              }catch{}
             }
             fail();
           });
