@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const revalidate = 600;
+export const maxDuration = 60;
 
 const BASE = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
 const ACTIONS = new Set(["home","search","detail","episodes","play"]);
@@ -49,7 +50,7 @@ export async function GET(request:Request) {
   }
 
   const controller = new AbortController();
-  const timeoutMs = action === "play" ? 30000 : action === "episodes" ? 25000 : 20000;
+  const timeoutMs = action === "play" ? 45000 : action === "episodes" ? 30000 : 30000;
   const timeout = setTimeout(()=>controller.abort(),timeoutMs);
   try {
     console.log(`[WeTV] ${action} -> ${target.pathname}${target.search}`);
