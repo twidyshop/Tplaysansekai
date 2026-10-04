@@ -90,7 +90,9 @@ export default function IqiyiWatchPage(){
     hls.current?.destroy();
     let instance:Hls|null=null,blob="";
     let url=source;
+    let usingProxy=false;
     const isDirect=/^https?:\/\//i.test(source);
+    const makeProxyUrl=(target:string)=>"/api/iqiyi/proxy?url="+encodeURIComponent(target);
 
     let recoveredMedia=false;
     let recoveredNetwork=false;
@@ -105,8 +107,14 @@ export default function IqiyiWatchPage(){
           }else setError("Format video iQIYI tidak dikenali.");
           return;
         }
+        // iQIYI is intentionally proxied only here. Other platform players/routes
+        // are untouched. The proxy streams media (including Range/206) instead
+        // of buffering the entire file, while preserving a direct-CDN fallback.
+        const proxiedUrl=makeProxyUrl(url);
+        usingProxy=true;
+
         if(v.canPlayType("application/vnd.apple.mpegurl")){
-          v.src=url;
+          v.src=proxiedUrl;
           v.addEventListener("error",fail,{once:true});
           await v.play().catch(()=>{});
           setPlaying(true);
@@ -128,7 +136,7 @@ export default function IqiyiWatchPage(){
             enableSoftwareAES:true,
           });
           hls.current=instance;
-          instance.loadSource(url);instance.attachMedia(v);
+          instance.loadSource(proxiedUrl);instance.attachMedia(v);
           instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
           instance.on(Hls.Events.ERROR,(_,d)=>{
             if(!d.fatal) return;
@@ -141,6 +149,39 @@ export default function IqiyiWatchPage(){
               recoveredMedia=true;
               instance?.recoverMediaError();
               return;
+            }
+            // If the iQIYI proxy is rejected/unstable, retry the exact same
+            // source directly. This fallback is local to the iQIYI player.
+            if(usingProxy){
+              usingProxy=false;
+              instance?.destroy();
+              instance=null;
+              try{
+                if(Hls.isSupported()){
+                  instance=new Hls({
+                    enableWorker:true,
+                    lowLatencyMode:false,
+                    backBufferLength:90,
+                    maxBufferLength:30,
+                    maxBufferSize:60*1000*1000,
+                    manifestLoadingMaxRetry:2,
+                    levelLoadingMaxRetry:3,
+                    fragLoadingMaxRetry:4,
+                    manifestLoadingRetryDelay:500,
+                    levelLoadingRetryDelay:500,
+                    fragLoadingRetryDelay:500,
+                    enableSoftwareAES:true,
+                  });
+                  hls.current=instance;
+                  instance.loadSource(url);
+                  instance.attachMedia(v);
+                  instance.on(Hls.Events.MANIFEST_PARSED,()=>{setPlaying(true);void v.play().catch(()=>{})});
+                  instance.on(Hls.Events.ERROR,(_,fallbackError)=>{
+                    if(fallbackError.fatal) fail();
+                  });
+                  return;
+                }
+              }catch{}
             }
             fail();
           });
