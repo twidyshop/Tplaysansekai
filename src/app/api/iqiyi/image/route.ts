@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function cors() {
@@ -103,14 +103,25 @@ export async function GET(request: Request) {
       upstream = fallback;
     }
 
+    // Send a concrete binary payload with Content-Length. Safari/iOS is
+    // less forgiving of streamed image responses from edge proxies.
+    const body = await upstream.arrayBuffer();
+    if (!body.byteLength) {
+      return new NextResponse("Empty image response", {
+        status: 502,
+        headers: cors(),
+      });
+    }
+
     const headers = new Headers(cors());
     headers.set("Content-Type", upstream.headers.get("content-type") || "image/jpeg");
+    headers.set("Content-Length", String(body.byteLength));
     headers.set(
       "Cache-Control",
       "public, s-maxage=86400, stale-while-revalidate=604800"
     );
 
-    return new NextResponse(upstream.body, {
+    return new NextResponse(body, {
       status: 200,
       headers,
     });
