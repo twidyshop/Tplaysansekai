@@ -1,11 +1,12 @@
 import { create } from "zustand";
 
 export type Platform =
-  | "iqiyi" | "meloshort" | "pinedrama" | "dramabox" | "reelshort" | "shortmax"
+  | "iqiyi" | "wetv" | "meloshort" | "pinedrama" | "dramabox" | "reelshort" | "shortmax"
   | "netshort" | "melolo" | "freereels" | "flickreels" | "dramanova" | "goodshort" | string;
 
 export const PLATFORMS = [
   { id: "iqiyi", name: "iQIYI", logo: "/iqiyi.svg", apiBase: "/api/iqiyi" },
+  { id: "wetv", name: "WeTV", logo: "/wetv.svg", apiBase: "/api/wetv" },
   { id: "meloshort", name: "MeloShort", logo: "/meloshort.png", apiBase: "/api/meloshort" },
   { id: "pinedrama", name: "PineDrama", logo: "/pinedrama.png", apiBase: "/api/pinedrama" },
   { id: "dramabox", name: "DramaBox", logo: "/dramabox.webp", apiBase: "/api/dramabox" },
@@ -34,6 +35,7 @@ export function usePlatform() {
   return {
     currentPlatform, platformInfo, setPlatform, platforms: PLATFORMS, getPlatformInfo,
     isIqiyi: currentPlatform === "iqiyi",
+    isWetv: currentPlatform === "wetv",
     isMeloShort: currentPlatform === "meloshort",
     isPineDrama: currentPlatform === "pinedrama",
     isDramaBox: currentPlatform === "dramabox",
