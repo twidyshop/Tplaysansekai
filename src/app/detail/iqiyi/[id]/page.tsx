@@ -34,8 +34,10 @@ export default function IqiyiDetailPage(){
   const quickTitle=search.get("title")||"iQIYI";
   const quickCover=search.get("cover")||"";
   const quickAlbumId=search.get("albumId")||"";
-  const {data,isLoading,error}=useQuery({
-    queryKey:["iqiyi-detail",id],
+  const quickDescription=search.get("description")||"";
+  const quickEpisodes=Number(search.get("episodes")||0);
+  const {data,isLoading}=useQuery({
+    queryKey:["iqiyi-detail",id,quickAlbumId],
     queryFn:async()=>{
       const response=await fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(id)+(quickAlbumId?"&albumId="+encodeURIComponent(quickAlbumId):"")+"&lang=id");
       const json=await response.json();
@@ -49,8 +51,8 @@ export default function IqiyiDetailPage(){
 
   const title=text(data,["title","name","bookName","albumName","displayName","albumTitle","videoName"],quickTitle);
   const cover=text(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterImg","imageUrl"],quickCover);
-  const description=text(data,["description","synopsis","introduction","desc","summary","shotDesc"],"");
-  const episodes=number(data,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"]);
+  const description=text(data,["description","synopsis","introduction","desc","summary","shotDesc"],quickDescription);
+  const episodes=number(data,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"])||quickEpisodes;
 
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70 hover:text-white">‹&nbsp; Kembali</button></div></header>
@@ -61,7 +63,7 @@ export default function IqiyiDetailPage(){
           <span className="mb-3 inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">iQIYI</span>
           <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>
           {description&&<div className="mb-6"><h2 className="mb-2 text-sm font-semibold">Sinopsis</h2><p className="whitespace-pre-line text-sm leading-7 text-white/55 md:text-base">{description}</p></div>}
-{error&&<p className="mb-5 text-xs text-amber-300/80">Info lengkap iQIYI sedang tidak tersedia, tetapi film tetap bisa dicoba diputar.</p>}
+{isLoading&&!description&&<p className="mb-5 text-xs text-white/35">Memuat sinopsis...</p>}
           {episodes>0&&<p className="mb-6 text-sm text-white/45">{episodes} episode</p>}
           <button onClick={()=>router.push("/watch/iqiyi/"+encodeURIComponent(id)+(quickAlbumId?"?albumId="+encodeURIComponent(quickAlbumId):""))} className="w-full rounded-xl bg-emerald-500 px-7 py-3.5 font-bold text-black transition hover:bg-emerald-400 md:w-auto md:min-w-[220px]">▶&nbsp; Mulai Nonton</button>
         </section>
