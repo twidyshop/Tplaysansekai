@@ -141,7 +141,15 @@ export async function GET(request: Request) {
       "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800"
     );
 
-    return new NextResponse(jpeg, {
+    // Next.js/TypeScript's BodyInit typing can reject Node's generic Buffer
+    // even though it is valid binary response data at runtime. Convert it to
+    // a plain ArrayBuffer before passing it to NextResponse.
+    const body = jpeg.buffer.slice(
+      jpeg.byteOffset,
+      jpeg.byteOffset + jpeg.byteLength
+    ) as ArrayBuffer;
+
+    return new NextResponse(body, {
       status: 200,
       headers,
     });
