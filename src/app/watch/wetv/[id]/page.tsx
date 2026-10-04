@@ -35,14 +35,45 @@ export default function WetvWatchPage(){
    const playback=inline?"/api/wetv/stream?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected)):"/api/wetv/proxy?url="+encodeURIComponent(source);
    const type=source.includes("#EXTM3U")||source.includes("#EXT-X-")||/\.m3u8(?:[?#]|$)/i.test(source)?"application/x-mpegURL":/\.mp4(?:[?#]|$)/i.test(source)?"video/mp4":"application/x-mpegURL";
    const instance=videojs(video.current,{controls:true,responsive:true,fluid:true,preload:"auto",playsinline:true,playbackRates:[0.5,0.75,1,1.25,1.5,2],html5:{vhs:{overrideNative:true,withCredentials:false,enableLowInitialPlaylist:false},nativeAudioTracks:false,nativeVideoTracks:false},controlBar:{pictureInPictureToggle:true,fullscreenToggle:true,remainingTimeDisplay:true,playbackRateMenuButton:true,subsCapsButton:true,skipButtons:{backward:10,forward:10}}});
+   subtitleOverlay=document.createElement("div");
+   subtitleOverlay.style.cssText="position:absolute;left:5%;right:5%;bottom:8%;z-index:20;text-align:center;color:#fff;font-size:clamp(16px,2.2vw,28px);font-weight:700;line-height:1.35;text-shadow:0 2px 4px #000,0 0 8px #000;pointer-events:none;display:none;white-space:pre-line";
+   video.current.parentElement?.appendChild(subtitleOverlay);
+   void loadVisualSubtitle();
+   const syncVisualSubtitle=()=>{if(!subtitleOverlay||!video.current)return;const t=video.current.currentTime||0;const cue=subtitleCues.find(x=>t>=x.start&&t<=x.end);subtitleOverlay.textContent=cue?.text||"";subtitleOverlay.style.display=cue?"block":"none";};
+   video.current.addEventListener("timeupdate",syncVisualSubtitle);
    player.current=instance;
+   // Render Indonesian subtitle as a visual overlay (hardsub-like) instead of relying on
+   // browser text-track rendering, which is unreliable for some WeTV subtitle formats.
+   let subtitleOverlay:HTMLDivElement|null=null;
+   let subtitleCues:{start:number,end:number,text:string}[]=[];
+   const parseVtt=(vtt:string)=>{
+     const clean=vtt.replace(/^\\uFEFF/,"").replace(/\\r/g,"");
+     const blocks=clean.split(/\\n\\s*\\n/);
+     const cues:{start:number,end:number,text:string}[]=[];
+     const time=(s:string)=>{const p=s.trim().split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];};
+     for(const block of blocks){const lines=block.split("\\n");const ti=lines.findIndex(x=>x.includes("-->"));if(ti<0)continue;const parts=lines[ti].split("-->");if(parts.length<2)continue;const start=time(parts[0].replace(/^[^0-9]*/,""));const end=time(parts[1].trim().split(/\\s+/)[0]);const text=lines.slice(ti+1).join("\\n").replace(/<[^>]+>/g,"").trim();if(text)cues.push({start,end,text});}
+     return cues;
+   };
+   const loadVisualSubtitle=async()=>{
+     try{
+       const sr=await fetch("/api/wetv/subtitle?id="+encodeURIComponent(dramaId)+"&episode="+encodeURIComponent(String(selected)),{cache:"no-store"});
+       if(!sr.ok)return;
+       const sj=await sr.json();
+       const tracks=Array.isArray(sj?.tracks)?sj.tracks:[];
+       const idTrack=tracks.find((x:any)=>String(x?.language||"").toLowerCase()==="id")||tracks[0];
+       if(!idTrack?.src)return;
+       const tr=await fetch(idTrack.src,{cache:"no-store"});
+       if(!tr.ok)return;
+       subtitleCues=parseVtt(await tr.text());
+     }catch{}
+   };
    const subtitleItems:any[]=[];const seenSub=new Set<string>();const collectSubs=(v:any,depth=0)=>{if(!v||depth>12||typeof v!=="object")return;if(Array.isArray(v)){v.forEach(x=>collectSubs(x,depth+1));return;}for(const k of Object.keys(v)){const key=k.toLowerCase(),x=v[k];if(/subtitle|caption|closed.?caption/.test(key)){const list=Array.isArray(x)?x:[x];for(const item of list){const src=typeof item==="string"?item:pick(item,["url","src","source","file","fileUrl","file_url","subtitleUrl","subtitle_url","captionUrl","caption_url","vtt","vttUrl","vtt_url","srt","srtUrl","srt_url","uri"]);if(/^https?:\/\//i.test(src)&&!seenSub.has(src)){seenSub.add(src);const language=typeof item==="object"?pick(item,["language","lang","srclang","languageCode","language_code","locale","code"],""): "";subtitleItems.push({src,language,label:typeof item==="object"?pick(item,["label","name","title"],"Subtitle"):"Subtitle"});}}}collectSubs(x,depth+1);}};collectSubs(playQ.data);void Promise.resolve({tracks:subtitleItems}).then(payload=>{if(cancelled||!player.current)return;const tracks=Array.isArray(payload?.tracks)?payload.tracks:[];const hasId=tracks.some((x:any)=>String(x?.language||"").toLowerCase()==="id");tracks.forEach((track:any,index:number)=>{if(!track?.src)return;try{instance.addRemoteTextTrack({kind:"subtitles",src:track.src,srclang:track.language||"und",language:track.language||"und",label:track.label||"Subtitle",default:hasId?String(track.language||"").toLowerCase()==="id":index===0},false);}catch{}});}).catch(()=>{});
    instance.src({src:playback,type});
    instance.on("playing",()=>{setPlaying(true);setError("");});instance.on("waiting",()=>setPlaying(false));
    let recovery=0;instance.on("error",()=>{if(recovery<3){recovery++;window.setTimeout(()=>{if(cancelled||!player.current)return;try{const pos=instance.currentTime();instance.reset();instance.src({src:playback,type});instance.one("loadedmetadata",()=>{if(pos>0)try{instance.currentTime(pos)}catch{}});void instance.play().catch(()=>{});}catch{}},800*recovery);return;}setPlaying(false);setError(instance.error()?.message||"Video WeTV gagal dimuat.");});
    instance.ready(()=>{if(!cancelled)void instance.play().catch(()=>{});});
   }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:"Gagal memuat Video.js");});
-  return()=>{cancelled=true;player.current?.dispose?.();player.current=null;};
+  return()=>{cancelled=true;if(video.current)video.current.removeEventListener("timeupdate",()=>{});subtitleOverlay?.remove();subtitleOverlay=null;subtitleCues=[];player.current?.dispose?.();player.current=null;};
  },[source,selected,dramaId]);
  const next=episodes[episodes.findIndex(x=>x.number===selected)+1];
  const play=useCallback((n:number)=>{setSelected(n);setSource("");setError("");setPlaying(false);},[]);
