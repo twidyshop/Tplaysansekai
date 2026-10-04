@@ -36,24 +36,26 @@ function pick(v: any, keys: string[], fallback = "") {
   return fallback;
 }
 
-function collectTagOptions(value: any, group: string, depth = 0): { value: string; label: string }[] {
-  if (depth > 8 || value == null || typeof value !== "object") return [];
-  const found: { value: string; label: string }[] = [];
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      if (typeof item === "string" || typeof item === "number") { const s = String(item).trim(); if (s) found.push({value:s,label:s}); }
-      else if (item && typeof item === "object") {
-        const rawValue = item.value ?? item.code ?? item.id ?? item.key ?? item.slug ?? item.name ?? item.label;
-        const rawLabel = item.label ?? item.name ?? item.title ?? item.text ?? rawValue;
-        if (rawValue != null && String(rawValue).trim()) found.push({value:String(rawValue).trim(),label:String(rawLabel ?? rawValue).trim()});
-      }
-    }
-  } else for (const [key, child] of Object.entries(value)) {
-    if (key.toLowerCase().includes(group)) found.push(...collectTagOptions(child,group,depth+1));
-    if (typeof child === "object") found.push(...collectTagOptions(child,group,depth+1));
+function getIqiyiTagOptions(value: any, kind: "region" | "genre" | "sort"): { value: string; label: string }[] {
+  const data = value?.data ?? value ?? {};
+
+  if (kind === "sort") {
+    const sort = Array.isArray(data?.sort) ? data.sort : [];
+    return sort
+      .filter((item: any) => item?.id != null && item?.name)
+      .map((item: any) => ({ value: String(item.id), label: String(item.name) }));
   }
-  const seen=new Set<string>();
-  return found.filter(x=>{const k=x.value.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+
+  const filterType = kind === "region" ? "area" : "type";
+  const group = Array.isArray(data?.filter)
+    ? data.filter.find((item: any) => item?.type === filterType)
+    : null;
+
+  return Array.isArray(group?.child)
+    ? group.child
+        .filter((item: any) => item?.id != null && item?.name)
+        .map((item: any) => ({ value: String(item.id), label: String(item.name) }))
+    : [];
 }
 
 function mapItem(x: any, i: number) {
@@ -231,9 +233,9 @@ export function IqiyiHome() {
   const trendingItems = liveTrendingItems.length ? liveTrendingItems : snapshot;
   const dramaItems = drama.data?.pages.flatMap(arr) ?? [];
   const animeItems = anime.data?.pages.flatMap(arr) ?? [];
-  const regionTags=collectTagOptions(tags.data,"region");
-  const genreTags=collectTagOptions(tags.data,"genre");
-  const sortTags=collectTagOptions(tags.data,"sort");
+  const regionTags=getIqiyiTagOptions(tags.data,"region");
+  const genreTags=getIqiyiTagOptions(tags.data,"genre");
+  const sortTags=getIqiyiTagOptions(tags.data,"sort");
 
   if (!trendingItems.length && trending.isLoading) {
     return (
