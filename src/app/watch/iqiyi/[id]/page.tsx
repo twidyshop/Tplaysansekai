@@ -4,6 +4,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useParams,useRouter} from "next/navigation";
 import Hls from "hls.js";
+import {useIqiyiDetail,useIqiyiEpisodes,useIqiyiPlay} from "@/hooks/useIqiyi";
 
 function arr(v:any):any[]{
   if(Array.isArray(v)) return v;
@@ -44,53 +45,45 @@ function findStream(v:any):string{
 export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
   const video=useRef<HTMLVideoElement|null>(null),hls=useRef<Hls|null>(null);
-  const [episodes,setEpisodes]=useState<any[]>([]),[title,setTitle]=useState("iQIYI"),[selected,setSelected]=useState(1),[source,setSource]=useState(""),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[error,setError]=useState(""),[episodeError,setEpisodeError]=useState("");
+  const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState("");
+  const detailQuery=useIqiyiDetail(dramaId,albumId);
+  const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
+  const playQuery=useIqiyiPlay(dramaId,selected,albumId);
+  const episodes=arr(episodesQuery.data||{}).map((x:any,i:number)=>({
+    id:pick(x,["id","episodeId","episode_id"],String(i+1)),
+    number:Number(x?.episode??x?.episodeNumber??x?.episode_index??i+1)||i+1,
+    title:pick(x,["title","name","episodeTitle"],"Episode "+(i+1))
+  }));
+  const title=pick(
+    detailQuery.data?.data?.detail??detailQuery.data?.data?.drama??detailQuery.data?.data?.album??detailQuery.data?.data??detailQuery.data,
+    ["title","name","bookName","albumName","displayName","albumTitle","videoName"],
+    "iQIYI"
+  );
 
-  const play=useCallback(async(n:number)=>{
-    setSelected(n);setPlaying(false);setError("");setSource("");
-    try{
-      const r=await fetch("/api/iqiyi?action=play&id="+encodeURIComponent(dramaId)+(albumId?"&albumId="+encodeURIComponent(albumId):"")+"&episode="+n+"&lang=id");
-      const j=await r.json();
-      if(!r.ok) throw new Error(j?.error||"Gagal mengambil video");
-      const stream=findStream(j);
-      if(!stream) throw new Error("Hoshiyomi tidak mengembalikan URL video yang bisa diputar.");
-      setSource(stream);
-    }catch(e){setError(e instanceof Error && e.name === "AbortError" ? "Request video iQIYI timeout. Coba ulangi episode." : e instanceof Error?e.message:"Gagal memutar video")}
-  },[dramaId,albumId]);
+  useEffect(()=>{
+    const stream=findStream(playQuery.data);
+    if(stream){setSource(stream);setError("");}
+    else if(playQuery.isError){
+      setSource("");
+      setError(playQuery.error instanceof Error?playQuery.error.message:"Gagal memutar video iQIYI");
+    }
+  },[playQuery.data,playQuery.isError,playQuery.error]);
 
-  const load=useCallback(async()=>{
-    if(!dramaId) return;
-    setLoading(true);setError("");setEpisodeError("");
+  useEffect(()=>{
+    if(episodes.length&&selected===1&&episodes[0].number!==1) setSelected(episodes[0].number);
+  },[episodes,selected]);
 
-    // Start the first episode request immediately; do not wait for metadata.
-    void play(1);
+  useEffect(()=>{
+    if(episodesQuery.isError && !episodes.length) setError("");
+  },[episodesQuery.isError,episodes.length]);
 
-    // Metadata is deliberately background-only so a slow detail endpoint cannot block playback.
-    void fetch("/api/iqiyi?action=detail&id="+encodeURIComponent(dramaId)+(albumId?"&albumId="+encodeURIComponent(albumId):"")+"&lang=id")
-      .then(r=>r.ok?r.json():null)
-      .then(j=>{
-        if(j){
-          const d=j?.data?.detail??j?.data?.drama??j?.data?.album??j?.data??j;
-          setTitle(pick(d,["title","name","bookName","albumName","displayName","albumTitle","videoName"],"iQIYI"));
-        }
-      }).catch(()=>{});
+  const loading=episodesQuery.isLoading;
+  const episodeError=episodesQuery.isError ? (episodesQuery.error instanceof Error?episodesQuery.error.message:"Episode belum berhasil dimuat.") : "";
+  const playLoading=playQuery.isLoading||playQuery.isFetching;
 
-    try{
-      const a=await fetch("/api/iqiyi?action=episodes&id="+encodeURIComponent(dramaId)+(albumId?"&albumId="+encodeURIComponent(albumId):"")+"&lang=id");
-      const aj=await a.json();
-      if(!a.ok) throw new Error(aj?.error||"Gagal memuat episode");
-      const list=arr(aj).map((x:any,i:number)=>({
-        id:pick(x,["id","episodeId","episode_id"],String(i+1)),
-        number:Number(x?.episode??x?.episodeNumber??x?.episode_index??i+1)||i+1,
-        title:pick(x,["title","name","episodeTitle"],"Episode "+(i+1))
-      }));
-      setEpisodes(list);
-      if(list.length&&list[0].number!==1) setSelected(list[0].number);
-    }catch(e){setEpisodeError(e instanceof Error && e.name === "AbortError" ? "Episode belum berhasil dimuat. Player tetap bisa dicoba." : e instanceof Error?e.message:"Episode belum berhasil dimuat.")}
-    finally{setLoading(false)}
-  },[dramaId,play]);
-
-  useEffect(()=>{void load()},[load]);
+  const play=useCallback((n:number)=>{
+    setSelected(n);setSource("");setError("");
+  },[]);
 
   useEffect(()=>{
     if(!source||!video.current) return;
@@ -208,7 +201,7 @@ export default function IqiyiWatchPage(){
     <div className="container mx-auto max-w-6xl px-4 py-5">
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} controls playsInline preload="metadata" className="aspect-video w-full bg-black"/></div>
       <h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}</p>
-      {error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">{episodeError}</div>}
+      {playLoading&&<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Menyiapkan video iQIYI...</div>}{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">Episode belum berhasil dimuat. Player tetap bisa dicoba.</div>}
       {loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}
     </div>
   </main>;
