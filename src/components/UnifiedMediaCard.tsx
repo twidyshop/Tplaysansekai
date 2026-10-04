@@ -54,7 +54,7 @@ export function UnifiedMediaCard({
           src={optimizeCover(cover)}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          loading="lazy"
+          loading={cover.startsWith("/api/iqiyi/image") ? "eager" : "lazy"}
           referrerPolicy="no-referrer"
         />
 
