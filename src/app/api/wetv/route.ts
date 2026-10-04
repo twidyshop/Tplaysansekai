@@ -49,13 +49,13 @@ export async function GET(request:Request) {
   }
 
   const controller = new AbortController();
-  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 10000;
+  const timeoutMs = action === "play" ? 30000 : action === "episodes" ? 25000 : 20000;
   const timeout = setTimeout(()=>controller.abort(),timeoutMs);
   try {
     console.log(`[WeTV] ${action} -> ${target.pathname}${target.search}`);
     const response = await fetch(target.toString(),{
       headers:{"X-API-Key":key,Accept:"application/json","User-Agent":"TPLAY+/1.0"},
-      ...(action === "play" ? {cache:"no-store" as const} : {next:{revalidate:600}}),
+      cache: "no-store" as const,
       signal:controller.signal,
     });
     clearTimeout(timeout);
