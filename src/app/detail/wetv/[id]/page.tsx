@@ -22,7 +22,7 @@ export default function WetvDetailPage(){
        return j;
      } finally {clearTimeout(timer);}
    },
-   enabled:!!id,staleTime:1800000,gcTime:3600000,retry:0,
+   enabled:!!id&&!quickDescription,staleTime:1800000,gcTime:3600000,retry:0,refetchOnWindowFocus:false,
  });
  const title=deep(data,["title","name","bookName","albumName","displayName","videoName"],quickTitle);
  const cover=deep(data,["cover","poster","image","thumbnail","coverUrl","pic","albumPic","posterUrl"],quickCover);
@@ -31,7 +31,7 @@ export default function WetvDetailPage(){
   <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button></div></header>
   <div className="container mx-auto max-w-5xl px-4 py-8">
    <div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]">
-    <div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={"/api/wetv/image?url="+encodeURIComponent(cover)} alt={title} className="h-full w-full object-cover" referrerPolicy="no-referrer"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div>
+    <div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={"/api/wetv/image?url="+encodeURIComponent(cover)} alt={title} className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="eager"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div>
     <section>
      <span className="mb-3 inline-flex rounded-full border border-teal-400/20 bg-teal-400/10 px-3 py-1 text-xs font-medium text-teal-300">WeTV</span>
      <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{title}</h1>
