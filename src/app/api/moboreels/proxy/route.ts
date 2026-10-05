@@ -41,7 +41,7 @@ function rewrite(text: string, base: string, proxy: string) {
 async function fetchUpstream(url: string, range: string | null) {
   // MoboReels/CDN links are often hotlink-protected. Try the same URL
   // with several browser-like header profiles before giving up.
-  const profiles = [
+  const profiles: Array<Record<string, string>> = [
     {
       Referer: "https://www.moboreels.com/",
       Origin: "https://www.moboreels.com",
