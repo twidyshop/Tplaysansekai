@@ -160,7 +160,7 @@ export default function MoboReelsWatch() {
   const [subUrl, setSubUrl] = useState("");
   const [subText, setSubText] = useState("");
   const [err, setErr] = useState("");
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);\n  const [showEpisodes, setShowEpisodes] = useState(false);
   const video = useRef<HTMLVideoElement | null>(null);
 
   const detail = useMoboReelsDetail(sid);
