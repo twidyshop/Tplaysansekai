@@ -164,25 +164,52 @@ async function resolveMoboReelsVideo(requestUrl: string) {
     const data = await response.json();
 
     const findUrl = (v: any, depth = 0): string => {
-      if (depth > 8 || v == null) return "";
-      if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+      if (depth > 10 || v == null) return "";
+
+      const isVideoUrl = (value: string) =>
+        /^https?:\\/\\//i.test(value) &&
+        (/(?:\\.m3u8|\\.mp4)(?:[?#]|$)/i.test(value) ||
+          /(?:m3u8|playlist|stream|video|play|media|vod)/i.test(value));
+
+      if (typeof v === "string") {
+        return isVideoUrl(v) ? v : "";
+      }
+
       if (typeof v !== "object") return "";
+
+      // Prefer explicit playback fields. The old recursive search could
+      // accidentally select a poster/CDN image URL before the video URL.
       for (const key of [
         "videoUrl",
         "video_url",
         "playUrl",
         "play_url",
-        "url",
         "streamUrl",
         "stream_url",
+        "m3u8",
+        "hls",
+        "hlsUrl",
+        "hls_url",
+        "video",
+        "play",
+        "stream",
+        "mediaUrl",
+        "media_url",
+        "url",
       ]) {
         const value = v[key];
-        if (typeof value === "string" && /^https?:\/\//i.test(value)) return value;
+        if (typeof value === "string" && isVideoUrl(value)) return value;
+        if (value && typeof value === "object") {
+          const nested = findUrl(value, depth + 1);
+          if (nested) return nested;
+        }
       }
+
       for (const key of Object.keys(v)) {
         const found = findUrl(v[key], depth + 1);
         if (found) return found;
       }
+
       return "";
     };
 
