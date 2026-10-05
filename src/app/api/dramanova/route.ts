@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
-export const revalidate = 600;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const BASE =
   process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
@@ -82,7 +83,8 @@ export async function GET(request: Request) {
   }
 
   const url = target(action, p);
-  const ms = action === "play" ? 30000 : 30000;
+  // Bound the upstream call; Node.js avoids the Edge 25s initial-response limit.
+  const ms = action === "play" ? 25000 : 15000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);
 
@@ -125,43 +127,8 @@ export async function GET(request: Request) {
         ("success" in data && data.success === false ||
           "error" in data && data.error))
     ) {
-      if ((action === "trending" || action === "home") && response.status >= 500) {
-        try {
-          const fallbackUrl = new URL("/api/dramanova/foryou", BASE);
-          fallbackUrl.searchParams.set("page", "1");
-          fallbackUrl.searchParams.set("lang", p.get("lang") || "id");
-
-          const fallbackController = new AbortController();
-          const fallbackTimeout = setTimeout(() => fallbackController.abort(), 30000);
-          const fallbackResponse = await fetch(fallbackUrl, {
-            headers: {
-              "X-API-Key": key,
-              Accept: "application/json",
-              "User-Agent": "TPLAY+/1.0",
-            },
-            cache: "no-store",
-            signal: fallbackController.signal,
-          });
-          const fallbackRaw = await fallbackResponse.text();
-          clearTimeout(fallbackTimeout);
-
-          if (fallbackResponse.ok) {
-            try {
-              const fallbackData = JSON.parse(fallbackRaw);
-              return NextResponse.json(fallbackData, {
-                status: 200,
-                headers: {
-                  "Cache-Control": "public, s-maxage=600, stale-while-revalidate=86400",
-                },
-              });
-            } catch {
-              // Continue to the original upstream error.
-            }
-          }
-        } catch {
-          // Continue to the original upstream error.
-        }
-      }
+      // Do not perform another long sequential upstream request here.
+      // That fallback could exceed Vercel's 25s initial-response limit.
       const obj = data as Record<string, unknown>;
       return NextResponse.json(
         {
