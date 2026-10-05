@@ -60,10 +60,11 @@ export async function GET(request: Request) {
       });
       break;
     case "kdrama":
-      // Use Hoshiyomi's dedicated K-Drama alias directly.
-      // Do not route this through the general /drama endpoint.
-      target = makeUrl("/api/iqiyi/kdrama", {
+      // Hoshiyomi's /kdrama alias returns the general drama feed.
+      // Use the verified Korea region on the general drama endpoint instead.
+      target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
+        region: "korea",
         sort: p.get("sort") || undefined,
         genre: p.get("genre") || undefined,
         year: p.get("year") || undefined,
