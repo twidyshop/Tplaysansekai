@@ -181,8 +181,6 @@ export function IqiyiHome() {
   const [region,setRegion]=useState("");
   const [genre,setGenre]=useState("");
   const [sort,setSort]=useState("");
-  const tags=useQuery({queryKey:["iqiyi-tags-id"],queryFn:()=>get("/api/iqiyi?action=tags&cid=4&lang=id"),staleTime:1800000,gcTime:3600000,retry:0});
-
   useEffect(() => {
     try {
       const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -213,32 +211,11 @@ export function IqiyiHome() {
   if(genre) tagParams.set("genre",genre);
   if(sort) tagParams.set("sort",sort);
 
-  // Hoshiyomi currently exposes iQIYI as a 5-endpoint STARTER+ integration.
-  // Do not fire speculative category endpoints here: failed queries caused the
-  // section headers to appear briefly and then disappear when loading ended.
-  // We keep the category UI backed by the same stable trending feed until the
-  // upstream exposes a real catalog/browse endpoint for iQIYI.
-  const iqiyiCatalog = useQuery({
-    queryKey: ["iqiyi-catalog-id"],
-    queryFn: () => get("/api/iqiyi?action=home&lang=id"),
-    staleTime: 600000,
-    gcTime: 1800000,
-    retry: 1,
-  });
 
-  const foryou = useQuery({
-    queryKey: ["iqiyi-foryou-id"],
-    queryFn: () => get("/api/iqiyi?action=foryou&lang=id"),
-    staleTime: 600000,
-    gcTime: 1800000,
-    retry: 0,
-  });
 
   const liveTrendingItems = arr(trending.data);
   const trendingItems = liveTrendingItems.length ? liveTrendingItems : snapshot;
-  const catalogItems = arr(iqiyiCatalog.data);
-  const foryouItems = arr(foryou.data);
-
+  const catalogItems = trendingItems;
   // Keep these sections stable instead of rendering empty/error queries.
   // If the upstream item contains type/genre/region metadata, use it;
   // otherwise fall back to the catalog so content never flashes away.
@@ -247,13 +224,13 @@ export function IqiyiHome() {
     return words.some((word) => raw.includes(word));
   };
   const kdramaItems = catalogItems.filter((x) => matches(x, ["korea", "korean", "kr", "south korea", "k-drama", "kdrama"]));
-  const movieItems = catalogItems.filter((x) => matches(x, ["movie", "film", "film" ]));
+  const movieItems = catalogItems.filter((x) => matches(x, ["movie", "film"]));
   const varietyItems = catalogItems.filter((x) => matches(x, ["variety", "reality", "show"]));
   const dramaItems = catalogItems.filter((x) => !kdramaItems.includes(x) && !movieItems.includes(x) && !varietyItems.includes(x));
   const animeItems = catalogItems.filter((x) => matches(x, ["anime", "animation", "donghua"]));
-  const regionTags=getIqiyiTagOptions(tags.data,"region");
-  const genreTags=getIqiyiTagOptions(tags.data,"genre");
-  const sortTags=getIqiyiTagOptions(tags.data,"sort");
+  const regionTags:any[]=[];
+  const genreTags:any[]=[];
+  const sortTags:any[]=[];
 
   if (!trendingItems.length && trending.isLoading) {
     return (
@@ -280,8 +257,8 @@ export function IqiyiHome() {
       <Section title="Trending" data={trendingItems} loading={false} />
       <Section
         title="Untukmu"
-        data={foryouItems}
-        loading={foryou.isLoading}
+        data={[]}
+        loading={false}
       />
       <Section
         title="Drama"
