@@ -97,7 +97,7 @@ function Section({
             disabled={loading}
             className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/10 disabled:opacity-50"
           >
-            {loading ? "Memuat..." : "Muat lebih banyak"}
+            {loading ? "Memuat..." : "Lihat lebih banyak"}
           </button>
         )}
       </div>
@@ -205,37 +205,56 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
-  const drama = useQuery({
-    queryKey: ["iqiyi", "drama", "1", "id"],
-    queryFn: () => get("/api/iqiyi?action=drama&page=1&lang=id"),
+  const nextPage = (lastPage: any, pages: any[]) => {
+    const meta = lastPage?.pagination || lastPage?.meta || lastPage?.data?.pagination || lastPage?.data?.meta;
+    if (meta?.hasNextPage === false || meta?.has_next === false || meta?.hasMore === false || meta?.has_more === false) return undefined;
+    const totalPages = Number(meta?.totalPages ?? meta?.total_pages ?? meta?.pages ?? 0);
+    if (totalPages > 0 && pages.length >= totalPages) return undefined;
+    if (!arr(lastPage).length) return undefined;
+    return pages.length + 1;
+  };
+
+  const drama = useInfiniteQuery({
+    queryKey: ["iqiyi", "drama", "id"],
+    queryFn: ({ pageParam }) => get(`/api/iqiyi?action=drama&page=${pageParam}&lang=id`),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     staleTime: 600000,
     gcTime: 1800000,
   });
 
-  const kdrama = useQuery({
-    queryKey: ["iqiyi", "kdrama", "1", "id"],
-    queryFn: () => get("/api/iqiyi?action=kdrama&page=1&lang=id"),
+  const kdrama = useInfiniteQuery({
+    queryKey: ["iqiyi", "kdrama", "id"],
+    queryFn: ({ pageParam }) => get(`/api/iqiyi?action=kdrama&page=${pageParam}&lang=id`),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     staleTime: 600000,
     gcTime: 1800000,
   });
 
-  const movie = useQuery({
-    queryKey: ["iqiyi", "movie", "1", "id"],
-    queryFn: () => get("/api/iqiyi?action=movie&page=1&lang=id"),
+  const movie = useInfiniteQuery({
+    queryKey: ["iqiyi", "movie", "id"],
+    queryFn: ({ pageParam }) => get(`/api/iqiyi?action=movie&page=${pageParam}&lang=id`),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     staleTime: 600000,
     gcTime: 1800000,
   });
 
-  const anime = useQuery({
-    queryKey: ["iqiyi", "anime", "1", "id"],
-    queryFn: () => get("/api/iqiyi?action=anime&page=1&lang=id"),
+  const anime = useInfiniteQuery({
+    queryKey: ["iqiyi", "anime", "id"],
+    queryFn: ({ pageParam }) => get(`/api/iqiyi?action=anime&page=${pageParam}&lang=id`),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     staleTime: 600000,
     gcTime: 1800000,
   });
 
-  const variety = useQuery({
-    queryKey: ["iqiyi", "variety", "1", "id"],
-    queryFn: () => get("/api/iqiyi?action=variety&page=1&lang=id"),
+  const variety = useInfiniteQuery({
+    queryKey: ["iqiyi", "variety", "id"],
+    queryFn: ({ pageParam }) => get(`/api/iqiyi?action=variety&page=${pageParam}&lang=id`),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     staleTime: 600000,
     gcTime: 1800000,
   });
@@ -250,11 +269,11 @@ export function IqiyiHome() {
 
   const trendingItems = arr(trending.data).length ? arr(trending.data) : snapshot;
   const foryouItems = arr(foryou.data);
-  const dramaItems = arr(drama.data);
-  const kdramaItems = arr(kdrama.data);
-  const movieItems = arr(movie.data);
-  const animeItems = arr(anime.data);
-  const varietyItems = arr(variety.data);
+  const dramaItems = drama.data?.pages.flatMap((page: any) => arr(page)) || [];
+  const kdramaItems = kdrama.data?.pages.flatMap((page: any) => arr(page)) || [];
+  const movieItems = movie.data?.pages.flatMap((page: any) => arr(page)) || [];
+  const animeItems = anime.data?.pages.flatMap((page: any) => arr(page)) || [];
+  const varietyItems = variety.data?.pages.flatMap((page: any) => arr(page)) || [];
 
   const regionTags:any[]=[];
   const genreTags:any[]=[];
