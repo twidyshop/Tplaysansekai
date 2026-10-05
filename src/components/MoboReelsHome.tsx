@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import {
   useMoboReelsForYou,
@@ -103,6 +103,7 @@ export function MoboReelsHome() {
 
   const [showMore, setShowMore] = useState(false);
   const [page, setPage] = useState(1);
+  const [catalog, setCatalog] = useState<any[]>([]);
 
   const {
     data: forYou,
@@ -110,6 +111,21 @@ export function MoboReelsHome() {
     isFetching: forYouFetching,
     error: forYouError,
   } = useMoboReelsForYou(page);
+
+  useEffect(() => {
+    if (!forYou) return;
+    setCatalog((previous) => {
+      if (page === 1) return forYou;
+      const seen = new Set(previous.map((item: any, index: number) => mapDrama(item, index).id));
+      const next = forYou.filter((item: any, index: number) => {
+        const id = mapDrama(item, index).id;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      return [...previous, ...next];
+    });
+  }, [forYou, page]);
 
   const visibleTrending = (trending || []).slice(0, 12);
 
@@ -195,7 +211,7 @@ export function MoboReelsHome() {
             </div>
           ) : (
             <>
-              <DramaGrid items={forYou || []} />
+              <DramaGrid items={catalog} />
 
               <div className="pt-5 flex justify-center">
                 <button
