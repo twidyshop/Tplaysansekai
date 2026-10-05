@@ -17,17 +17,11 @@ function rewrite(text: string, base: string, proxy: string) {
     .split("\n")
     .map((line) => {
       const t = line.trim();
-      if (
-        !t ||
-        t.startsWith("#EXTM3U") ||
-        t.startsWith("#EXT-X-") ||
-        t.startsWith("#EXTINF") ||
-        t.startsWith("#EXT-X-VERSION") ||
-        t.startsWith("#EXT-X-TARGETDURATION") ||
-        t.startsWith("#EXT-X-MEDIA-SEQUENCE") ||
-        t.startsWith("#EXT-X-ENDLIST")
-      ) return line;
+      if (!t || t.startsWith("#EXTM3U")) return line;
       if (t.startsWith("#")) {
+        // HLS tags such as EXT-X-KEY and EXT-X-MAP can contain media/init
+        // URLs in a URI attribute. Those must also go through our proxy;
+        // otherwise the player still contacts the hotlink-protected CDN.
         return line.replace(
           /URI="([^"]+)"/g,
           (_, u) => `URI="${proxy}?url=${encodeURIComponent(abs(base, u))}"`
