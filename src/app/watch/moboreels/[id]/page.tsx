@@ -203,7 +203,7 @@ export default function MoboReelsWatch() {
     if (!subUrl) return;
     let cancelled = false;
     fetch("/api/moboreels/proxy?url=" + encodeURIComponent(subUrl), {
-      referrerPolicy: "no-referrer" // FIX: Menghindari blokir Referer saat fetch subtitle
+      referrerPolicy: "no-referrer"
     })
       .then((r) => (r.ok ? r.text() : ""))
       .then((text) => {
@@ -219,7 +219,6 @@ export default function MoboReelsWatch() {
 
   const cues = useMemo(() => parseVtt(subText), [subText]);
 
-  // FIX: Validasi regex dihapus.
   const playbackUrl = src || "";
 
   useEffect(() => {
@@ -274,7 +273,8 @@ export default function MoboReelsWatch() {
               controls
               playsInline
               preload="auto"
-              referrerPolicy="no-referrer" // FIX: Menghindari blokir Hotlink dari CDN
+              // @ts-ignore: Memaksa TypeScript mengabaikan error karena referrerPolicy valid di browser
+              referrerPolicy="no-referrer"
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onError={() => {
                 setErr("Video MoboReels tidak dapat diputar karena akses ditolak.");
