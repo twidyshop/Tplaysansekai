@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       // returning the general drama feed.
       target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
-        region: action === "kdrama" ? "kr" : (p.get("region") || undefined),
+        region: p.get("region") || (action === "kdrama" ? "kr" : undefined),
         sort: p.get("sort") || undefined,
         genre: p.get("genre") || undefined,
         year: p.get("year") || undefined,
