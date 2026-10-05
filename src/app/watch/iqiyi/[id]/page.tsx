@@ -166,6 +166,7 @@ export default function IqiyiWatchPage(){
         controls:true,
         responsive:true,
         fluid:true,
+        aspectRatio:'16:9',
         preload:'auto',
         playsinline:true,
         playbackRates:[0.5,0.75,1,1.25,1.5,2],
