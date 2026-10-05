@@ -65,6 +65,7 @@ async function fetchUpstream(url: string, range: string | null) {
   for (const profile of profiles) {
     try {
       const headers: Record<string, string> = {
+        ...profile,
         "User-Agent":
           "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
         Accept: "*/*",
@@ -72,7 +73,6 @@ async function fetchUpstream(url: string, range: string | null) {
         "Sec-Fetch-Dest": "video",
         "Sec-Fetch-Mode": "cors",
         Connection: "keep-alive",
-        ...profile,
       };
 
       if (range) headers.Range = range;
