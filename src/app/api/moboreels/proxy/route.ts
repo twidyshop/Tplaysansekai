@@ -79,11 +79,83 @@ async function fetchUpstream(url: string, range: string | null) {
   return last;
 }
 
-export async function GET(r: Request) {
-  const u = new URL(r.url).searchParams.get("url");
-  if (!u) return NextResponse.json({ error: "Missing url" }, { status: 400 });
+async function resolveMoboReelsVideo(requestUrl: string) {
+  const p = new URL(requestUrl).searchParams;
+  const id = p.get("id");
+  const ep = p.get("ep");
+  if (!id || !ep) return "";
+
+  const key = process.env.HOSHIYOMI_API_KEY;
+  if (!key) return "";
+
+  const base = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
+  const endpoint = new URL("/api/moboreels/episode", base);
+  endpoint.searchParams.set("id", id);
+  endpoint.searchParams.set("ep", ep);
+  endpoint.searchParams.set("lang", p.get("lang") || "id");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25000);
 
   try {
+    const response = await fetch(endpoint, {
+      headers: {
+        "X-API-Key": key,
+        Accept: "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+        Referer: "https://www.moboreels.com/",
+      },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return "";
+    const data = await response.json();
+
+    const findUrl = (v: any, depth = 0): string => {
+      if (depth > 8 || v == null) return "";
+      if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+      if (typeof v !== "object") return "";
+      for (const key of [
+        "videoUrl",
+        "video_url",
+        "playUrl",
+        "play_url",
+        "url",
+        "streamUrl",
+        "stream_url",
+      ]) {
+        const value = v[key];
+        if (typeof value === "string" && /^https?:\/\//i.test(value)) return value;
+      }
+      for (const key of Object.keys(v)) {
+        const found = findUrl(v[key], depth + 1);
+        if (found) return found;
+      }
+      return "";
+    };
+
+    return findUrl(data);
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function GET(r: Request) {
+  const requestUrl = new URL(r.url);
+  let u = requestUrl.searchParams.get("url") || "";
+
+  try {
+    if (requestUrl.searchParams.get("id") && requestUrl.searchParams.get("ep")) {
+      const fresh = await resolveMoboReelsVideo(r.url);
+      if (fresh) u = fresh;
+    }
+
+    if (!u) return NextResponse.json({ error: "Missing video URL" }, { status: 400 });
+
     const range = r.headers.get("range");
     const x = await fetchUpstream(u, range);
 
