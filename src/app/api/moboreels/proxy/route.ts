@@ -14,7 +14,7 @@ const CORS = {
   "Access-Control-Expose-Headers": "Accept-Ranges,Content-Length,Content-Range,Content-Type,ETag,Last-Modified",
 };
 
-const PROFILES = [
+const PROFILES: Array<Record<string, string>> = [
   { Referer: "https://www.moboreels.com/" },
   { Referer: "https://moboreels.com/" },
   { Referer: "https://www.cdreader.com/" },
