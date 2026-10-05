@@ -58,7 +58,17 @@ async function fetchHoshiyomiRelay(url: string, range: string | null) {
       redirect: "follow",
     });
 
-    if (response.ok || response.status === 206) return response;
+    if (response.ok || response.status === 206) {
+      const ct = response.headers.get("content-type") || "";
+      if (
+        ct.includes("video/") ||
+        ct.includes("mpegurl") ||
+        ct.includes("application/octet-stream") ||
+        /\.m3u8($|\?)/i.test(relay)
+      ) {
+        return response;
+      }
+    }
   } catch {
     // Fall through to the direct CDN attempts below.
   }
