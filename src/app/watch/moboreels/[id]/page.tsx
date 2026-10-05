@@ -228,7 +228,7 @@ export default function MoboReelsWatch() {
     if (!el) return;
 
     const node = el as HTMLVideoElement & { referrerPolicy?: string };
-    node.referrerPolicy = "no-referrer";
+    node.referrerPolicy = "strict-origin-when-cross-origin";
 
     if (!playbackUrl) {
       el.removeAttribute("src");
@@ -272,7 +272,6 @@ export default function MoboReelsWatch() {
               controls
               playsInline
               preload="auto"
-              src={playbackUrl || undefined}
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onError={() => {
                 if (!useProxyFallback && src) {
