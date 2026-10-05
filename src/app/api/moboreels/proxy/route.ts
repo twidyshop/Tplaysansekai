@@ -166,10 +166,18 @@ async function resolveMoboReelsVideo(requestUrl: string) {
     const findUrl = (v: any, depth = 0): string => {
       if (depth > 10 || v == null) return "";
 
-      const isVideoUrl = (value: string) =>
-        /^https?:\/\//i.test(value) &&
-        (/(?:\.m3u8|\.mp4)(?:[?#]|$)/i.test(value) ||
-          /(?:m3u8|playlist|stream|video|play|media|vod)/i.test(value));
+      const isVideoUrl = (value: string) => {
+        if (!/^https?:\/\//i.test(value)) return false;
+
+        // MoboReels/Hoshiyomi may return signed or opaque playback URLs
+        // that do not contain .m3u8/.mp4 or a "video" keyword.
+        // Reject obvious image/poster URLs, but accept other HTTPS URLs.
+        if (/(?:\.jpe?g|\.png|\.webp|\.gif|\.avif|\.svg)(?:[?#]|$)/i.test(value)) {
+          return false;
+        }
+
+        return true;
+      };
 
       if (typeof v === "string") {
         return isVideoUrl(v) ? v : "";
