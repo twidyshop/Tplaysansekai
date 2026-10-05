@@ -227,9 +227,30 @@ export default function MoboReelsWatch() {
       "&lang=id"
     : src;
 
+  const hlsRef = useRef<any>(null);
+
   useEffect(() => {
+    let cancelled = false;
     const el = video.current;
     if (!el) return;
+
+    const destroy = () => {
+      const hls = hlsRef.current;
+      if (hls) {
+        try {
+          hls.stopLoad();
+        } catch {}
+        try {
+          hls.detachMedia();
+        } catch {}
+        try {
+          hls.destroy();
+        } catch {}
+        hlsRef.current = null;
+      }
+    };
+
+    destroy();
 
     const node = el as HTMLVideoElement & { referrerPolicy?: string };
     node.referrerPolicy = "no-referrer";
@@ -237,13 +258,106 @@ export default function MoboReelsWatch() {
     if (!playbackUrl) {
       el.removeAttribute("src");
       el.load();
-      return;
+      return () => {
+        cancelled = true;
+        destroy();
+      };
     }
 
-    if (el.src !== new URL(playbackUrl, window.location.href).href) {
-      el.src = playbackUrl;
-      el.load();
-    }
+    const setup = async () => {
+      const isHls = /\\.m3u8(?:[?#]|$)/i.test(playbackUrl);
+
+      if (isHls) {
+        try {
+          const HlsModule = await import("hls.js");
+          const Hls = HlsModule.default;
+
+          if (cancelled) return;
+
+          if (Hls?.isSupported()) {
+            const hls = new Hls({
+              enableWorker: true,
+              lowLatencyMode: false,
+              maxBufferLength: 30,
+              maxMaxBufferLength: 60,
+              backBufferLength: 90,
+              startFragPrefetch: true,
+              manifestLoadingMaxRetry: 4,
+              levelLoadingMaxRetry: 4,
+              fragLoadingMaxRetry: 4,
+              manifestLoadingRetryDelay: 1200,
+              levelLoadingRetryDelay: 1200,
+              fragLoadingRetryDelay: 1200,
+              capLevelToPlayerSize: true,
+              startLevel: -1,
+            });
+
+            hlsRef.current = hls;
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+              if (!cancelled) {
+                el.play().catch(() => {});
+              }
+            });
+
+            hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
+              if (cancelled || !data?.fatal) return;
+
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                try {
+                  hls.startLoad();
+                } catch {}
+                return;
+              }
+
+              if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                try {
+                  hls.recoverMediaError();
+                } catch {}
+                return;
+              }
+
+              if (hlsRef.current === hls) {
+                try {
+                  hls.destroy();
+                } catch {}
+                hlsRef.current = null;
+              }
+            });
+
+            hls.loadSource(playbackUrl);
+            hls.attachMedia(el);
+            return;
+          }
+
+          if (el.canPlayType("application/vnd.apple.mpegurl")) {
+            el.src = playbackUrl;
+            el.load();
+            return;
+          }
+        } catch (error) {
+          console.warn("MoboReels HLS.js gagal dimuat:", error);
+        }
+      }
+
+      if (!cancelled) {
+        el.src = playbackUrl;
+        el.load();
+        el.play().catch(() => {});
+      }
+    };
+
+    void setup();
+
+    return () => {
+      cancelled = true;
+      destroy();
+      try {
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      } catch {}
+    };
   }, [playbackUrl]);
 
   const activeSub = useMemo(
