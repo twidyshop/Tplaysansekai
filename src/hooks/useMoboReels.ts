@@ -66,7 +66,22 @@ export function useMoboReelsForYou(page: number) {
   });
 }
 
-export function useMoboReelsDetail(id: string) {
+
+
+export function useMoboReelsEpisodes(id: string) {
+  return useQuery({
+    queryKey: ["moboreels", "episodes", id],
+    queryFn: () =>
+      fetchJson<any>(
+        "/api/moboreels?action=detail&id=" +
+          encodeURIComponent(id) +
+          "&lang=id"
+      ),
+    enabled: !!id,
+    staleTime: 600000,
+  });
+}
+\nexport function useMoboReelsDetail(id: string) {
   return useQuery({
     queryKey: ["moboreels", "detail", id],
     queryFn: () =>
