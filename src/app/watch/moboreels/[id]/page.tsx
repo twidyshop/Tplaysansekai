@@ -59,15 +59,15 @@ function stream(v: any, n = 0): string {
   const x = p(
     v,
     [
+      "videoUrl",
+      "video_url",
+      "playUrl",
+      "play_url",
+      "streamUrl",
+      "stream_url",
       "hlsUrl",
       "hls",
       "m3u8",
-      "streamUrl",
-      "stream_url",
-      "playUrl",
-      "play_url",
-      "videoUrl",
-      "video_url",
       "MainPlayUrl",
       "mainPlayUrl",
       "url",
@@ -162,7 +162,6 @@ export default function MoboReelsWatch() {
   const [err, setErr] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [showEpisodes, setShowEpisodes] = useState(false);
-  const [useProxyFallback, setUseProxyFallback] = useState(false);
   const video = useRef<HTMLVideoElement | null>(null);
 
   const detail = useMoboReelsDetail(sid);
@@ -192,7 +191,6 @@ export default function MoboReelsWatch() {
     const sub = subtitleUrl(play.data);
     if (s) {
       setSrc(s);
-      setUseProxyFallback(false);
       setErr("");
     } else if (play.isError) {
       setErr(play.error instanceof Error ? play.error.message : "Gagal memutar MoboReels");
@@ -219,146 +217,29 @@ export default function MoboReelsWatch() {
 
   const cues = useMemo(() => parseVtt(subText), [subText]);
 
-  const playbackUrl = src
-    ? "/api/moboreels/proxy?url=" + encodeURIComponent(src)
-    : useProxyFallback
-      ? "/api/moboreels/proxy?id=" +
-        encodeURIComponent(sid) +
-        "&ep=" +
-        ep +
-        "&lang=id"
-      : "";
-
-  const hlsRef = useRef<any>(null);
+  // MoboReels player: MP4 langsung dari endpoint play.
+  // /api/moboreels dan /api/moboreels/proxy sengaja tidak disentuh.
+  const playbackUrl = src && /\\.mp4(?:[?#]|$)/i.test(src) ? src : "";
 
   useEffect(() => {
-    let cancelled = false;
     const el = video.current;
     if (!el) return;
 
-    const destroy = () => {
-      const hls = hlsRef.current;
-      if (hls) {
-        try {
-          hls.stopLoad();
-        } catch {}
-        try {
-          hls.detachMedia();
-        } catch {}
-        try {
-          hls.destroy();
-        } catch {}
-        hlsRef.current = null;
-      }
-    };
-
-    destroy();
-
-    const node = el as HTMLVideoElement & { referrerPolicy?: string };
-    node.referrerPolicy = "no-referrer";
-
     if (!playbackUrl) {
+      el.pause();
       el.removeAttribute("src");
       el.load();
-      return () => {
-        cancelled = true;
-        destroy();
-      };
+      return;
     }
 
-    const setup = async () => {
-      const isHls = /\.m3u8(?:[?#]|$)/i.test(src) || /%2Em3u8(?:%3F|%23|$)/i.test(playbackUrl);
-
-      if (isHls) {
-        try {
-          const HlsModule = await import("hls.js");
-          const Hls = HlsModule.default;
-
-          if (cancelled) return;
-
-          if (Hls?.isSupported()) {
-            const hls = new Hls({
-              enableWorker: true,
-              lowLatencyMode: false,
-              maxBufferLength: 30,
-              maxMaxBufferLength: 60,
-              backBufferLength: 90,
-              startFragPrefetch: true,
-              manifestLoadingMaxRetry: 4,
-              levelLoadingMaxRetry: 4,
-              fragLoadingMaxRetry: 4,
-              manifestLoadingRetryDelay: 1200,
-              levelLoadingRetryDelay: 1200,
-              fragLoadingRetryDelay: 1200,
-              capLevelToPlayerSize: true,
-              startLevel: -1,
-            });
-
-            hlsRef.current = hls;
-
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              if (!cancelled) {
-                el.play().catch(() => {});
-              }
-            });
-
-            hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
-              if (cancelled || !data?.fatal) return;
-
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                try {
-                  hls.startLoad();
-                } catch {}
-                return;
-              }
-
-              if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                try {
-                  hls.recoverMediaError();
-                } catch {}
-                return;
-              }
-
-              if (hlsRef.current === hls) {
-                try {
-                  hls.destroy();
-                } catch {}
-                hlsRef.current = null;
-              }
-            });
-
-            hls.loadSource(playbackUrl);
-            hls.attachMedia(el);
-            return;
-          }
-
-          if (el.canPlayType("application/vnd.apple.mpegurl")) {
-            el.src = playbackUrl;
-            el.load();
-            return;
-          }
-        } catch (error) {
-          console.warn("MoboReels HLS.js gagal dimuat:", error);
-        }
-      }
-
-      if (!cancelled) {
-        el.src = playbackUrl;
-        el.load();
-        el.play().catch(() => {});
-      }
-    };
-
-    void setup();
+    el.src = playbackUrl;
+    el.load();
+    el.play().catch(() => {});
 
     return () => {
-      cancelled = true;
-      destroy();
-      try {
-        el.pause();
-        el.removeAttribute("src");
-        el.load();
-      } catch {}
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
     };
   }, [playbackUrl]);
 
@@ -394,10 +275,6 @@ export default function MoboReelsWatch() {
               preload="auto"
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onError={() => {
-                if (!useProxyFallback && src) {
-                  setUseProxyFallback(true);
-                  return;
-                }
                 setErr("Video MoboReels tidak dapat diputar.");
               }}
             />
@@ -429,7 +306,6 @@ export default function MoboReelsWatch() {
                       onClick={() => {
                         setEp(x.n);
                         setSrc("");
-                        setUseProxyFallback(false);
                         setErr("");
                         setSubUrl("");
                         setSubText("");
