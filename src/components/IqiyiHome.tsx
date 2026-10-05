@@ -192,8 +192,50 @@ export function IqiyiHome() {
   }, []);
 
   const trending = useQuery({
-    queryKey: ["iqiyi-trending-id"],
+    queryKey: ["iqiyi", "trending", "id"],
     queryFn: () => get("/api/iqiyi?action=home&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
+  const foryou = useQuery({
+    queryKey: ["iqiyi", "foryou", "id"],
+    queryFn: () => get("/api/iqiyi?action=foryou&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
+  const drama = useQuery({
+    queryKey: ["iqiyi", "drama", "1", "id"],
+    queryFn: () => get("/api/iqiyi?action=drama&page=1&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
+  const kdrama = useQuery({
+    queryKey: ["iqiyi", "kdrama", "1", "id"],
+    queryFn: () => get("/api/iqiyi?action=kdrama&page=1&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
+  const movie = useQuery({
+    queryKey: ["iqiyi", "movie", "1", "id"],
+    queryFn: () => get("/api/iqiyi?action=movie&page=1&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
+  const anime = useQuery({
+    queryKey: ["iqiyi", "anime", "1", "id"],
+    queryFn: () => get("/api/iqiyi?action=anime&page=1&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
+  const variety = useQuery({
+    queryKey: ["iqiyi", "variety", "1", "id"],
+    queryFn: () => get("/api/iqiyi?action=variety&page=1&lang=id"),
     staleTime: 600000,
     gcTime: 1800000,
   });
@@ -206,28 +248,16 @@ export function IqiyiHome() {
     } catch {}
   }, [trending.data]);
 
-  const tagParams=new URLSearchParams({lang:"id"});
-  if(region) tagParams.set("region",region);
-  if(genre) tagParams.set("genre",genre);
-  if(sort) tagParams.set("sort",sort);
+  const trendingItems = arr(trending.data).length ? arr(trending.data) : snapshot;
+  const foryouItems = arr(foryou.data);
+  const dramaItems = arr(drama.data);
+  const kdramaItems = arr(kdrama.data);
+  const movieItems = arr(movie.data);
+  const animeItems = arr(anime.data);
+  const varietyItems = arr(variety.data);
 
-
-
-  const liveTrendingItems = arr(trending.data);
-  const trendingItems = liveTrendingItems.length ? liveTrendingItems : snapshot;
-  const catalogItems = trendingItems;
-  // Keep these sections stable instead of rendering empty/error queries.
-  // If the upstream item contains type/genre/region metadata, use it;
-  // otherwise fall back to the catalog so content never flashes away.
-  const matches = (item: any, words: string[]) => {
-    const raw = JSON.stringify(item).toLowerCase();
-    return words.some((word) => raw.includes(word));
-  };
-  const kdramaItems = catalogItems.filter((x) => matches(x, ["korea", "korean", "kr", "south korea", "k-drama", "kdrama"]));
-  const movieItems = catalogItems.filter((x) => matches(x, ["movie", "film"]));
-  const varietyItems = catalogItems.filter((x) => matches(x, ["variety", "reality", "show"]));
-  const dramaItems = catalogItems.filter((x) => !kdramaItems.includes(x) && !movieItems.includes(x) && !varietyItems.includes(x));
-  const animeItems = catalogItems.filter((x) => matches(x, ["anime", "animation", "donghua"]));
+  const anyLoading = trending.isLoading || foryou.isLoading || drama.isLoading || kdrama.isLoading || movie.isLoading || anime.isLoading || variety.isLoading;
+  const anyError = [trending, foryou, drama, kdrama, movie, anime, variety].some((q) => q.isError);
   const regionTags:any[]=[];
   const genreTags:any[]=[];
   const sortTags:any[]=[];
