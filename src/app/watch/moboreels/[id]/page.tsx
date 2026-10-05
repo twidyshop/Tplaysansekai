@@ -202,7 +202,9 @@ export default function MoboReelsWatch() {
   useEffect(() => {
     if (!subUrl) return;
     let cancelled = false;
-    fetch("/api/moboreels/proxy?url=" + encodeURIComponent(subUrl))
+    fetch("/api/moboreels/proxy?url=" + encodeURIComponent(subUrl), {
+      referrerPolicy: "no-referrer" // FIX: Menghindari blokir Referer saat fetch subtitle
+    })
       .then((r) => (r.ok ? r.text() : ""))
       .then((text) => {
         if (!cancelled) setSubText(text);
@@ -217,8 +219,7 @@ export default function MoboReelsWatch() {
 
   const cues = useMemo(() => parseVtt(subText), [subText]);
 
-  // FIX: Validasi regex "\\." dihapus. Langsung menggunakan state 'src'.
-  // API sudah memvalidasi bahwa file tersebut adalah MP4.
+  // FIX: Validasi regex dihapus.
   const playbackUrl = src || "";
 
   useEffect(() => {
@@ -273,6 +274,7 @@ export default function MoboReelsWatch() {
               controls
               playsInline
               preload="auto"
+              referrerPolicy="no-referrer" // FIX: Menghindari blokir Hotlink dari CDN
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onError={() => {
                 setErr("Video MoboReels tidak dapat diputar karena akses ditolak.");
