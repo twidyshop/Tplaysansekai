@@ -324,36 +324,6 @@ export default function MoboReelsWatch() {
             </div>
           )}
 
-          <section className="mt-7">
-            <h2 className="mb-3 text-lg font-bold">Episode</h2>
-            {eps.isLoading ? (
-              <p className="text-sm text-white/45">Memuat episode...</p>
-            ) : (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-                {list.map((x) => (
-                  <button
-                    key={x.id + "-" + x.n}
-                    onClick={() => {
-                      setEp(x.n);
-                      setSrc("");
-                      setErr("");
-                      setSubUrl("");
-                      setSubText("");
-                      setCurrentTime(0);
-                    }}
-                    className={
-                      "rounded-lg border px-3 py-2 text-sm font-semibold " +
-                      (x.n === ep
-                        ? "border-amber-300 bg-amber-400 text-black"
-                        : "border-white/10 bg-white/5 text-white/75")
-                    }
-                  >
-                    {x.n}
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
         </div>
       </div>
     </main>
