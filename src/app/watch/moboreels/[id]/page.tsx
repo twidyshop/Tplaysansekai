@@ -162,6 +162,7 @@ export default function MoboReelsWatch() {
   const [err, setErr] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [showEpisodes, setShowEpisodes] = useState(false);
+  const [useProxyFallback, setUseProxyFallback] = useState(false);
   const video = useRef<HTMLVideoElement | null>(null);
 
   const detail = useMoboReelsDetail(sid);
@@ -191,6 +192,7 @@ export default function MoboReelsWatch() {
     const sub = subtitleUrl(play.data);
     if (s) {
       setSrc(s);
+      setUseProxyFallback(false);
       setErr("");
     } else if (play.isError) {
       setErr(play.error instanceof Error ? play.error.message : "Gagal memutar MoboReels");
@@ -217,14 +219,9 @@ export default function MoboReelsWatch() {
 
   const cues = useMemo(() => parseVtt(subText), [subText]);
 
-  useEffect(() => {
-    if (!video.current || !src) return;
-    const u = "/api/moboreels/proxy?url=" + encodeURIComponent(src);
-    video.current.src = u;
-    video.current.load();
-    void video.current.play().catch(() => {});
-    return () => video.current?.pause();
-  }, [src]);
+  const playbackUrl = useProxyFallback
+    ? "/api/moboreels/proxy?url=" + encodeURIComponent(src)
+    : src;
 
   const activeSub = useMemo(
     () => cues.find((cue) => currentTime >= cue.startTime && currentTime <= cue.endTime)?.text || "",
@@ -256,7 +253,16 @@ export default function MoboReelsWatch() {
               controls
               playsInline
               preload="auto"
+              src={playbackUrl || undefined}
+              referrerPolicy="no-referrer"
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              onError={() => {
+                if (!useProxyFallback && src) {
+                  setUseProxyFallback(true);
+                  return;
+                }
+                setErr("Video MoboReels tidak dapat diputar.");
+              }}
             />
             {activeSub && (
               <div className="pointer-events-none absolute inset-x-3 bottom-16 z-20 text-center">
@@ -286,6 +292,7 @@ export default function MoboReelsWatch() {
                       onClick={() => {
                         setEp(x.n);
                         setSrc("");
+                        setUseProxyFallback(false);
                         setErr("");
                         setSubUrl("");
                         setSubText("");
