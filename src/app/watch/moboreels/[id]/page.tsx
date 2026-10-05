@@ -267,7 +267,7 @@ export default function MoboReelsWatch() {
     }
 
     const setup = async () => {
-      const isHls = /\\.m3u8(?:[?#]|$)/i.test(playbackUrl);
+      const isHls = new RegExp("\\.m3u8(?:[?#]|$)", "i").test(playbackUrl);
 
       if (isHls) {
         try {
