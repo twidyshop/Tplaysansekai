@@ -219,13 +219,15 @@ export default function MoboReelsWatch() {
 
   const cues = useMemo(() => parseVtt(subText), [subText]);
 
-  const playbackUrl = useProxyFallback
-    ? "/api/moboreels/proxy?id=" +
-      encodeURIComponent(sid) +
-      "&ep=" +
-      ep +
-      "&lang=id"
-    : src;
+  const playbackUrl = src
+    ? "/api/moboreels/proxy?url=" + encodeURIComponent(src)
+    : useProxyFallback
+      ? "/api/moboreels/proxy?id=" +
+        encodeURIComponent(sid) +
+        "&ep=" +
+        ep +
+        "&lang=id"
+      : "";
 
   const hlsRef = useRef<any>(null);
 
