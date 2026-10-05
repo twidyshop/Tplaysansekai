@@ -160,7 +160,8 @@ export default function MoboReelsWatch() {
   const [subUrl, setSubUrl] = useState("");
   const [subText, setSubText] = useState("");
   const [err, setErr] = useState("");
-  const [currentTime, setCurrentTime] = useState(0);\n  const [showEpisodes, setShowEpisodes] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [showEpisodes, setShowEpisodes] = useState(false);
   const video = useRef<HTMLVideoElement | null>(null);
 
   const detail = useMoboReelsDetail(sid);
@@ -258,10 +259,50 @@ export default function MoboReelsWatch() {
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
             />
             {activeSub && (
-              <div className="pointer-events-none absolute inset-x-3 bottom-14 z-10 text-center">
-                <span className="inline-block max-w-full whitespace-pre-line rounded-md bg-black/70 px-2.5 py-1 text-base font-semibold leading-snug text-white [text-shadow:0_1px_2px_rgba(0,0,0,1),0_0_4px_rgba(0,0,0,1)] sm:text-lg">
+              <div className="pointer-events-none absolute inset-x-3 bottom-16 z-20 text-center">
+                <span className="inline-block max-w-full whitespace-pre-line rounded-md bg-black/75 px-2.5 py-1 text-base font-semibold leading-snug text-white [text-shadow:0_1px_2px_rgba(0,0,0,1),0_0_4px_rgba(0,0,0,1)] sm:text-lg">
                   {activeSub}
                 </span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowEpisodes((v) => !v)}
+              className="absolute right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/70 text-white backdrop-blur-md"
+              aria-label="Daftar episode"
+            >
+              <span className="text-xl leading-none">☰</span>
+            </button>
+
+            {showEpisodes && (
+              <div className="absolute right-3 top-14 z-30 max-h-[55%] w-44 overflow-y-auto rounded-xl border border-white/15 bg-[#111]/95 p-2 shadow-2xl backdrop-blur-xl">
+                <div className="mb-2 px-2 text-xs font-semibold text-white/55">EPISODE</div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {list.map((x) => (
+                    <button
+                      key={x.id + "-" + x.n}
+                      type="button"
+                      onClick={() => {
+                        setEp(x.n);
+                        setSrc("");
+                        setErr("");
+                        setSubUrl("");
+                        setSubText("");
+                        setCurrentTime(0);
+                        setShowEpisodes(false);
+                      }}
+                      className={
+                        "rounded-md px-2 py-1.5 text-xs font-semibold " +
+                        (x.n === ep
+                          ? "bg-amber-400 text-black"
+                          : "bg-white/10 text-white/75")
+                      }
+                    >
+                      {x.n}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
