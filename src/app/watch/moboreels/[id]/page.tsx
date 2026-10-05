@@ -223,6 +223,12 @@ export default function MoboReelsWatch() {
     ? "/api/moboreels/proxy?url=" + encodeURIComponent(src)
     : src;
 
+  useEffect(() => {
+    if (video.current) {
+      (video.current as HTMLVideoElement & { referrerPolicy?: string }).referrerPolicy = "no-referrer";
+    }
+  }, [playbackUrl]);
+
   const activeSub = useMemo(
     () => cues.find((cue) => currentTime >= cue.startTime && currentTime <= cue.endTime)?.text || "",
     [cues, currentTime]
