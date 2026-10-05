@@ -49,13 +49,24 @@ export async function GET(request: Request) {
       });
       break;
     case "drama":
-    case "kdrama":
+    case "kdrama": {
+      // K-Drama must be explicitly constrained to the Korean region.
+      // Using the drama catalog with region=kr avoids the alias endpoint
+      // returning the general drama feed.
+      target = makeUrl("/api/iqiyi/drama", {
+        page: p.get("page") || "1",
+        region: action === "kdrama" ? "kr" : (p.get("region") || undefined),
+        sort: p.get("sort") || undefined,
+        genre: p.get("genre") || undefined,
+        year: p.get("year") || undefined,
+        sub: p.get("sub") || undefined,
+        lang,
+      });
+      break;
+    }
     case "movie":
     case "variety": {
-      // Hoshiyomi documents these as channel aliases of the iQIYI catalog.
-      // Keep the provider's native route instead of translating them to /browse.
-      const endpoint = action === "drama" ? "drama" : action;
-      target = makeUrl("/api/iqiyi/" + endpoint, {
+      target = makeUrl("/api/iqiyi/" + action, {
         page: p.get("page") || "1",
         region: p.get("region") || undefined,
         sort: p.get("sort") || undefined,
