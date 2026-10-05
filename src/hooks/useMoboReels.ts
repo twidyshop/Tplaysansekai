@@ -81,7 +81,7 @@ export function useMoboReelsEpisodes(id: string) {
     staleTime: 600000,
   });
 }
-\nexport function useMoboReelsDetail(id: string) {
+export function useMoboReelsDetail(id: string) {
   return useQuery({
     queryKey: ["moboreels", "detail", id],
     queryFn: () =>
