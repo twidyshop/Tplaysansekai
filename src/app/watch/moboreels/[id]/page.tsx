@@ -224,8 +224,21 @@ export default function MoboReelsWatch() {
     : src;
 
   useEffect(() => {
-    if (video.current) {
-      (video.current as HTMLVideoElement & { referrerPolicy?: string }).referrerPolicy = "no-referrer";
+    const el = video.current;
+    if (!el) return;
+
+    const node = el as HTMLVideoElement & { referrerPolicy?: string };
+    node.referrerPolicy = "no-referrer";
+
+    if (!playbackUrl) {
+      el.removeAttribute("src");
+      el.load();
+      return;
+    }
+
+    if (el.src !== new URL(playbackUrl, window.location.href).href) {
+      el.src = playbackUrl;
+      el.load();
     }
   }, [playbackUrl]);
 
