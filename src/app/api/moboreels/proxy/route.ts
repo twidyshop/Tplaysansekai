@@ -79,6 +79,36 @@ async function fetchUpstream(url: string, range: string | null) {
   return last;
 }
 
+async function fetchViaFallbackProxy(url: string, range: string | null) {
+  const candidates = [
+    "https://corsproxy.io/?url=" + encodeURIComponent(url),
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+  ];
+
+  for (const proxyUrl of candidates) {
+    try {
+      const headers: Record<string, string> = {
+        Accept: "*/*",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+      };
+      if (range) headers.Range = range;
+
+      const response = await fetch(proxyUrl, {
+        headers,
+        cache: "no-store",
+        redirect: "follow",
+      });
+
+      if (response.ok || response.status === 206) return response;
+    } catch {
+      // Try the next fallback.
+    }
+  }
+
+  return null;
+}
+
 async function resolveMoboReelsVideo(requestUrl: string) {
   const p = new URL(requestUrl).searchParams;
   const id = p.get("id");
@@ -157,7 +187,12 @@ export async function GET(r: Request) {
     if (!u) return NextResponse.json({ error: "Missing video URL" }, { status: 400 });
 
     const range = r.headers.get("range");
-    const x = await fetchUpstream(u, range);
+    let x = await fetchUpstream(u, range);
+
+    if (!x || (!x.ok && x.status !== 206)) {
+      const fallback = await fetchViaFallbackProxy(u, range);
+      if (fallback) x = fallback;
+    }
 
     if (!x) {
       return NextResponse.json({ error: "No upstream response" }, { status: 502 });
