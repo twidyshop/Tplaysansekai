@@ -102,9 +102,10 @@ async function handle(request: NextRequest) {
   const upstream = await fetchMp4(url, request.headers.get("range"));
 
   if (!upstream.body) {
+    console.error("[Proxy Error] Empty upstream video body from MoboReels URL:", url);
     return NextResponse.json(
       { error: "Empty upstream video body" },
-      { status: 502, headers: CORS },
+      { status: 500, headers: CORS },
     );
   }
 
@@ -133,6 +134,9 @@ export async function GET(request: NextRequest) {
   try {
     return await handle(request);
   } catch (error) {
+    // Mencetak detail error ke log console server
+    console.error("[GET Proxy Error]:", error);
+    
     return NextResponse.json(
       {
         error:
@@ -140,7 +144,7 @@ export async function GET(request: NextRequest) {
             ? error.message
             : "MoboReels MP4 proxy failed",
       },
-      { status: 502, headers: CORS },
+      { status: 500, headers: CORS }, // Diubah ke 500 agar beda dengan 502 Nginx
     );
   }
 }
@@ -181,8 +185,10 @@ export async function HEAD(request: NextRequest) {
       status: upstream.status,
       headers,
     });
-  } catch {
-    return new NextResponse(null, { status: 502, headers: CORS });
+  } catch (error) {
+    // Mencetak detail error ke log console server
+    console.error("[HEAD Proxy Error]:", error);
+    return new NextResponse(null, { status: 500, headers: CORS });
   }
 }
 
