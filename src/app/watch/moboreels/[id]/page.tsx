@@ -254,7 +254,6 @@ export default function MoboReelsWatch() {
               playsInline
               preload="auto"
               src={playbackUrl || undefined}
-              referrerPolicy="no-referrer"
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onError={() => {
                 if (!useProxyFallback && src) {
