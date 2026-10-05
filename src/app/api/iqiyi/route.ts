@@ -49,13 +49,32 @@ export async function GET(request: Request) {
       });
       break;
     case "drama":
-    case "kdrama":
+    case "kdrama": {
+      // Hoshiyomi's iQIYI catalog is more reliable through the drama feed.
+      // K-Drama is the same feed constrained to South Korea instead of relying
+      // on a separate /kdrama endpoint that is not consistently exposed.
+      target = makeUrl("/api/iqiyi/drama", {
+        page: p.get("page") || "1",
+        region: action === "kdrama" ? "kr" : (p.get("region") || undefined),
+        sort: p.get("sort") || undefined,
+        genre: p.get("genre") || undefined,
+        year: p.get("year") || undefined,
+        sub: p.get("sub") || undefined,
+        lang,
+      });
+      break;
+    }
     case "movie":
     case "variety": {
-      target = makeUrl(`/api/iqiyi/${action}`, {
-        page: p.get("page") || "1", region: p.get("region") || undefined,
-        sort: p.get("sort") || undefined, genre: p.get("genre") || undefined,
-        year: p.get("year") || undefined, sub: p.get("sub") || undefined, lang,
+      // Use the generic iQIYI browse endpoint for content families that are
+      // not guaranteed to have dedicated proxy endpoints.
+      target = makeUrl("/api/iqiyi/browse", {
+        cid: p.get("cid") || "4",
+        page: p.get("page") || "1",
+        category: action,
+        caption: p.get("caption") || undefined,
+        sort: p.get("sort") || undefined,
+        lang,
       });
       break;
     }
