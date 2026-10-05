@@ -42,9 +42,8 @@ export function UnifiedMediaCard({
     fontFamily: "inherit"
   };
 
-  const imageSrc = cover.startsWith("/api/iqiyi/image")
-    ? cover
-    : optimizeCover(cover);
+  const isInternalProxy = cover.startsWith("/api/");
+  const imageSrc = isInternalProxy ? cover : optimizeCover(cover);
 
   return (
     <Link
@@ -58,7 +57,7 @@ export function UnifiedMediaCard({
           src={imageSrc}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          loading={cover.startsWith("/api/iqiyi/image") ? "eager" : "lazy"}
+          loading={isInternalProxy ? "eager" : "lazy"}
           referrerPolicy="no-referrer"
         />
 
