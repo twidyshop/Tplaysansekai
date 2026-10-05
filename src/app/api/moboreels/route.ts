@@ -41,15 +41,123 @@ function target(action: string, p: URLSearchParams) {
   return u;
 }
 
+function pick(v: any, keys: string[]) {
+  if (!v || typeof v !== "object") return "";
+  for (const key of keys) {
+    const x = v[key];
+    if (typeof x === "string" && x.trim()) return x.trim();
+    if (typeof x === "number") return String(x);
+  }
+  return "";
+}
+
+function deepPick(v: any, keys: string[], depth = 0): string {
+  if (depth > 8 || v == null) return "";
+  const direct = pick(v, keys);
+  if (direct) return direct;
+  if (typeof v !== "object") return "";
+  for (const key of Object.keys(v)) {
+    const found = deepPick(v[key], keys, depth + 1);
+    if (found) return found;
+  }
+  return "";
+}
+
+function findArray(v: any, depth = 0): any[] {
+  if (depth > 8 || v == null) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v !== "object") return [];
+
+  for (const key of [
+    "items",
+    "data",
+    "list",
+    "rows",
+    "results",
+    "records",
+    "contents",
+    "dramas",
+    "albums",
+    "books",
+  ]) {
+    const found = findArray(v[key], depth + 1);
+    if (found.length) return found;
+  }
+  return [];
+}
+
+function normalizeItems(data: any) {
+  return findArray(data).map((item: any, index: number) => ({
+    id:
+      deepPick(item, [
+        "id",
+        "dramaId",
+        "drama_id",
+        "bookId",
+        "videoId",
+        "albumId",
+        "key",
+      ]) || String(index),
+    title:
+      deepPick(item, [
+        "title",
+        "name",
+        "bookName",
+        "book_name",
+        "albumName",
+        "dramaName",
+      ]) || "Untitled",
+    cover: deepPick(item, [
+      "cover",
+      "coverUrl",
+      "cover_url",
+      "coverImage",
+      "cover_image",
+      "coverImg",
+      "verticalCover",
+      "vertical_cover",
+      "poster",
+      "posterUrl",
+      "poster_url",
+      "posterImage",
+      "poster_image",
+      "posterImg",
+      "posterImgUrl",
+      "image",
+      "imageUrl",
+      "image_url",
+      "thumbnail",
+      "thumbnailUrl",
+      "thumbnail_url",
+      "thumbUrl",
+      "thumb_url",
+      "pic",
+      "picUrl",
+      "pic_url",
+      "img",
+      "imgUrl",
+      "img_url",
+    ]),
+    episodes:
+      Number(
+        deepPick(item, [
+          "totalEpisodes",
+          "episodeCount",
+          "episode_count",
+          "serialCount",
+          "serial_count",
+          "episodes",
+        ])
+      ) || 0,
+  }));
+}
+
 export async function GET(request: Request) {
   const p = new URL(request.url).searchParams;
   const action = p.get("action") || "";
 
   if (!ACTIONS.has(action)) {
-    return NextResponse.json(
-      { error: "Invalid MoboReels action" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid MoboReels action" }, { status: 400 });
   }
 
   const key = process.env.HOSHIYOMI_API_KEY;
@@ -61,17 +169,11 @@ export async function GET(request: Request) {
   }
 
   if (["detail", "play"].includes(action) && !p.get("id")) {
-    return NextResponse.json(
-      { error: "Parameter id wajib diisi." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
   }
 
   if (action === "search" && !(p.get("q") || p.get("query"))) {
-    return NextResponse.json(
-      { error: "Parameter q wajib diisi." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Parameter q wajib diisi." }, { status: 400 });
   }
 
   const url = target(action, p);
@@ -80,15 +182,14 @@ export async function GET(request: Request) {
   const timeout = setTimeout(() => controller.abort(), ms);
 
   try {
-    console.log(
-      `[MoboReels] ${action} -> ${url.pathname}${url.search}`
-    );
+    console.log("[MoboReels]", action, "->", url.pathname + url.search);
 
     const response = await fetch(url, {
       headers: {
         "X-API-Key": key,
         Accept: "application/json",
-        "User-Agent": "TPLAY+/1.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+        Referer: "https://www.moboreels.com/",
       },
       cache: "no-store",
       signal: controller.signal,
@@ -97,11 +198,7 @@ export async function GET(request: Request) {
     const raw = await response.text();
     clearTimeout(timeout);
 
-    console.log(
-      `[MoboReels] ${action} <- ${response.status} (${raw.length} bytes)`
-    );
-
-    let data: unknown;
+    let data: any;
     try {
       data = JSON.parse(raw);
     } catch {
@@ -113,22 +210,37 @@ export async function GET(request: Request) {
 
     if (
       !response.ok ||
-      (typeof data === "object" &&
-        data !== null &&
-        (("success" in data && data.success === false) ||
-          ("error" in data && data.error)))
+      (data && typeof data === "object" &&
+        ((data.success === false) || data.error))
     ) {
-      const obj = data as Record<string, unknown>;
       return NextResponse.json(
         {
           error:
-            (typeof obj.message === "string" && obj.message) ||
-            (typeof obj.error === "string" && obj.error) ||
+            (typeof data?.message === "string" && data.message) ||
+            (typeof data?.error === "string" && data.error) ||
             "Hoshiyomi request failed",
           status: response.status,
           action,
         },
         { status: response.status }
+      );
+    }
+
+    if (["home", "trending", "foryou", "search"].includes(action)) {
+      const items = normalizeItems(data);
+      return NextResponse.json(
+        {
+          ...data,
+          items,
+          data: items,
+          _moboreels: { normalized: true, count: items.length, action },
+        },
+        {
+          status: response.status,
+          headers: {
+            "Cache-Control": "public, s-maxage=600, stale-while-revalidate=86400",
+          },
+        }
       );
     }
 
@@ -143,7 +255,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     clearTimeout(timeout);
-
     return NextResponse.json(
       {
         error:
