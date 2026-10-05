@@ -167,8 +167,8 @@ async function resolveMoboReelsVideo(requestUrl: string) {
       if (depth > 10 || v == null) return "";
 
       const isVideoUrl = (value: string) =>
-        /^https?:\\/\\//i.test(value) &&
-        (/(?:\\.m3u8|\\.mp4)(?:[?#]|$)/i.test(value) ||
+        /^https?:\/\//i.test(value) &&
+        (/(?:\.m3u8|\.mp4)(?:[?#]|$)/i.test(value) ||
           /(?:m3u8|playlist|stream|video|play|media|vod)/i.test(value));
 
       if (typeof v === "string") {
