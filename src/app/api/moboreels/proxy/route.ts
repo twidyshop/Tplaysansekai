@@ -38,44 +38,6 @@ function rewrite(text: string, base: string, proxy: string) {
     .join("\n");
 }
 
-async function fetchHoshiyomiRelay(url: string, range: string | null) {
-  const apiKey = process.env.HOSHIYOMI_API_KEY;
-  const base = (process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id").replace(/\/$/, "");
-  if (!apiKey) return null;
-
-  try {
-    const relay = base + "/api/stream?url=" + encodeURIComponent(url);
-    const headers: Record<string, string> = {
-      "X-API-Key": apiKey,
-      "User-Agent": "Mozilla/5.0",
-      Accept: "*/*",
-    };
-    if (range) headers.Range = range;
-
-    const response = await fetch(relay, {
-      headers,
-      cache: "no-store",
-      redirect: "follow",
-    });
-
-    if (response.ok || response.status === 206) {
-      const ct = response.headers.get("content-type") || "";
-      if (
-        ct.includes("video/") ||
-        ct.includes("mpegurl") ||
-        ct.includes("application/octet-stream") ||
-        /\.m3u8($|\?)/i.test(relay)
-      ) {
-        return response;
-      }
-    }
-  } catch {
-    // Fall through to the direct CDN attempts below.
-  }
-
-  return null;
-}
-
 async function fetchUpstream(url: string, range: string | null) {
   const referers = [
     "https://www.moboreels.com/",
@@ -123,10 +85,7 @@ export async function GET(r: Request) {
 
   try {
     const range = r.headers.get("range");
-    // Prefer Hoshiyomi's relay when available so protected MoboReels/CDReader
-    // URLs are authorized upstream instead of being fetched directly by Vercel.
-    const relayed = await fetchHoshiyomiRelay(u, range);
-    const x = relayed || (await fetchUpstream(u, range));
+    const x = await fetchUpstream(u, range);
 
     if (!x) {
       return NextResponse.json({ error: "No upstream response" }, { status: 502 });
