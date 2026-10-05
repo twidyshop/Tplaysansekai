@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function arr(v:any):any[] {
   if(Array.isArray(v)) return v;
@@ -48,16 +48,74 @@ function Section({title,items,loading=false}:{title:string,items:any[],loading?:
     <Cards items={items}/>
   </section>;
 }
+
+const SNAPSHOT_KEY = "tplay-wetv-trending-id-v1";
+
 export function WetvHome() {
+  const [snapshot,setSnapshot]=useState<any[]>([]);
   const [more,setMore]=useState(false),[animeMore,setAnimeMore]=useState(false);
-  const trending=useQuery({queryKey:["wetv","home",more?2:1],queryFn:async()=>{const r=await fetch("/api/wetv?action=home&lang=id&page="+(more?2:1)+"&limit=30");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV");return arr(j);},staleTime:600000,gcTime:1800000});
-  const anime=useQuery({queryKey:["wetv","anime",1],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&page=1");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},staleTime:600000,gcTime:1800000});
-  const animeMoreQ=useQuery({queryKey:["wetv","anime",2],queryFn:async()=>{const r=await fetch("/api/wetv?action=anime&lang=id&page=2");const j=await r.json();if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");return arr(j);},enabled:animeMore,staleTime:600000,gcTime:1800000});
-  const trendingItems=trending.data?.map(mapItem).slice(0,30)||[];
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      if(raw){
+        const parsed=JSON.parse(raw);
+        if(Array.isArray(parsed)) setSnapshot(parsed);
+      }
+    } catch {}
+  },[]);
+
+  const trending=useQuery({
+    queryKey:["wetv","home",more?2:1],
+    queryFn:async()=>{
+      const r=await fetch("/api/wetv?action=home&lang=id&page="+(more?2:1)+"&limit=30");
+      const j=await r.json();
+      if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV");
+      return arr(j);
+    },
+    staleTime:600000,
+    gcTime:1800000
+  });
+
+  useEffect(() => {
+    const items=arr(trending.data);
+    if(!items.length) return;
+    try {
+      localStorage.setItem(SNAPSHOT_KEY,JSON.stringify(items.slice(0,30)));
+    } catch {}
+  },[trending.data]);
+
+  const anime=useQuery({
+    queryKey:["wetv","anime",1],
+    queryFn:async()=>{
+      const r=await fetch("/api/wetv?action=anime&lang=id&page=1");
+      const j=await r.json();
+      if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");
+      return arr(j);
+    },
+    staleTime:600000,
+    gcTime:1800000
+  });
+  const animeMoreQ=useQuery({
+    queryKey:["wetv","anime",2],
+    queryFn:async()=>{
+      const r=await fetch("/api/wetv?action=anime&lang=id&page=2");
+      const j=await r.json();
+      if(!r.ok)throw new Error(j?.error||"Gagal memuat WeTV Anime");
+      return arr(j);
+    },
+    enabled:animeMore,
+    staleTime:600000,
+    gcTime:1800000
+  });
+
+  const liveTrendingItems=arr(trending.data);
+  const trendingItems=liveTrendingItems.length?liveTrendingItems:snapshot;
   const animeItems=[...(anime.data||[]),...(animeMore?(animeMoreQ.data||[]):[])].map(mapItem).slice(0,60);
+
   if(trending.error&&!trendingItems.length) return <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">Gagal memuat WeTV: {trending.error instanceof Error?trending.error.message:"Request gagal"}</div>;
   return <div className="space-y-10">
-    <Section title="Trending" items={trendingItems} loading={trending.isLoading&&!trendingItems.length}/>
+    <Section title="Trending" items={trendingItems.map(mapItem)} loading={trending.isLoading&&!trendingItems.length}/>
     <div className="flex justify-center">
       <button onClick={()=>setMore(v=>!v)} className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10">{more?"Tampilkan Trending Awal":"Lihat lebih banyak Trending"}</button>
     </div>
