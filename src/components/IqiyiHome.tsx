@@ -256,8 +256,6 @@ export function IqiyiHome() {
   const animeItems = arr(anime.data);
   const varietyItems = arr(variety.data);
 
-  const anyLoading = trending.isLoading || foryou.isLoading || drama.isLoading || kdrama.isLoading || movie.isLoading || anime.isLoading || variety.isLoading;
-  const anyError = [trending, foryou, drama, kdrama, movie, anime, variety].some((q) => q.isError);
   const regionTags:any[]=[];
   const genreTags:any[]=[];
   const sortTags:any[]=[];
@@ -285,39 +283,35 @@ export function IqiyiHome() {
       {(regionTags.length||genreTags.length||sortTags.length)>0&&<section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold text-white">Filter iQIYI</h2>{(region||genre||sort)&&<button onClick={()=>{setRegion("");setGenre("");setSort("");}} className="text-xs text-white/50 hover:text-white">Reset</button>}</div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{regionTags.length>0&&<select value={region} onChange={e=>setRegion(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Region</option>{regionTags.map(x=><option key={"r-"+x.value} value={x.value}>{x.label}</option>)}</select>}{genreTags.length>0&&<select value={genre} onChange={e=>setGenre(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Genre</option>{genreTags.map(x=><option key={"g-"+x.value} value={x.value}>{x.label}</option>)}</select>}{sortTags.length>0&&<select value={sort} onChange={e=>setSort(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Urutan Default</option>{sortTags.map(x=><option key={"s-"+x.value} value={x.value}>{x.label}</option>)}</select>}</div></section>}
 
       <Section title="Trending" data={trendingItems} loading={false} />
-      <Section
-        title="Untukmu"
-        data={[]}
-        loading={false}
-      />
+      <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
       <Section
         title="Drama"
         data={dramaItems}
-        loading={iqiyiCatalog.isLoading}
+        loading={drama.isLoading}
         hasMore={false}
       />
       <Section
         title="K-Drama"
         data={kdramaItems}
-        loading={iqiyiCatalog.isLoading}
+        loading={kdrama.isLoading}
         hasMore={false}
       />
       <Section
         title="Movie"
         data={movieItems}
-        loading={iqiyiCatalog.isLoading}
+        loading={movie.isLoading}
         hasMore={false}
       />
       <Section
         title="Anime"
         data={animeItems}
-        loading={iqiyiCatalog.isLoading}
+        loading={anime.isLoading}
         hasMore={false}
       />
       <Section
         title="Variety"
         data={varietyItems}
-        loading={iqiyiCatalog.isLoading}
+        loading={variety.isLoading}
         hasMore={false}
       />
     </div>
