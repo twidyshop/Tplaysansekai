@@ -229,10 +229,46 @@ export function IqiyiHome() {
     staleTime: 600000,
   });
 
+  const kdrama = useInfiniteQuery({
+    queryKey: ["iqiyi-kdrama-id",region,genre,sort],
+    queryFn: ({ pageParam }) => get("/api/iqiyi?action=kdrama&page="+pageParam+"&"+tagParams.toString()),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (arr(last).length ? pages.length + 1 : undefined),
+    staleTime: 600000,
+  });
+
+  const movie = useInfiniteQuery({
+    queryKey: ["iqiyi-movie-id",region,genre,sort],
+    queryFn: ({ pageParam }) => get("/api/iqiyi?action=movie&page="+pageParam+"&"+tagParams.toString()),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (arr(last).length ? pages.length + 1 : undefined),
+    staleTime: 600000,
+  });
+
+  const variety = useInfiniteQuery({
+    queryKey: ["iqiyi-variety-id",region,genre,sort],
+    queryFn: ({ pageParam }) => get("/api/iqiyi?action=variety&page="+pageParam+"&"+tagParams.toString()),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (arr(last).length ? pages.length + 1 : undefined),
+    staleTime: 600000,
+  });
+
+  const foryou = useQuery({
+    queryKey: ["iqiyi-foryou-id"],
+    queryFn: () => get("/api/iqiyi?action=foryou&lang=id"),
+    staleTime: 600000,
+    gcTime: 1800000,
+    retry: 0,
+  });
+
   const liveTrendingItems = arr(trending.data);
   const trendingItems = liveTrendingItems.length ? liveTrendingItems : snapshot;
   const dramaItems = drama.data?.pages.flatMap(arr) ?? [];
   const animeItems = anime.data?.pages.flatMap(arr) ?? [];
+  const kdramaItems = kdrama.data?.pages.flatMap(arr) ?? [];
+  const movieItems = movie.data?.pages.flatMap(arr) ?? [];
+  const varietyItems = variety.data?.pages.flatMap(arr) ?? [];
+  const foryouItems = arr(foryou.data);
   const regionTags=getIqiyiTagOptions(tags.data,"region");
   const genreTags=getIqiyiTagOptions(tags.data,"genre");
   const sortTags=getIqiyiTagOptions(tags.data,"sort");
@@ -268,11 +304,44 @@ export function IqiyiHome() {
         hasMore={!!drama.hasNextPage}
       />
       <Section
+        title="Untukmu"
+        data={foryouItems}
+        loading={foryou.isLoading}
+      />
+      <Section
+        title="Drama"
+        data={dramaItems}
+        loading={drama.isLoading || drama.isFetchingNextPage}
+        onMore={() => drama.fetchNextPage()}
+        hasMore={!!drama.hasNextPage}
+      />
+      <Section
+        title="K-Drama"
+        data={kdramaItems}
+        loading={kdrama.isLoading || kdrama.isFetchingNextPage}
+        onMore={() => kdrama.fetchNextPage()}
+        hasMore={!!kdrama.hasNextPage}
+      />
+      <Section
+        title="Movie"
+        data={movieItems}
+        loading={movie.isLoading || movie.isFetchingNextPage}
+        onMore={() => movie.fetchNextPage()}
+        hasMore={!!movie.hasNextPage}
+      />
+      <Section
         title="Anime"
         data={animeItems}
-        loading={anime.isFetchingNextPage}
+        loading={anime.isLoading || anime.isFetchingNextPage}
         onMore={() => anime.fetchNextPage()}
         hasMore={!!anime.hasNextPage}
+      />
+      <Section
+        title="Variety"
+        data={varietyItems}
+        loading={variety.isLoading || variety.isFetchingNextPage}
+        onMore={() => variety.fetchNextPage()}
+        hasMore={!!variety.hasNextPage}
       />
     </div>
   );
