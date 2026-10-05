@@ -277,8 +277,11 @@ export async function GET(r: Request) {
     }
 
     const headers = new Headers();
+    const upstreamType = x.headers.get("content-type") || "";
+    const isMp4 = /\\.mp4(?:[?#]|$)/i.test(u);
+    headers.set("Content-Type", isMp4 ? "video/mp4" : upstreamType || "application/octet-stream");
+
     for (const k of [
-      "content-type",
       "content-length",
       "content-range",
       "accept-ranges",
