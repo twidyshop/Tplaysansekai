@@ -39,41 +39,61 @@ function rewrite(text: string, base: string, proxy: string) {
 }
 
 async function fetchUpstream(url: string, range: string | null) {
-  const referers = [
-    "https://www.moboreels.com/",
-    "https://moboreels.com/",
-    "https://www.cdreader.com/",
-    "https://cdreader.com/",
-    "https://www.tplay.my.id/",
-    "",
+  // MoboReels/CDN links are often hotlink-protected. Try the same URL
+  // with several browser-like header profiles before giving up.
+  const profiles = [
+    {
+      Referer: "https://www.moboreels.com/",
+      Origin: "https://www.moboreels.com",
+      "Sec-Fetch-Site": "cross-site",
+    },
+    {
+      Referer: "https://moboreels.com/",
+      Origin: "https://moboreels.com",
+      "Sec-Fetch-Site": "cross-site",
+    },
+    {
+      Referer: "https://www.cdreader.com/",
+      Origin: "https://www.cdreader.com",
+      "Sec-Fetch-Site": "cross-site",
+    },
+    {},
   ];
 
   let last: Response | null = null;
 
-  for (const referer of referers) {
-    const headers: Record<string, string> = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
-      Accept: "*/*",
-      Referer: referer,
-      "Sec-Fetch-Dest": "video",
-      "Sec-Fetch-Mode": "cors",
-      "Sec-Fetch-Site": "cross-site",
-    };
-    if (referer) {
-      headers.Referer = referer;
-      headers.Origin = new URL(referer).origin;
+  for (const profile of profiles) {
+    try {
+      const headers: Record<string, string> = {
+        "User-Agent":
+          "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+        Accept: "*/*",
+        "Accept-Encoding": "identity",
+        "Sec-Fetch-Dest": "video",
+        "Sec-Fetch-Mode": "cors",
+        Connection: "keep-alive",
+        ...profile,
+      };
+
+      if (range) headers.Range = range;
+
+      const response = await fetch(url, {
+        headers,
+        cache: "no-store",
+        redirect: "follow",
+      });
+
+      last = response;
+
+      // A successful response, including partial content for byte-range
+      // requests, is immediately usable.
+      if (response.ok || response.status === 206) return response;
+
+      // Do not waste time retrying a permanent 404.
+      if (response.status === 404) break;
+    } catch {
+      // Try the next header profile.
     }
-    if (range) headers.Range = range;
-
-    const response = await fetch(url, {
-      headers,
-      cache: "no-store",
-      redirect: "follow",
-    });
-
-    last = response;
-    if (response.ok || response.status === 206) return response;
   }
 
   return last;
