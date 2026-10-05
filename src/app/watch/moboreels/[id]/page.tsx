@@ -12,21 +12,7 @@ import {
 function arr(v: any): any[] {
   if (Array.isArray(v)) return v;
   if (!v || typeof v !== "object") return [];
-  for (const k of [
-    "data",
-    "episodes",
-    "episodeList",
-    "episode_list",
-    "episodeData",
-    "episode_data",
-    "list",
-    "rows",
-    "results",
-    "items",
-    "chapters",
-    "videos",
-    "result",
-  ]) {
+  for (const k of ["data", "episodes", "episodeList", "episode_list", "episodeData", "episode_data", "list", "rows", "results", "items", "chapters", "videos", "result"]) {
     const n = arr(v[k]);
     if (n.length) return n;
   }
@@ -56,24 +42,7 @@ function d(v: any, keys: string[], f = "", n = 0): string {
 
 function stream(v: any, n = 0): string {
   if (n > 12 || v == null) return "";
-  const x = p(
-    v,
-    [
-      "videoUrl",
-      "video_url",
-      "playUrl",
-      "play_url",
-      "streamUrl",
-      "stream_url",
-      "hlsUrl",
-      "hls",
-      "m3u8",
-      "MainPlayUrl",
-      "mainPlayUrl",
-      "url",
-    ],
-    ""
-  );
+  const x = p(v, ["videoUrl", "video_url", "playUrl", "play_url", "streamUrl", "stream_url", "hlsUrl", "hls", "m3u8", "MainPlayUrl", "mainPlayUrl", "url"], "");
   if (/^https?:\/\//i.test(x) || x.includes(".m3u8")) return x;
   if (typeof v !== "object") return "";
   for (const q of Object.keys(v)) {
@@ -91,23 +60,7 @@ function subtitleUrl(v: any, n = 0): string {
     return "";
   }
   if (typeof v !== "object") return "";
-  for (const key of [
-    "subtitle",
-    "subtitles",
-    "subtitleUrl",
-    "subtitle_url",
-    "subUrl",
-    "sub_url",
-    "caption",
-    "captionUrl",
-    "caption_url",
-    "vtt",
-    "vttUrl",
-    "vtt_url",
-    "webvtt",
-    "webvttUrl",
-    "url",
-  ]) {
+  for (const key of ["subtitle", "subtitles", "subtitleUrl", "subtitle_url", "subUrl", "sub_url", "caption", "captionUrl", "caption_url", "vtt", "vttUrl", "vtt_url", "webvtt", "webvttUrl", "url"]) {
     const found = subtitleUrl(v[key], n + 1);
     if (found) return found;
   }
@@ -202,9 +155,7 @@ export default function MoboReelsWatch() {
   useEffect(() => {
     if (!subUrl) return;
     let cancelled = false;
-    fetch("/api/moboreels/proxy?url=" + encodeURIComponent(subUrl), {
-      referrerPolicy: "no-referrer"
-    })
+    fetch("/api/moboreels/proxy?url=" + encodeURIComponent(subUrl))
       .then((r) => (r.ok ? r.text() : ""))
       .then((text) => {
         if (!cancelled) setSubText(text);
@@ -219,7 +170,9 @@ export default function MoboReelsWatch() {
 
   const cues = useMemo(() => parseVtt(subText), [subText]);
 
-  const playbackUrl = src || "";
+  // FIX UTAMA FRONTEND: Arahkan kembali src ke proxy buatan kita (Edge Runtime)
+  // Agar proses download MP4 diwakilkan oleh server yang punya akses untuk memalsukan Referer
+  const playbackUrl = src ? `/api/moboreels/proxy?url=${encodeURIComponent(src)}` : "";
 
   useEffect(() => {
     const el = video.current;
@@ -273,11 +226,9 @@ export default function MoboReelsWatch() {
               controls
               playsInline
               preload="auto"
-              // @ts-ignore: Memaksa TypeScript mengabaikan error karena referrerPolicy valid di browser
-              referrerPolicy="no-referrer"
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onError={() => {
-                setErr("Video MoboReels tidak dapat diputar karena akses ditolak.");
+                setErr("Video MoboReels gagal dimuat lewat Proxy server.");
               }}
             />
             {activeSub && (
@@ -345,7 +296,6 @@ export default function MoboReelsWatch() {
               {err}
             </div>
           )}
-
         </div>
       </div>
     </main>
