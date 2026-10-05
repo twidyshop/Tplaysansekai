@@ -205,11 +205,49 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
+  const categories = useQuery({
+    queryKey: ["iqiyi", "categories", "id"],
+    queryFn: () => get("/api/iqiyi?action=categories&lang=id"),
+    staleTime: 3600000,
+    gcTime: 7200000,
+  });
+
+  const koreanRegion =
+    getIqiyiTagOptions(categories.data, "region").find((x) => {
+      const label = x.label.toLowerCase();
+      return (
+        label.includes("korea") ||
+        label.includes("korean") ||
+        label.includes("korea selatan") ||
+        label.includes("south korea") ||
+        label.includes("한국")
+      );
+    })?.value || "kr";
+
   const nextPage = (lastPage: any, pages: any[]) => {
-    const meta = lastPage?.pagination || lastPage?.meta || lastPage?.data?.pagination || lastPage?.data?.meta;
-    if (meta?.hasNextPage === false || meta?.has_next === false || meta?.hasMore === false || meta?.has_more === false) return undefined;
-    const totalPages = Number(meta?.totalPages ?? meta?.total_pages ?? meta?.pages ?? 0);
+    const meta =
+      lastPage?.pagination ||
+      lastPage?.meta ||
+      lastPage?.data?.pagination ||
+      lastPage?.data?.meta;
+
+    if (
+      meta?.hasNextPage === false ||
+      meta?.has_next === false ||
+      meta?.hasMore === false ||
+      meta?.has_more === false
+    ) {
+      return undefined;
+    }
+
+    const totalPages = Number(
+      meta?.totalPages ?? meta?.total_pages ?? meta?.pages ?? 0
+    );
     if (totalPages > 0 && pages.length >= totalPages) return undefined;
+
+    // Hoshiyomi/iQIYI responses do not always expose pagination metadata.
+    // If the current page contains items, keep the "Lihat lebih banyak"
+    // control available and request the next page explicitly.
     if (!arr(lastPage).length) return undefined;
     return pages.length + 1;
   };
@@ -224,8 +262,9 @@ export function IqiyiHome() {
   });
 
   const kdrama = useInfiniteQuery({
-    queryKey: ["iqiyi", "kdrama", "id"],
-    queryFn: ({ pageParam }) => get(`/api/iqiyi?action=kdrama&page=${pageParam}&lang=id`),
+    queryKey: ["iqiyi", "kdrama", "id", koreanRegion],
+    queryFn: ({ pageParam }) =>
+      get(`/api/iqiyi?action=kdrama&page=${pageParam}&region=${encodeURIComponent(koreanRegion)}&lang=id`),
     initialPageParam: 1,
     getNextPageParam: nextPage,
     staleTime: 600000,
@@ -306,32 +345,37 @@ export function IqiyiHome() {
       <Section
         title="Drama"
         data={dramaItems}
-        loading={drama.isLoading}
-        hasMore={false}
+        loading={drama.isLoading || drama.isFetchingNextPage}
+        onMore={() => drama.fetchNextPage()}
+        hasMore={!!drama.hasNextPage}
       />
       <Section
         title="K-Drama"
         data={kdramaItems}
-        loading={kdrama.isLoading}
-        hasMore={false}
+        loading={kdrama.isLoading || kdrama.isFetchingNextPage}
+        onMore={() => kdrama.fetchNextPage()}
+        hasMore={!!kdrama.hasNextPage}
       />
       <Section
         title="Movie"
         data={movieItems}
-        loading={movie.isLoading}
-        hasMore={false}
+        loading={movie.isLoading || movie.isFetchingNextPage}
+        onMore={() => movie.fetchNextPage()}
+        hasMore={!!movie.hasNextPage}
       />
       <Section
         title="Anime"
         data={animeItems}
-        loading={anime.isLoading}
-        hasMore={false}
+        loading={anime.isLoading || anime.isFetchingNextPage}
+        onMore={() => anime.fetchNextPage()}
+        hasMore={!!anime.hasNextPage}
       />
       <Section
         title="Variety"
         data={varietyItems}
-        loading={variety.isLoading}
-        hasMore={false}
+        loading={variety.isLoading || variety.isFetchingNextPage}
+        onMore={() => variety.fetchNextPage()}
+        hasMore={!!variety.hasNextPage}
       />
     </div>
   );
