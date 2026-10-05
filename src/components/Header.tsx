@@ -53,7 +53,7 @@ export function Header() {
      * History MeloShort akan dibuat/diperbarui oleh:
      * /watch/meloshort/[bookId]/page.tsx
      */
-    if (platform.toLowerCase() === "meloshort") {
+    if (["meloshort", "iqiyi"].includes(platform.toLowerCase())) {
       return;
     }
 
