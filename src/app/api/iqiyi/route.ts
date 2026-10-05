@@ -4,7 +4,7 @@ export const runtime = "edge";
 export const revalidate = 600;
 
 const BASE = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
-const ACTIONS = new Set(["home", "search", "detail", "episodes", "play", "categories", "tags", "drama", "anime"]);
+const ACTIONS = new Set(["home", "foryou", "languages", "search", "detail", "episodes", "play", "categories", "tags", "browse", "drama", "kdrama", "movie", "variety", "anime"]);
 
 function makeUrl(path: string, params: Record<string, string | undefined>) {
   const u = new URL(path, BASE);
@@ -37,15 +37,28 @@ export async function GET(request: Request) {
 
   switch (action) {
     case "home": target = makeUrl("/api/iqiyi/trending", { lang }); break;
+    case "foryou": target = makeUrl("/api/iqiyi/foryou", { lang }); break;
+    case "languages": target = makeUrl("/api/iqiyi/languages", {}); break;
     case "categories": target = makeUrl("/api/iqiyi/categories", { lang }); break;
     case "tags": target = makeUrl("/api/iqiyi/tags", { cid: p.get("cid") || undefined, lang }); break;
+    case "browse":
+      target = makeUrl("/api/iqiyi/browse", {
+        cid: p.get("cid") || "4", page: p.get("page") || "1",
+        category: p.get("category") || undefined, caption: p.get("caption") || undefined,
+        sort: p.get("sort") || undefined, lang,
+      });
+      break;
     case "drama":
-      target = makeUrl("/api/iqiyi/drama", {
+    case "kdrama":
+    case "movie":
+    case "variety": {
+      target = makeUrl(`/api/iqiyi/${action}`, {
         page: p.get("page") || "1", region: p.get("region") || undefined,
         sort: p.get("sort") || undefined, genre: p.get("genre") || undefined,
         year: p.get("year") || undefined, sub: p.get("sub") || undefined, lang,
       });
       break;
+    }
     case "anime":
       target = makeUrl("/api/iqiyi/anime", {
         page: p.get("page") || "1", region: p.get("region") || undefined,
