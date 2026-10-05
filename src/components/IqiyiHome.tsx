@@ -205,25 +205,6 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
-  const categories = useQuery({
-    queryKey: ["iqiyi", "categories", "id"],
-    queryFn: () => get("/api/iqiyi?action=categories&lang=id"),
-    staleTime: 3600000,
-    gcTime: 7200000,
-  });
-
-  const koreanRegion =
-    getIqiyiTagOptions(categories.data, "region").find((x) => {
-      const label = x.label.toLowerCase();
-      return (
-        label.includes("korea") ||
-        label.includes("korean") ||
-        label.includes("korea selatan") ||
-        label.includes("south korea") ||
-        label.includes("한국")
-      );
-    })?.value || "kr";
-
   const nextPage = (lastPage: any, pages: any[]) => {
     const meta =
       lastPage?.pagination ||
@@ -262,9 +243,9 @@ export function IqiyiHome() {
   });
 
   const kdrama = useInfiniteQuery({
-    queryKey: ["iqiyi", "kdrama", "id", koreanRegion],
+    queryKey: ["iqiyi", "kdrama", "id"],
     queryFn: ({ pageParam }) =>
-      get(`/api/iqiyi?action=kdrama&page=${pageParam}&region=${encodeURIComponent(koreanRegion)}&lang=id`),
+      get(`/api/iqiyi?action=kdrama&page=${pageParam}&lang=id`),
     initialPageParam: 1,
     getNextPageParam: nextPage,
     staleTime: 600000,
