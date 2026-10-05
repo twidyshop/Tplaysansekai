@@ -4,6 +4,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useParams,useRouter} from "next/navigation";
 import {useIqiyiDetail,useIqiyiEpisodes,useIqiyiPlay} from "@/hooks/useIqiyi";
+import {useWatchHistoryStore} from "@/hooks/useWatchHistory";
 
 function arr(v:any):any[]{
   if(Array.isArray(v)) return v;
@@ -45,6 +46,7 @@ export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
   const video=useRef<HTMLVideoElement|null>(null),player=useRef<any>(null);
   const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false);
+  const addHistory=useWatchHistoryStore((state)=>state.addItem);
   const detailQuery=useIqiyiDetail(dramaId,albumId);
   const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
   const playQuery=useIqiyiPlay(dramaId,selected,albumId);
@@ -79,6 +81,24 @@ export default function IqiyiWatchPage(){
   const loading=episodesQuery.isLoading;
   const episodeError=episodesQuery.isError ? (episodesQuery.error instanceof Error?episodesQuery.error.message:"Episode belum berhasil dimuat.") : "";
   const playLoading=playQuery.isLoading||playQuery.isFetching;
+  useEffect(()=>{
+    if(!dramaId || !title || title === "iQIYI" || !episodes.length) return;
+
+    const detailSource=detailQuery.data?.data?.detail??detailQuery.data?.data?.drama??detailQuery.data?.data?.album??detailQuery.data?.data??detailQuery.data;
+    const image=deepText(detailSource,["cover","coverUrl","cover_url","poster","posterUrl","poster_url","image","imageUrl","image_url","thumbnail","thumbnailUrl","albumCover","album_cover"],"");
+
+    addHistory({
+      id:dramaId,
+      title,
+      image,
+      platform:"Iqiyi",
+      timestamp:Date.now(),
+      url:window.location.pathname+window.location.search+window.location.hash,
+      episode:selected,
+      totalEpisodes:episodes.length,
+    });
+  },[dramaId,title,selected,episodes.length,detailQuery.data,addHistory]);
+
 
   const play=useCallback((n:number)=>{
     setSelected(n);setSource("");setError("");setPlaying(false);
