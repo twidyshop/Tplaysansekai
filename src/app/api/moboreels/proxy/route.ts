@@ -45,6 +45,7 @@ async function fetchUpstream(url: string, range: string | null) {
     "https://www.cdreader.com/",
     "https://cdreader.com/",
     "https://www.tplay.my.id/",
+    "",
   ];
 
   let last: Response | null = null;
@@ -55,11 +56,14 @@ async function fetchUpstream(url: string, range: string | null) {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
       Accept: "*/*",
       Referer: referer,
-      Origin: new URL(referer).origin,
       "Sec-Fetch-Dest": "video",
       "Sec-Fetch-Mode": "cors",
       "Sec-Fetch-Site": "cross-site",
     };
+    if (referer) {
+      headers.Referer = referer;
+      headers.Origin = new URL(referer).origin;
+    }
     if (range) headers.Range = range;
 
     const response = await fetch(url, {
