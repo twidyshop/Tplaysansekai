@@ -232,7 +232,7 @@ export default function MoboReelsWatch() {
     if (!el) return;
 
     const node = el as HTMLVideoElement & { referrerPolicy?: string };
-    node.referrerPolicy = "strict-origin-when-cross-origin";
+    node.referrerPolicy = "no-referrer";
 
     if (!playbackUrl) {
       el.removeAttribute("src");
