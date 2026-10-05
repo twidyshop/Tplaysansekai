@@ -297,13 +297,6 @@ export function IqiyiHome() {
 
       <Section title="Trending" data={trendingItems} loading={false} />
       <Section
-        title="Drama"
-        data={dramaItems}
-        loading={drama.isFetchingNextPage}
-        onMore={() => drama.fetchNextPage()}
-        hasMore={!!drama.hasNextPage}
-      />
-      <Section
         title="Untukmu"
         data={foryouItems}
         loading={foryou.isLoading}
