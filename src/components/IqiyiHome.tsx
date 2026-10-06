@@ -348,8 +348,8 @@ export function IqiyiHome() {
         action: "drama",
         page: "1",
         lang: "id",
-        ...(region ? { region } : {}),
-        ...(genre ? { genre } : {}),
+        ...(region ? (region === "korea" ? { region: "korea" } : { area: region }) : {}),
+        ...(genre ? { type: genre } : {}),
         ...(sort ? { sort } : {}),
       });
       return get("/api/iqiyi?" + qs.toString());
@@ -379,30 +379,26 @@ export function IqiyiHome() {
   const genreTags = getIqiyiTagOptions(tags.data, "genre");
   const sortTags = getIqiyiTagOptions(tags.data, "sort");
 
-  // Keep the dropdown usable even when /tags is empty or wrapped differently.
-  // If /tags returns real options, those API values always take priority.
-  const visibleRegionTags = regionTags.length ? regionTags : [
+  // These are the exact IDs returned by iQIYI /tags.
+  // Korea is the verified region slug; Japan/China use the API's area IDs.
+  const visibleRegionTags = [
     { value: "korea", label: "Korea Selatan" },
-    { value: "china", label: "China Daratan" },
-    { value: "japan", label: "Jepang" },
-    { value: "thailand", label: "Thailand" },
-    { value: "taiwan", label: "Taiwan" },
-    { value: "malaysia", label: "Malaysia" },
-    { value: "indonesia", label: "Indonesia" },
-    { value: "america", label: "Amerika" },
-    { value: "uk", label: "Inggris" },
+    ...(regionTags.length ? regionTags : [
+      { value: "3170660783876333", label: "Jepang" },
+      { value: "7128547076428233", label: "China Daratan" },
+    ]),
   ];
   const visibleGenreTags = genreTags.length ? genreTags : [
-    { value: "adventure", label: "Petualangan" },
-    { value: "comedy", label: "Komedi" },
-    { value: "science-fiction", label: "Fiksi Ilmiah" },
-    { value: "romance", label: "Percintaan" },
-    { value: "passion", label: "Bergairah" },
-    { value: "fantasy", label: "Fantasi" },
-    { value: "inspirational", label: "Inspirasional" },
-    { value: "comic-adaptation", label: "Adaptasi Komik" },
-    { value: "campus", label: "Kampus" },
-    { value: "youth", label: "Remaja Laki-laki" },
+    { value: "8205855809889433", label: "Petualangan" },
+    { value: "1425950065128833", label: "Komedi" },
+    { value: "2131856011104833", label: "Fiksi Ilmiah" },
+    { value: "3158628296160833", label: "Percintaan" },
+    { value: "6840569537103833", label: "Bergairah" },
+    { value: "3006216785097933", label: "Fantasi" },
+    { value: "2321167151162133", label: "Inspirasional" },
+    { value: "5001203248327733", label: "Adaptasi Komik" },
+    { value: "5482502756947733", label: "Kampus" },
+    { value: "4376316052969433", label: "Remaja Laki-laki" },
   ];
   const visibleSortTags = sortTags.length ? sortTags : [
     { value: "11", label: "Popularitas" },
