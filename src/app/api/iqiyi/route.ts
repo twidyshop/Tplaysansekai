@@ -42,11 +42,23 @@ export async function GET(request: Request) {
     case "categories": target = makeUrl("/api/iqiyi/categories", { lang }); break;
     case "tags": target = makeUrl("/api/iqiyi/tags", { cid: p.get("cid") || undefined, lang }); break;
     case "browse":
-      target = makeUrl("/api/iqiyi/browse", {
-        cid: p.get("cid") || "4", page: p.get("page") || "1",
-        category: p.get("category") || undefined, caption: p.get("caption") || undefined,
-        sort: p.get("sort") || undefined, lang,
-      });
+      // Korea is a verified special region slug on the drama endpoint.
+      // Other filter IDs from /tags belong to /browse.
+      if (p.get("region") === "korea") {
+        target = makeUrl("/api/iqiyi/drama", {
+          page: p.get("page") || "1",
+          region: "korea",
+          sort: p.get("sort") || undefined,
+          lang,
+        });
+      } else {
+        target = makeUrl("/api/iqiyi/browse", {
+          cid: p.get("cid") || "4", page: p.get("page") || "1",
+          category: p.get("category") || undefined,
+          caption: p.get("caption") || undefined,
+          sort: p.get("sort") || undefined, lang,
+        });
+      }
       break;
     case "drama":
       target = makeUrl("/api/iqiyi/drama", {
