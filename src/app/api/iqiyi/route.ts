@@ -42,23 +42,19 @@ export async function GET(request: Request) {
     case "categories": target = makeUrl("/api/iqiyi/categories", { lang }); break;
     case "tags": target = makeUrl("/api/iqiyi/tags", { cid: p.get("cid") || undefined, lang }); break;
     case "browse":
-      // Korea is a verified special region slug on the drama endpoint.
-      // Other filter IDs from /tags belong to /browse.
-      if (p.get("region") === "korea") {
-        target = makeUrl("/api/iqiyi/drama", {
-          page: p.get("page") || "1",
-          region: "korea",
-          sort: p.get("sort") || undefined,
-          lang,
-        });
-      } else {
-        target = makeUrl("/api/iqiyi/browse", {
-          cid: p.get("cid") || "4", page: p.get("page") || "1",
-          category: p.get("category") || undefined,
-          caption: p.get("caption") || undefined,
-          sort: p.get("sort") || undefined, lang,
-        });
-      }
+      // The /tags reference maps directly to /drama:
+      // area = region ID, type = genre ID, sort = 11/4.
+      // Korea remains the special region slug.
+      target = makeUrl("/api/iqiyi/drama", {
+        page: p.get("page") || "1",
+        region: p.get("region") || undefined,
+        area: p.get("area") || undefined,
+        type: p.get("type") || undefined,
+        sort: p.get("sort") || undefined,
+        year: p.get("year") || undefined,
+        sub: p.get("sub") || undefined,
+        lang,
+      });
       break;
     case "drama":
       target = makeUrl("/api/iqiyi/drama", {
