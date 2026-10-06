@@ -42,11 +42,13 @@ export async function GET(request: Request) {
     case "categories": target = makeUrl("/api/iqiyi/categories", { lang }); break;
     case "tags": target = makeUrl("/api/iqiyi/tags", { cid: p.get("cid") || undefined, lang }); break;
     case "browse":
-      // Hoshiyomi documents the /tags IDs specifically for /browse.
-      // Keep the browse endpoint intact instead of routing it through
-      // /drama, because /drama does not apply all browse filter tags.
-      target = makeUrl("/api/iqiyi/browse", {
+      // The /tags response is a filter-definition endpoint. Its IDs are
+      // consumed by the iQIYI catalog/drama request; do not call /browse.
+      // cid=4 is the iQIYI drama catalog used by the filter page.
+      target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
+        cid: p.get("cid") || "4",
+        region: p.get("region") || undefined,
         area: p.get("area") || undefined,
         type: p.get("type") || undefined,
         sort: p.get("sort") || undefined,
