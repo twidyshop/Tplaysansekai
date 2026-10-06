@@ -339,18 +339,18 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
-  // Hoshiyomi /tags documents these IDs for the /browse endpoint.
-  // Use /browse for the tag filters instead of /drama.
+  // Hoshiyomi /tags IDs map directly to /drama filters:
+  // area = region, type = genre, sort = ordering.
+  // Keep every selected filter independent so combinations also work.
   const browse = useQuery({
     queryKey: ["iqiyi", "filter", "id", region, genre, sort],
     queryFn: () => {
-      const category = genre || (region && region !== "korea" ? region : "");
       const qs = new URLSearchParams({
         action: "browse",
-        cid: "4",
         page: "1",
         lang: "id",
-        ...(category ? { category } : {}),
+        ...(region && region !== "korea" ? { area: region } : {}),
+        ...(genre ? { type: genre } : {}),
         ...(sort ? { sort } : {}),
         ...(region === "korea" ? { region: "korea" } : {}),
       });
