@@ -193,7 +193,7 @@ export function IqiyiHome() {
 
   const tags = useQuery({
     queryKey: ["iqiyi", "tags", "id", "4"],
-    queryFn: () => get("/api/iqiyi?action=tags&cid=4&lang=id"),
+    queryFn: () => get("/api/iqiyi?action=tags&lang=id"),
     staleTime: 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
   });
