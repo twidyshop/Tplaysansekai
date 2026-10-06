@@ -52,8 +52,9 @@ export async function GET(request: Request) {
       target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
         region: p.get("region") || undefined,
+        area: p.get("area") || undefined,
+        type: p.get("type") || undefined,
         sort: p.get("sort") || undefined,
-        genre: p.get("genre") || undefined,
         year: p.get("year") || undefined,
         sub: p.get("sub") || undefined,
         lang,
