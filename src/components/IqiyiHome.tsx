@@ -379,11 +379,35 @@ export function IqiyiHome() {
   const genreTags = getIqiyiTagOptions(tags.data, "genre");
   const sortTags = getIqiyiTagOptions(tags.data, "sort");
 
-  // Do not guess filter values. The dropdowns must use the exact IDs
-  // supplied by Hoshiyomi /tags so every selection maps to a real filter.
-  const visibleRegionTags = regionTags;
-  const visibleGenreTags = genreTags;
-  const visibleSortTags = sortTags;
+  // Keep the dropdown usable even when /tags is empty or wrapped differently.
+  // If /tags returns real options, those API values always take priority.
+  const visibleRegionTags = regionTags.length ? regionTags : [
+    { value: "korea", label: "Korea Selatan" },
+    { value: "china", label: "China Daratan" },
+    { value: "japan", label: "Jepang" },
+    { value: "thailand", label: "Thailand" },
+    { value: "taiwan", label: "Taiwan" },
+    { value: "malaysia", label: "Malaysia" },
+    { value: "indonesia", label: "Indonesia" },
+    { value: "america", label: "Amerika" },
+    { value: "uk", label: "Inggris" },
+  ];
+  const visibleGenreTags = genreTags.length ? genreTags : [
+    { value: "adventure", label: "Petualangan" },
+    { value: "comedy", label: "Komedi" },
+    { value: "science-fiction", label: "Fiksi Ilmiah" },
+    { value: "romance", label: "Percintaan" },
+    { value: "passion", label: "Bergairah" },
+    { value: "fantasy", label: "Fantasi" },
+    { value: "inspirational", label: "Inspirasional" },
+    { value: "comic-adaptation", label: "Adaptasi Komik" },
+    { value: "campus", label: "Kampus" },
+    { value: "youth", label: "Remaja Laki-laki" },
+  ];
+  const visibleSortTags = sortTags.length ? sortTags : [
+    { value: "11", label: "Popularitas" },
+    { value: "4", label: "Terbaru" },
+  ];
 
   const browseItems = arr(browse.data);
 
