@@ -333,6 +333,34 @@ export function IqiyiHome() {
   const regionTags = getIqiyiTagOptions(tags.data, "region");
   const genreTags = getIqiyiTagOptions(tags.data, "genre");
   const sortTags = getIqiyiTagOptions(tags.data, "sort");
+
+  // Keep the filter controls visible even when Hoshiyomi's /tags response
+  // is unavailable or returns a different shape. API-provided options still
+  // take priority; these are safe browse values used as a UI fallback.
+  const visibleRegionTags = regionTags.length ? regionTags : [
+    { value: "china", label: "China Daratan" },
+    { value: "korea", label: "Korea Selatan" },
+    { value: "thailand", label: "Thailand" },
+    { value: "taiwan", label: "Taiwan" },
+    { value: "japan", label: "Jepang" },
+    { value: "malaysia", label: "Malaysia" },
+    { value: "indonesia", label: "Indonesia" },
+    { value: "america", label: "Amerika" },
+    { value: "uk", label: "Inggris" },
+  ];
+  const visibleGenreTags = genreTags.length ? genreTags : [
+    { value: "adventure", label: "Petualangan" },
+    { value: "comedy", label: "Komedi" },
+    { value: "science-fiction", label: "Fiksi Ilmiah" },
+    { value: "romance", label: "Percintaan" },
+    { value: "fantasy", label: "Fantasi" },
+    { value: "campus", label: "Kampus" },
+    { value: "youth", label: "Remaja Laki-laki" },
+  ];
+  const visibleSortTags = sortTags.length ? sortTags : [
+    { value: "11", label: "Popularitas" },
+    { value: "4", label: "Terbaru" },
+  ];
   const browseItems = arr(browse.data);
 
   if (!trendingItems.length && trending.isLoading) {
@@ -355,7 +383,30 @@ export function IqiyiHome() {
 
   return (
     <div className="space-y-10">
-      {(regionTags.length||genreTags.length||sortTags.length)>0&&<section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold text-white">Filter iQIYI</h2>{(region||genre||sort)&&<button onClick={()=>{setRegion("");setGenre("");setSort("");}} className="text-xs text-white/50 hover:text-white">Reset</button>}</div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{regionTags.length>0&&<select value={region} onChange={e=>setRegion(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Region</option>{regionTags.map(x=><option key={"r-"+x.value} value={x.value}>{x.label}</option>)}</select>}{genreTags.length>0&&<select value={genre} onChange={e=>setGenre(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Genre</option>{genreTags.map(x=><option key={"g-"+x.value} value={x.value}>{x.label}</option>)}</select>}{sortTags.length>0&&<select value={sort} onChange={e=>setSort(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Urutan Default</option>{sortTags.map(x=><option key={"s-"+x.value} value={x.value}>{x.label}</option>)}</select>}</div></section>}
+      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-white">Filter iQIYI</h2>
+          {(region || genre || sort) && (
+            <button onClick={() => { setRegion(""); setGenre(""); setSort(""); }} className="text-xs text-white/50 hover:text-white">
+              Reset
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <select value={region} onChange={e => setRegion(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white">
+            <option value="">Semua Region</option>
+            {visibleRegionTags.map(x => <option key={"r-" + x.value} value={x.value}>{x.label}</option>)}
+          </select>
+          <select value={genre} onChange={e => setGenre(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white">
+            <option value="">Semua Genre</option>
+            {visibleGenreTags.map(x => <option key={"g-" + x.value} value={x.value}>{x.label}</option>)}
+          </select>
+          <select value={sort} onChange={e => setSort(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white">
+            <option value="">Urutan Default</option>
+            {visibleSortTags.map(x => <option key={"s-" + x.value} value={x.value}>{x.label}</option>)}
+          </select>
+        </div>
+      </section>
 
       {(region || genre || sort) && (
         <Section
