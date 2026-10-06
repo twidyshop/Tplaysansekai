@@ -37,25 +37,34 @@ function pick(v: any, keys: string[], fallback = "") {
 }
 
 function getIqiyiTagOptions(value: any, kind: "region" | "genre" | "sort"): { value: string; label: string }[] {
-  const data = value?.data ?? value ?? {};
+  const root = value?.data ?? value ?? {};
+  const groups: any[] = [];
+  const walk = (x: any, depth = 0) => {
+    if (!x || depth > 8) return;
+    if (Array.isArray(x)) {
+      for (const y of x) walk(y, depth + 1);
+      return;
+    }
+    if (typeof x !== "object") return;
+    const type = String(x.type ?? x.key ?? x.code ?? "").toLowerCase();
+    if (type) groups.push(x);
+    for (const y of Object.values(x)) walk(y, depth + 1);
+  };
+  walk(root);
 
-  if (kind === "sort") {
-    const sort = Array.isArray(data?.sort) ? data.sort : [];
-    return sort
-      .filter((item: any) => item?.id != null && item?.name)
-      .map((item: any) => ({ value: String(item.id), label: String(item.name) }));
-  }
-
-  const filterType = kind === "region" ? "area" : "type";
-  const group = Array.isArray(data?.filter)
-    ? data.filter.find((item: any) => item?.type === filterType)
-    : null;
-
-  return Array.isArray(group?.child)
-    ? group.child
-        .filter((item: any) => item?.id != null && item?.name)
-        .map((item: any) => ({ value: String(item.id), label: String(item.name) }))
+  const wanted = kind === "sort" ? "sort" : kind === "region" ? "area" : "type";
+  const group = groups.find(x => String(x.type ?? x.key ?? x.code ?? "").toLowerCase() === wanted);
+  const source = Array.isArray(group?.child) ? group.child
+    : Array.isArray(group?.children) ? group.children
+    : Array.isArray(group?.items) ? group.items
+    : Array.isArray(group?.list) ? group.list
+    : Array.isArray(root?.[wanted]) ? root[wanted]
     : [];
+
+  return source.map((item: any) => ({
+    value: pick(item, ["id", "tagId", "tag_id", "value", "code", "key"], ""),
+    label: pick(item, ["name", "title", "label", "text", "valueName"], ""),
+  })).filter((item: any) => item.value && item.label);
 }
 
 function mapItem(x: any, i: number) {
