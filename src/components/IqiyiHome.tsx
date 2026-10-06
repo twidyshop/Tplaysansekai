@@ -339,18 +339,20 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
-  // Filter applies immediately when a dropdown changes. Use the verified
-  // iQIYI drama endpoint because it accepts region/genre/sort directly.
+  // Hoshiyomi /tags documents these IDs for the /browse endpoint.
+  // Use /browse for the tag filters instead of /drama.
   const browse = useQuery({
     queryKey: ["iqiyi", "filter", "id", region, genre, sort],
     queryFn: () => {
+      const category = genre || (region && region !== "korea" ? region : "");
       const qs = new URLSearchParams({
-        action: "drama",
+        action: "browse",
+        cid: "4",
         page: "1",
         lang: "id",
-        ...(region ? (region === "korea" ? { region: "korea" } : { area: region }) : {}),
-        ...(genre ? { type: genre } : {}),
+        ...(category ? { category } : {}),
         ...(sort ? { sort } : {}),
+        ...(region === "korea" ? { region: "korea" } : {}),
       });
       return get("/api/iqiyi?" + qs.toString());
     },
@@ -379,14 +381,10 @@ export function IqiyiHome() {
   const genreTags = getIqiyiTagOptions(tags.data, "genre");
   const sortTags = getIqiyiTagOptions(tags.data, "sort");
 
-  // These are the exact IDs returned by iQIYI /tags.
-  // Korea is the verified region slug; Japan/China use the API's area IDs.
+  // Japan is intentionally omitted. Keep only the useful region filters.
   const visibleRegionTags = [
     { value: "korea", label: "Korea Selatan" },
-    ...(regionTags.length ? regionTags : [
-      { value: "3170660783876333", label: "Jepang" },
-      { value: "7128547076428233", label: "China Daratan" },
-    ]),
+    { value: "7128547076428233", label: "China Daratan" },
   ];
   const visibleGenreTags = genreTags.length ? genreTags : [
     { value: "8205855809889433", label: "Petualangan" },
