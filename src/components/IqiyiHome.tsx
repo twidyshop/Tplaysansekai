@@ -181,6 +181,13 @@ export function IqiyiHome() {
   const [region,setRegion]=useState("");
   const [genre,setGenre]=useState("");
   const [sort,setSort]=useState("");
+
+  const tags = useQuery({
+    queryKey: ["iqiyi", "tags", "id", "4"],
+    queryFn: () => get("/api/iqiyi?action=tags&cid=4&lang=id"),
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+  });
   useEffect(() => {
     try {
       const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -279,6 +286,25 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
+  const browse = useQuery({
+    queryKey: ["iqiyi", "browse", "id", region, genre, sort],
+    queryFn: () => {
+      const qs = new URLSearchParams({
+        action: "browse",
+        cid: "4",
+        page: "1",
+        lang: "id",
+        ...(region ? { caption: region } : {}),
+        ...(genre ? { category: genre } : {}),
+        ...(sort ? { sort } : {}),
+      });
+      return get("/api/iqiyi?" + qs.toString());
+    },
+    enabled: !!(region || genre || sort),
+    staleTime: 600000,
+    gcTime: 1800000,
+  });
+
   useEffect(() => {
     const items = arr(trending.data);
     if (!items.length) return;
@@ -295,9 +321,10 @@ export function IqiyiHome() {
   const animeItems = anime.data?.pages.flatMap((page: any) => arr(page)) || [];
   const varietyItems = variety.data?.pages.flatMap((page: any) => arr(page)) || [];
 
-  const regionTags:any[]=[];
-  const genreTags:any[]=[];
-  const sortTags:any[]=[];
+  const regionTags = getIqiyiTagOptions(tags.data, "region");
+  const genreTags = getIqiyiTagOptions(tags.data, "genre");
+  const sortTags = getIqiyiTagOptions(tags.data, "sort");
+  const browseItems = arr(browse.data);
 
   if (!trendingItems.length && trending.isLoading) {
     return (
@@ -320,6 +347,14 @@ export function IqiyiHome() {
   return (
     <div className="space-y-10">
       {(regionTags.length||genreTags.length||sortTags.length)>0&&<section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold text-white">Filter iQIYI</h2>{(region||genre||sort)&&<button onClick={()=>{setRegion("");setGenre("");setSort("");}} className="text-xs text-white/50 hover:text-white">Reset</button>}</div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{regionTags.length>0&&<select value={region} onChange={e=>setRegion(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Region</option>{regionTags.map(x=><option key={"r-"+x.value} value={x.value}>{x.label}</option>)}</select>}{genreTags.length>0&&<select value={genre} onChange={e=>setGenre(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Semua Genre</option>{genreTags.map(x=><option key={"g-"+x.value} value={x.value}>{x.label}</option>)}</select>}{sortTags.length>0&&<select value={sort} onChange={e=>setSort(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white"><option value="">Urutan Default</option>{sortTags.map(x=><option key={"s-"+x.value} value={x.value}>{x.label}</option>)}</select>}</div></section>}
+
+      {(region || genre || sort) && (
+        <Section
+          title="Hasil Filter"
+          data={browseItems}
+          loading={browse.isLoading}
+        />
+      )}
 
       <Section title="Trending" data={trendingItems} loading={false} />
       <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
