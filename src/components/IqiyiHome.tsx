@@ -38,33 +38,77 @@ function pick(v: any, keys: string[], fallback = "") {
 
 function getIqiyiTagOptions(value: any, kind: "region" | "genre" | "sort"): { value: string; label: string }[] {
   const root = value?.data ?? value ?? {};
+  const wanted = kind === "sort" ? "sort" : kind === "region" ? "area" : "type";
   const groups: any[] = [];
+
+  // Hoshiyomi /tags has appeared in several wrapper shapes. Always use
+  // the actual option IDs returned by the API; never invent slugs.
   const walk = (x: any, depth = 0) => {
-    if (!x || depth > 8) return;
+    if (!x || depth > 12) return;
     if (Array.isArray(x)) {
-      for (const y of x) walk(y, depth + 1);
+      x.forEach(y => walk(y, depth + 1));
       return;
     }
     if (typeof x !== "object") return;
-    const type = String(x.type ?? x.key ?? x.code ?? "").toLowerCase();
-    if (type) groups.push(x);
+
+    const type = String(
+      x.type ?? x.filterType ?? x.tagType ?? x.tag_type ?? x.category ??
+      x.key ?? x.code ?? ""
+    ).toLowerCase().trim();
+
+    if (
+      type === wanted ||
+      (type === "region" && wanted === "area") ||
+      (type === "genre" && wanted === "type")
+    ) {
+      groups.push(x);
+    }
+
     for (const y of Object.values(x)) walk(y, depth + 1);
   };
   walk(root);
 
-  const wanted = kind === "sort" ? "sort" : kind === "region" ? "area" : "type";
-  const group = groups.find(x => String(x.type ?? x.key ?? x.code ?? "").toLowerCase() === wanted);
-  const source = Array.isArray(group?.child) ? group.child
-    : Array.isArray(group?.children) ? group.children
-    : Array.isArray(group?.items) ? group.items
-    : Array.isArray(group?.list) ? group.list
-    : Array.isArray(root?.[wanted]) ? root[wanted]
-    : [];
+  const candidates: any[] = [];
+  const addArray = (v: any) => {
+    if (Array.isArray(v)) candidates.push(...v);
+  };
 
-  return source.map((item: any) => ({
+  for (const group of groups) {
+    for (const key of ["child", "children", "items", "list", "options", "values", "tags", "filters", "data"]) {
+      addArray(group?.[key]);
+    }
+  }
+
+  addArray(root?.[wanted]);
+  addArray(root?.[kind]);
+  if (kind === "region") {
+    addArray(root?.region);
+    addArray(root?.regions);
+    addArray(root?.area);
+    addArray(root?.areas);
+  }
+  if (kind === "genre") {
+    addArray(root?.genre);
+    addArray(root?.genres);
+    addArray(root?.type);
+    addArray(root?.types);
+  }
+  if (kind === "sort") {
+    addArray(root?.sort);
+    addArray(root?.sorts);
+    addArray(root?.order);
+    addArray(root?.orders);
+  }
+
+  const seen = new Set<string>();
+  return candidates.map((item: any) => ({
     value: pick(item, ["id", "tagId", "tag_id", "value", "code", "key"], ""),
-    label: pick(item, ["name", "title", "label", "text", "valueName"], ""),
-  })).filter((item: any) => item.value && item.label);
+    label: pick(item, ["name", "title", "label", "text", "valueName", "displayName"], ""),
+  })).filter((item: any) => {
+    if (!item.value || !item.label || seen.has(item.value)) return false;
+    seen.add(item.value);
+    return true;
+  });
 }
 
 function mapItem(x: any, i: number) {
@@ -335,33 +379,12 @@ export function IqiyiHome() {
   const genreTags = getIqiyiTagOptions(tags.data, "genre");
   const sortTags = getIqiyiTagOptions(tags.data, "sort");
 
-  // Keep the filter controls visible even when Hoshiyomi's /tags response
-  // is unavailable or returns a different shape. API-provided options still
-  // take priority; these are safe browse values used as a UI fallback.
-  const visibleRegionTags = regionTags.length ? regionTags : [
-    { value: "china", label: "China Daratan" },
-    { value: "korea", label: "Korea Selatan" },
-    { value: "thailand", label: "Thailand" },
-    { value: "taiwan", label: "Taiwan" },
-    { value: "japan", label: "Jepang" },
-    { value: "malaysia", label: "Malaysia" },
-    { value: "indonesia", label: "Indonesia" },
-    { value: "america", label: "Amerika" },
-    { value: "uk", label: "Inggris" },
-  ];
-  const visibleGenreTags = genreTags.length ? genreTags : [
-    { value: "adventure", label: "Petualangan" },
-    { value: "comedy", label: "Komedi" },
-    { value: "science-fiction", label: "Fiksi Ilmiah" },
-    { value: "romance", label: "Percintaan" },
-    { value: "fantasy", label: "Fantasi" },
-    { value: "campus", label: "Kampus" },
-    { value: "youth", label: "Remaja Laki-laki" },
-  ];
-  const visibleSortTags = sortTags.length ? sortTags : [
-    { value: "11", label: "Popularitas" },
-    { value: "4", label: "Terbaru" },
-  ];
+  // Do not guess filter values. The dropdowns must use the exact IDs
+  // supplied by Hoshiyomi /tags so every selection maps to a real filter.
+  const visibleRegionTags = regionTags;
+  const visibleGenreTags = genreTags;
+  const visibleSortTags = sortTags;
+
   const browseItems = arr(browse.data);
 
   if (!trendingItems.length && trending.isLoading) {
