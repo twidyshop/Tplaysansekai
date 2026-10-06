@@ -377,16 +377,14 @@ export function IqiyiHome() {
   const animeItems = anime.data?.pages.flatMap((page: any) => arr(page)) || [];
   const varietyItems = variety.data?.pages.flatMap((page: any) => arr(page)) || [];
 
-  const regionTags = getIqiyiTagOptions(tags.data, "region");
-  const genreTags = getIqiyiTagOptions(tags.data, "genre");
-  const sortTags = getIqiyiTagOptions(tags.data, "sort");
-
-  // Japan is intentionally omitted. Keep only the useful region filters.
+  // Use the exact IDs from Hoshiyomi /tags. Do not parse the
+  // response dynamically because its wrapper shape is not stable.
+  // Japan is intentionally omitted.
   const visibleRegionTags = [
     { value: "korea", label: "Korea Selatan" },
     { value: "7128547076428233", label: "China Daratan" },
   ];
-  const visibleGenreTags = genreTags.length ? genreTags : [
+  const visibleGenreTags = [
     { value: "8205855809889433", label: "Petualangan" },
     { value: "1425950065128833", label: "Komedi" },
     { value: "2131856011104833", label: "Fiksi Ilmiah" },
@@ -398,7 +396,7 @@ export function IqiyiHome() {
     { value: "5482502756947733", label: "Kampus" },
     { value: "4376316052969433", label: "Remaja Laki-laki" },
   ];
-  const visibleSortTags = sortTags.length ? sortTags : [
+  const visibleSortTags = [
     { value: "11", label: "Popularitas" },
     { value: "4", label: "Terbaru" },
   ];
