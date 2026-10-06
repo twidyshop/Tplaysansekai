@@ -295,16 +295,17 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
+  // Filter applies immediately when a dropdown changes. Use the verified
+  // iQIYI drama endpoint because it accepts region/genre/sort directly.
   const browse = useQuery({
-    queryKey: ["iqiyi", "browse", "id", region, genre, sort],
+    queryKey: ["iqiyi", "filter", "id", region, genre, sort],
     queryFn: () => {
       const qs = new URLSearchParams({
-        action: "browse",
-        cid: "4",
+        action: "drama",
         page: "1",
         lang: "id",
-        ...(region ? { caption: region } : {}),
-        ...(genre ? { category: genre } : {}),
+        ...(region ? { region } : {}),
+        ...(genre ? { genre } : {}),
         ...(sort ? { sort } : {}),
       });
       return get("/api/iqiyi?" + qs.toString());
@@ -408,51 +409,53 @@ export function IqiyiHome() {
         </div>
       </section>
 
-      {(region || genre || sort) && (
+      {(region || genre || sort) ? (
         <Section
           title="Hasil Filter"
           data={browseItems}
-          loading={browse.isLoading}
+          loading={browse.isLoading || browse.isFetching}
         />
+      ) : (
+        <>
+          <Section title="Trending" data={trendingItems} loading={false} />
+          <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
+          <Section
+            title="Drama"
+            data={dramaItems}
+            loading={drama.isLoading || drama.isFetchingNextPage}
+            onMore={() => drama.fetchNextPage()}
+            hasMore={!!drama.hasNextPage}
+          />
+          <Section
+            title="K-Drama"
+            data={kdramaItems}
+            loading={kdrama.isLoading || kdrama.isFetchingNextPage}
+            onMore={() => kdrama.fetchNextPage()}
+            hasMore={!!kdrama.hasNextPage}
+          />
+          <Section
+            title="Movie"
+            data={movieItems}
+            loading={movie.isLoading || movie.isFetchingNextPage}
+            onMore={() => movie.fetchNextPage()}
+            hasMore={!!movie.hasNextPage}
+          />
+          <Section
+            title="Anime"
+            data={animeItems}
+            loading={anime.isLoading || anime.isFetchingNextPage}
+            onMore={() => anime.fetchNextPage()}
+            hasMore={!!anime.hasNextPage}
+          />
+          <Section
+            title="Variety"
+            data={varietyItems}
+            loading={variety.isLoading || variety.isFetchingNextPage}
+            onMore={() => variety.fetchNextPage()}
+            hasMore={!!variety.hasNextPage}
+          />
+        </>
       )}
-
-      <Section title="Trending" data={trendingItems} loading={false} />
-      <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
-      <Section
-        title="Drama"
-        data={dramaItems}
-        loading={drama.isLoading || drama.isFetchingNextPage}
-        onMore={() => drama.fetchNextPage()}
-        hasMore={!!drama.hasNextPage}
-      />
-      <Section
-        title="K-Drama"
-        data={kdramaItems}
-        loading={kdrama.isLoading || kdrama.isFetchingNextPage}
-        onMore={() => kdrama.fetchNextPage()}
-        hasMore={!!kdrama.hasNextPage}
-      />
-      <Section
-        title="Movie"
-        data={movieItems}
-        loading={movie.isLoading || movie.isFetchingNextPage}
-        onMore={() => movie.fetchNextPage()}
-        hasMore={!!movie.hasNextPage}
-      />
-      <Section
-        title="Anime"
-        data={animeItems}
-        loading={anime.isLoading || anime.isFetchingNextPage}
-        onMore={() => anime.fetchNextPage()}
-        hasMore={!!anime.hasNextPage}
-      />
-      <Section
-        title="Variety"
-        data={varietyItems}
-        loading={variety.isLoading || variety.isFetchingNextPage}
-        onMore={() => variety.fetchNextPage()}
-        hasMore={!!variety.hasNextPage}
-      />
     </div>
   );
 }
