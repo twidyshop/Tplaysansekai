@@ -42,12 +42,11 @@ export async function GET(request: Request) {
     case "categories": target = makeUrl("/api/iqiyi/categories", { lang }); break;
     case "tags": target = makeUrl("/api/iqiyi/tags", { cid: p.get("cid") || undefined, lang }); break;
     case "browse":
-      // The /tags reference maps directly to /drama:
-      // area = region ID, type = genre ID, sort = 11/4.
-      // Korea remains the special region slug.
-      target = makeUrl("/api/iqiyi/drama", {
+      // Hoshiyomi documents the /tags IDs specifically for /browse.
+      // Keep the browse endpoint intact instead of routing it through
+      // /drama, because /drama does not apply all browse filter tags.
+      target = makeUrl("/api/iqiyi/browse", {
         page: p.get("page") || "1",
-        region: p.get("region") || undefined,
         area: p.get("area") || undefined,
         type: p.get("type") || undefined,
         sort: p.get("sort") || undefined,
