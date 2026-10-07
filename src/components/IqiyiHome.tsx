@@ -36,81 +36,6 @@ function pick(v: any, keys: string[], fallback = "") {
   return fallback;
 }
 
-function getIqiyiTagOptions(value: any, kind: "region" | "genre" | "sort"): { value: string; label: string }[] {
-  const root = value?.data ?? value ?? {};
-  const wanted = kind === "sort" ? "sort" : kind === "region" ? "area" : "type";
-  const groups: any[] = [];
-
-  // Hoshiyomi /tags has appeared in several wrapper shapes. Always use
-  // the actual option IDs returned by the API; never invent slugs.
-  const walk = (x: any, depth = 0) => {
-    if (!x || depth > 12) return;
-    if (Array.isArray(x)) {
-      x.forEach(y => walk(y, depth + 1));
-      return;
-    }
-    if (typeof x !== "object") return;
-
-    const type = String(
-      x.type ?? x.filterType ?? x.tagType ?? x.tag_type ?? x.category ??
-      x.key ?? x.code ?? ""
-    ).toLowerCase().trim();
-
-    if (
-      type === wanted ||
-      (type === "region" && wanted === "area") ||
-      (type === "genre" && wanted === "type")
-    ) {
-      groups.push(x);
-    }
-
-    for (const y of Object.values(x)) walk(y, depth + 1);
-  };
-  walk(root);
-
-  const candidates: any[] = [];
-  const addArray = (v: any) => {
-    if (Array.isArray(v)) candidates.push(...v);
-  };
-
-  for (const group of groups) {
-    for (const key of ["child", "children", "items", "list", "options", "values", "tags", "filters", "data"]) {
-      addArray(group?.[key]);
-    }
-  }
-
-  addArray(root?.[wanted]);
-  addArray(root?.[kind]);
-  if (kind === "region") {
-    addArray(root?.region);
-    addArray(root?.regions);
-    addArray(root?.area);
-    addArray(root?.areas);
-  }
-  if (kind === "genre") {
-    addArray(root?.genre);
-    addArray(root?.genres);
-    addArray(root?.type);
-    addArray(root?.types);
-  }
-  if (kind === "sort") {
-    addArray(root?.sort);
-    addArray(root?.sorts);
-    addArray(root?.order);
-    addArray(root?.orders);
-  }
-
-  const seen = new Set<string>();
-  return candidates.map((item: any) => ({
-    value: pick(item, ["id", "tagId", "tag_id", "value", "code", "key"], ""),
-    label: pick(item, ["name", "title", "label", "text", "valueName", "displayName"], ""),
-  })).filter((item: any) => {
-    if (!item.value || !item.label || seen.has(item.value)) return false;
-    seen.add(item.value);
-    return true;
-  });
-}
-
 function mapItem(x: any, i: number) {
   const id = pick(x, ["id", "bookId", "dramaId", "videoId", "albumId"], String(i));
   const albumId = pick(x, ["albumId", "album_id", "albumID"], "");
@@ -231,16 +156,6 @@ const SNAPSHOT_KEY = "tplay-iqiyi-trending-id-v2";
 
 export function IqiyiHome() {
   const [snapshot, setSnapshot] = useState<any[]>([]);
-  const [region,setRegion]=useState("");
-  const [genre,setGenre]=useState("");
-  const [sort,setSort]=useState("");
-
-  const tags = useQuery({
-    queryKey: ["iqiyi", "tags", "id", "4"],
-    queryFn: () => get("/api/iqiyi?action=tags&lang=id"),
-    staleTime: 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-  });
   useEffect(() => {
     try {
       const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -339,68 +254,6 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
-  // IDs supplied by Hoshiyomi /tags are sent to the iQIYI /drama catalog request.
-  // /tags defines the available filters; /drama returns the filtered catalog.
-  const browse = useQuery({
-    queryKey: ["iqiyi", "filter", "id", region, genre, sort],
-    queryFn: () => {
-      const qs = new URLSearchParams({
-        action: "drama",
-        page: "1",
-        lang: "id",
-        ...(region && region !== "korea" ? { area: region } : {}),
-        ...(genre ? { type: genre } : {}),
-        ...(sort ? { sort } : {}),
-        ...(region === "korea" ? { region: "korea" } : {}),
-      });
-      return get("/api/iqiyi?" + qs.toString());
-    },
-    enabled: !!(region || genre || sort),
-    staleTime: 600000,
-    gcTime: 1800000,
-  });
-
-  useEffect(() => {
-    const items = arr(trending.data);
-    if (!items.length) return;
-    try {
-      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(items.slice(0, 24)));
-    } catch {}
-  }, [trending.data]);
-
-  const trendingItems = arr(trending.data).length ? arr(trending.data) : snapshot;
-  const foryouItems = arr(foryou.data);
-  const dramaItems = drama.data?.pages.flatMap((page: any) => arr(page)) || [];
-  const kdramaItems = kdrama.data?.pages.flatMap((page: any) => arr(page)) || [];
-  const movieItems = movie.data?.pages.flatMap((page: any) => arr(page)) || [];
-  const animeItems = anime.data?.pages.flatMap((page: any) => arr(page)) || [];
-  const varietyItems = variety.data?.pages.flatMap((page: any) => arr(page)) || [];
-
-  // Use the exact IDs from Hoshiyomi /tags. Do not parse the
-  // response dynamically because its wrapper shape is not stable.
-  // Japan is intentionally omitted.
-  const visibleRegionTags = [
-    { value: "korea", label: "Korea Selatan" },
-    { value: "7128547076428233", label: "China Daratan" },
-  ];
-  const visibleGenreTags = [
-    { value: "8205855809889433", label: "Petualangan" },
-    { value: "1425950065128833", label: "Komedi" },
-    { value: "2131856011104833", label: "Fiksi Ilmiah" },
-    { value: "3158628296160833", label: "Percintaan" },
-    { value: "6840569537103833", label: "Bergairah" },
-    { value: "3006216785097933", label: "Fantasi" },
-    { value: "2321167151162133", label: "Inspirasional" },
-    { value: "5001203248327733", label: "Adaptasi Komik" },
-    { value: "5482502756947733", label: "Kampus" },
-    { value: "4376316052969433", label: "Remaja Laki-laki" },
-  ];
-  const visibleSortTags = [
-    { value: "11", label: "Popularitas" },
-    { value: "4", label: "Terbaru" },
-  ];
-
-  const browseItems = arr(browse.data);
 
   if (!trendingItems.length && trending.isLoading) {
     return (
@@ -422,40 +275,14 @@ export function IqiyiHome() {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-white">Filter iQIYI</h2>
-          {(region || genre || sort) && (
-            <button onClick={() => { setRegion(""); setGenre(""); setSort(""); }} className="text-xs text-white/50 hover:text-white">
-              Reset
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <select value={region} onChange={e => setRegion(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white">
-            <option value="">Semua Region</option>
-            {visibleRegionTags.map(x => <option key={"r-" + x.value} value={x.value}>{x.label}</option>)}
-          </select>
-          <select value={genre} onChange={e => setGenre(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white">
-            <option value="">Semua Genre</option>
-            {visibleGenreTags.map(x => <option key={"g-" + x.value} value={x.value}>{x.label}</option>)}
-          </select>
-          <select value={sort} onChange={e => setSort(e.target.value)} className="rounded-xl border border-white/10 bg-[#111735] px-3 py-2.5 text-sm text-white">
-            <option value="">Urutan Default</option>
-            {visibleSortTags.map(x => <option key={"s-" + x.value} value={x.value}>{x.label}</option>)}
-          </select>
-        </div>
-      </section>
+      <>
 
-      {(region || genre || sort) ? (
         <Section
           title="Hasil Filter"
           data={browseItems}
           loading={browse.isLoading || browse.isFetching}
         />
-      ) : (
-        <>
-          <Section title="Trending" data={trendingItems} loading={false} />
+                <Section title="Trending" data={trendingItems} loading={false} />
           <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
           <Section
             title="Drama"
@@ -492,8 +319,6 @@ export function IqiyiHome() {
             onMore={() => variety.fetchNextPage()}
             hasMore={!!variety.hasNextPage}
           />
-        </>
-      )}
-    </div>
+      </div>
   );
 }
