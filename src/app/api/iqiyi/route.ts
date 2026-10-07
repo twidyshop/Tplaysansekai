@@ -4,7 +4,7 @@ export const runtime = "edge";
 export const revalidate = 600;
 
 const BASE = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
-const ACTIONS = new Set(["home", "foryou", "languages", "search", "detail", "episodes", "play", "categories", "tags", "browse", "drama", "kdrama", "movie", "variety", "anime"]);
+const ACTIONS = new Set(["home", "foryou", "languages", "search", "detail", "episodes", "play", "categories", "tags", "drama", "kdrama", "movie", "variety", "anime"]);
 
 function makeUrl(path: string, params: Record<string, string | undefined>) {
   const u = new URL(path, BASE);
@@ -41,22 +41,6 @@ export async function GET(request: Request) {
     case "languages": target = makeUrl("/api/iqiyi/languages", {}); break;
     case "categories": target = makeUrl("/api/iqiyi/categories", { lang }); break;
     case "tags": target = makeUrl("/api/iqiyi/tags", { cid: p.get("cid") || undefined, lang }); break;
-    case "browse":
-      // The /tags response is a filter-definition endpoint. Its IDs are
-      // consumed by the iQIYI catalog/drama request; do not call /browse.
-      // cid=4 is the iQIYI drama catalog used by the filter page.
-      target = makeUrl("/api/iqiyi/drama", {
-        page: p.get("page") || "1",
-        cid: p.get("cid") || "4",
-        region: p.get("region") || undefined,
-        area: p.get("area") || undefined,
-        type: p.get("type") || undefined,
-        sort: p.get("sort") || undefined,
-        year: p.get("year") || undefined,
-        sub: p.get("sub") || undefined,
-        lang,
-      });
-      break;
     case "drama":
       target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
