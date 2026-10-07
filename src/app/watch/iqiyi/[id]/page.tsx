@@ -45,8 +45,65 @@ function findStream(v:any):string{
 export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
   const video=useRef<HTMLVideoElement|null>(null),player=useRef<any>(null);
-  const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false);
+  const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false),[castReady,setCastReady]=useState(false),[castSource,setCastSource]=useState("");
   const addHistory=useWatchHistoryStore((state)=>state.addItem);
+  useEffect(()=>{
+    let cancelled=false;
+    const w=window as any;
+    if(w.cast?.framework&&w.chrome?.cast) {
+      w.cast.framework.CastContext.getInstance().setOptions({
+        receiverApplicationId:w.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+        autoJoinPolicy:w.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+      });
+      setCastReady(true);
+      return;
+    }
+
+    const previous=w.__onGCastApiAvailable;
+    w.__onGCastApiAvailable=(isAvailable:boolean)=>{
+      if(typeof previous==='function') previous(isAvailable);
+      if(cancelled||!isAvailable||!w.cast?.framework||!w.chrome?.cast) return;
+      w.cast.framework.CastContext.getInstance().setOptions({
+        receiverApplicationId:w.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+        autoJoinPolicy:w.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+      });
+      setCastReady(true);
+    };
+
+    if(!document.querySelector('script[data-tplay-cast]')){
+      const script=document.createElement('script');
+      script.src='https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
+      script.async=true;
+      script.dataset.tplayCast='1';
+      document.head.appendChild(script);
+    }
+
+    return()=>{
+      cancelled=true;
+      w.__onGCastApiAvailable=previous;
+    };
+  },[]);
+
+  const castCurrentVideo=useCallback(async()=>{
+    const w=window as any;
+    if(!castReady||!castSource||!w.cast?.framework||!w.chrome?.cast) return;
+    try{
+      const context=w.cast.framework.CastContext.getInstance();
+      let session=context.getCurrentSession();
+      if(!session) {
+        await context.requestSession();
+        session=context.getCurrentSession();
+      }
+      if(!session) return;
+      const mediaInfo=new w.chrome.cast.media.MediaInfo(castSource,'application/x-mpegURL');
+      mediaInfo.streamType=w.chrome.cast.media.StreamType.BUFFERED;
+      mediaInfo.metadata=new w.chrome.cast.media.GenericMediaMetadata();
+      mediaInfo.metadata.title=title;
+      const request=new w.chrome.cast.media.LoadRequest(mediaInfo);
+      await session.loadMedia(request);
+    }catch{}
+  },[castReady,castSource,title]);
+
   const detailQuery=useIqiyiDetail(dramaId,albumId);
   const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
   const playQuery=useIqiyiPlay(dramaId,selected,albumId);
@@ -180,6 +237,7 @@ export default function IqiyiWatchPage(){
         setError('Format video iQIYI tidak dikenali.');
         return;
       }
+      setCastSource(playbackSource);
 
       let recoveryCount=0;
       const instance=videojs(v,{
@@ -279,7 +337,7 @@ export default function IqiyiWatchPage(){
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center justify-between px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button><Link href={"/detail/iqiyi/"+encodeURIComponent(dramaId)} className="text-sm text-white/70">Detail</Link></div></header>
     <div className="container mx-auto max-w-6xl px-4 py-5">
-      <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} id="iqiyi-video-player" className="video-js vjs-big-play-centered" playsInline preload="auto"/></div>
+      <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black"><video ref={video} id="iqiyi-video-player" className="video-js vjs-big-play-centered" playsInline preload="auto"/></div>{castReady&&castSource&&<button type="button" onClick={()=>void castCurrentVideo()} className="mt-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10">📺 Cast ke Android TV</button>}
       <h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}{playing?" • Playing":""}</p>
       {playLoading&&<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Menyiapkan video iQIYI...</div>}{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">Episode belum berhasil dimuat. Player tetap bisa dicoba.</div>}
       {loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7" data-total-episodes={episodes.length}><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}
