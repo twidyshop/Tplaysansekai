@@ -47,6 +47,20 @@ export default function IqiyiWatchPage(){
   const video=useRef<HTMLVideoElement|null>(null),player=useRef<any>(null);
   const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false),[castReady,setCastReady]=useState(false),[castSource,setCastSource]=useState("");
   const addHistory=useWatchHistoryStore((state)=>state.addItem);
+  const detailQuery=useIqiyiDetail(dramaId,albumId);
+  const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
+  const playQuery=useIqiyiPlay(dramaId,selected,albumId);
+  const episodes=arr(episodesQuery.data||{}).map((x:any,i:number)=>({
+    id:pick(x,["id","episodeId","episode_id"],String(i+1)),
+    number:Number(x?.episode??x?.episodeNumber??x?.episode_index??i+1)||i+1,
+    title:pick(x,["title","name","episodeTitle"],"Episode "+(i+1))
+  }));
+  const title=deepText(
+    detailQuery.data?.data?.detail??detailQuery.data?.data?.drama??detailQuery.data?.data?.album??detailQuery.data?.data??detailQuery.data,
+    ["title","name","bookName","albumName","displayName","albumTitle","videoName"],
+    "iQIYI"
+  );
+
   useEffect(()=>{
     let cancelled=false;
     const w=window as any;
@@ -103,20 +117,6 @@ export default function IqiyiWatchPage(){
       await session.loadMedia(request);
     }catch{}
   },[castReady,castSource,title]);
-
-  const detailQuery=useIqiyiDetail(dramaId,albumId);
-  const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
-  const playQuery=useIqiyiPlay(dramaId,selected,albumId);
-  const episodes=arr(episodesQuery.data||{}).map((x:any,i:number)=>({
-    id:pick(x,["id","episodeId","episode_id"],String(i+1)),
-    number:Number(x?.episode??x?.episodeNumber??x?.episode_index??i+1)||i+1,
-    title:pick(x,["title","name","episodeTitle"],"Episode "+(i+1))
-  }));
-  const title=deepText(
-    detailQuery.data?.data?.detail??detailQuery.data?.data?.drama??detailQuery.data?.data?.album??detailQuery.data?.data??detailQuery.data,
-    ["title","name","bookName","albumName","displayName","albumTitle","videoName"],
-    "iQIYI"
-  );
 
   useEffect(()=>{
     const stream=findStream(playQuery.data);
