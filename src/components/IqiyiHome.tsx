@@ -254,6 +254,15 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
+  const trendingItems = arr(trending.data);
+  const foryouItems = arr(foryou.data);
+  const dramaItems = drama.data?.pages.flatMap((page: any) => arr(page)) ?? [];
+  const kdramaItems = kdrama.data?.pages.flatMap((page: any) => arr(page)) ?? [];
+  const movieItems = movie.data?.pages.flatMap((page: any) => arr(page)) ?? [];
+  const animeItems = anime.data?.pages.flatMap((page: any) => arr(page)) ?? [];
+  const varietyItems = variety.data?.pages.flatMap((page: any) => arr(page)) ?? [];
+
+
 
   if (!trendingItems.length && trending.isLoading) {
     return (
