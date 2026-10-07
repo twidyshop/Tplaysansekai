@@ -55,8 +55,6 @@ export async function GET(request: Request) {
       });
       break;
     case "kdrama":
-      // Hoshiyomi's /kdrama alias returns the general drama feed.
-      // Use the verified Korea region on the general drama endpoint instead.
       target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
         region: "korea",
@@ -95,7 +93,6 @@ export async function GET(request: Request) {
     }
     case "detail":
       if (!id) return NextResponse.json({ error: "Parameter id wajib diisi." }, { status: 400 });
-      // iQIYI's Indonesian international metadata uses the id-id locale.
       target = makeUrl("/api/iqiyi/detail", { id, albumId, lang: "idid", language: "id_id", region: "id" });
       break;
     case "episodes":
@@ -114,7 +111,7 @@ export async function GET(request: Request) {
 
   const isPlay = action === "play";
   const controller = new AbortController();
-  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : action === "browse" || action === "drama" || action === "kdrama" ? 25000 : 10000;
+  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : action === "drama" || action === "kdrama" ? 25000 : 10000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
