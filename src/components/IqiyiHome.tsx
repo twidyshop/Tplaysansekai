@@ -275,13 +275,6 @@ export function IqiyiHome() {
 
   return (
     <div className="space-y-10">
-      <>
-
-        <Section
-          title="Hasil Filter"
-          data={browseItems}
-          loading={browse.isLoading || browse.isFetching}
-        />
                 <Section title="Trending" data={trendingItems} loading={false} />
           <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
           <Section
@@ -319,6 +312,6 @@ export function IqiyiHome() {
             onMore={() => variety.fetchNextPage()}
             hasMore={!!variety.hasNextPage}
           />
-      </div>
+    </div>
   );
 }
