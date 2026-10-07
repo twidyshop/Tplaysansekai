@@ -60,6 +60,7 @@ export async function GET(request: Request) {
     case "drama":
       target = makeUrl("/api/iqiyi/drama", {
         page: p.get("page") || "1",
+        cid: p.get("cid") || "4",
         region: p.get("region") || undefined,
         area: p.get("area") || undefined,
         type: p.get("type") || undefined,
@@ -129,7 +130,7 @@ export async function GET(request: Request) {
 
   const isPlay = action === "play";
   const controller = new AbortController();
-  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : 10000;
+  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : action === "browse" || action === "drama" || action === "kdrama" ? 25000 : 10000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
