@@ -339,14 +339,13 @@ export function IqiyiHome() {
     gcTime: 1800000,
   });
 
-  // Hoshiyomi /tags IDs map directly to /drama filters:
-  // area = region, type = genre, sort = ordering.
-  // Keep every selected filter independent so combinations also work.
+  // IDs supplied by Hoshiyomi /tags are sent to the iQIYI /drama catalog request.
+  // /tags defines the available filters; /drama returns the filtered catalog.
   const browse = useQuery({
     queryKey: ["iqiyi", "filter", "id", region, genre, sort],
     queryFn: () => {
       const qs = new URLSearchParams({
-        action: "browse",
+        action: "drama",
         page: "1",
         lang: "id",
         ...(region && region !== "korea" ? { area: region } : {}),
