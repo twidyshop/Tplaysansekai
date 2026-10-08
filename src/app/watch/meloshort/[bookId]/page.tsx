@@ -6,9 +6,9 @@ import { useParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 
 import {
-  extractStardustEpisodes,
-  extractStardustStream,
-  extractStardustText,
+  extractMeloShortEpisodes,
+  extractMeloShortStream,
+  extractMeloShortText,
   getMeloShortStream,
   useMeloShortDetail,
 } from "@/hooks/useMeloShort";
@@ -86,7 +86,7 @@ export default function MeloShortWatchPage() {
   };
 
   const title = getStardustHistoryTitle(detail);
-  const cover = extractStardustText(
+  const cover = extractMeloShortText(
     detail,
     [
       "cover",
@@ -105,7 +105,7 @@ export default function MeloShortWatchPage() {
     "",
   );
 
-  const episodes = extractStardustEpisodes(detail);
+  const episodes = extractMeloShortEpisodes(detail);
 
   useEffect(() => {
     if (episodes.length === 0) return;
@@ -146,7 +146,7 @@ export default function MeloShortWatchPage() {
         if (!selectedChapterId) return;
 
         const response = await getMeloShortStream(id, selectedChapterId);
-        const source = extractStardustStream(response);
+        const source = extractMeloShortStream(response);
 
         if (!source) {
           throw new Error("URL video MeloShort tidak ditemukan.");
