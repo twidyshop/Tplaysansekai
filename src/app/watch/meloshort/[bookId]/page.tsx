@@ -1620,7 +1620,78 @@ export default function WatchPage() {
         </div>
       </section>
 
-      {/* =====================================================\n          DESKTOP EPISODE BAR\n      ====================================================== */}\n      {episodes.length > 0 && (\n        <section className="desktopEpisodeBar">\n          <div className="desktopEpisodeHeader">\n            <div><strong>{dramaMetadataRef.current.title || "Episode"}</strong><span>Episode {currentIndex + 1} / {episodes.length}</span></div>\n            <div className="desktopNav">\n              <button type="button" disabled={currentIndex <= 0} onClick={() => { if (currentIndex > 0) { playEpisode(currentIndex - 1); } }}>← Sebelumnya</button>\n              <button type="button" disabled={currentIndex >= episodes.length - 1} onClick={() => { if (currentIndex < episodes.length - 1) { playEpisode(currentIndex + 1); } }}>Berikutnya →</button>\n            </div>\n          </div>\n          <div className="desktopEpisodeList">\n            {episodes.map((episode, index) => (\n              <button key={String(episode.id ?? episode.chapter_id ?? episode.chapterId ?? index) + "-desktop"} type="button" className={index === currentIndex ? "desktopEpisodeItem active" : "desktopEpisodeItem"} onClick={() => { playEpisode(index); }}>{getEpisodeNumber(episode, index)}</button>\n            ))}\n          </div>\n        </section>\n      )}\n\n      {/* =====================================================
+      {/* =====================================================
+          DESKTOP EPISODE BAR
+      ====================================================== */}
+
+      {episodes.length > 0 && (
+        <section className="desktopEpisodeBar">
+          <div className="desktopEpisodeHeader">
+            <div>
+              <strong>
+                {dramaMetadataRef.current.title || "Episode"}
+              </strong>
+              <span>
+                Episode {currentIndex + 1} / {episodes.length}
+              </span>
+            </div>
+
+            <div className="desktopNav">
+              <button
+                type="button"
+                disabled={currentIndex <= 0}
+                onClick={() => {
+                  if (currentIndex > 0) {
+                    playEpisode(currentIndex - 1);
+                  }
+                }}
+              >
+                ← Sebelumnya
+              </button>
+
+              <button
+                type="button"
+                disabled={currentIndex >= episodes.length - 1}
+                onClick={() => {
+                  if (currentIndex < episodes.length - 1) {
+                    playEpisode(currentIndex + 1);
+                  }
+                }}
+              >
+                Berikutnya →
+              </button>
+            </div>
+          </div>
+
+          <div className="desktopEpisodeList">
+            {episodes.map((episode, index) => (
+              <button
+                key={
+                  String(
+                    episode.id ??
+                      episode.chapter_id ??
+                      episode.chapterId ??
+                      index
+                  ) + "-desktop"
+                }
+                type="button"
+                className={
+                  index === currentIndex
+                    ? "desktopEpisodeItem active"
+                    : "desktopEpisodeItem"
+                }
+                onClick={() => {
+                  playEpisode(index);
+                }}
+              >
+                {getEpisodeNumber(episode, index)}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* =====================================================
           EPISODE DRAWER
       ====================================================== */}
 
