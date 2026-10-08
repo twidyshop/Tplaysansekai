@@ -1,71 +1,149 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
-const BASE = "https://api.quickplay.my.id";
+const BASE_URL = "https://api.quickplay.my.id";
 
-export async function GET(req: NextRequest) {
+function signAndFetch(url: URL, apiKey: string): Promise<Response> {
+  const timestamp = Date.now().toString();
+  const signedPath = url.pathname + url.search;
+
+  const signature = crypto
+    .createHmac("sha256", apiKey)
+    .update("GET:" + signedPath + ":" + timestamp)
+    .digest("hex");
+
+  return fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      "X-Timestamp": timestamp,
+      "X-Signature": signature,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+async function resolveChapterId(
+  id: string,
+  chapterId: string,
+  lang: string,
+  apiKey: string,
+): Promise<string> {
+  // QuickPlay expects chapterId to be the external chapter ID returned by
+  // /detail. Older MeloShort calls may still send the episode number (1, 2...).
+  if (!/^\d+$/.test(chapterId)) return chapterId;
+
+  const detailUrl = new URL(BASE_URL + "/api/v2/detail");
+  detailUrl.searchParams.set("category_p", "meloshort");
+  detailUrl.searchParams.set("id", id);
+  detailUrl.searchParams.set("lang", lang);
+
+  const detailResponse = await signAndFetch(detailUrl, apiKey);
+  if (!detailResponse.ok) return chapterId;
+
+  const detail = await detailResponse.json().catch(() => null);
+  const chapters = detail?.data?.chapters;
+
+  if (!Array.isArray(chapters)) return chapterId;
+
+  const episodeNumber = Number(chapterId);
+  const chapter = chapters.find(
+    (item: any) =>
+      Number(item?.index ?? item?.episode ?? item?.episode_index) ===
+      episodeNumber,
+  );
+
+  return typeof chapter?.id === "string" && chapter.id
+    ? chapter.id
+    : chapterId;
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = req.nextUrl;
-    
-    // Ambil path dari parameter ?path=..., default ke /api/v2/home jika kosong
+    const searchParams = request.nextUrl.searchParams;
     const targetPath = searchParams.get("path") || "/api/v2/home";
-    const upstream = new URL(BASE + targetPath);
 
-    // Masukkan semua parameter lain ke upstream
-    for (const [k, v] of searchParams.entries()) {
-      if (k !== "path") {
-        upstream.searchParams.set(k, v);
-      }
+    if (!targetPath.startsWith("/api/v2/")) {
+      return NextResponse.json(
+        { success: false, error: "Invalid QuickPlay path" },
+        { status: 400 },
+      );
     }
 
-    // Pastikan parameter wajib selalu ada
-    if (!upstream.searchParams.has("category_p")) {
+    const apiKey = process.env.QUICKPLAY_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "QUICKPLAY_API_KEY belum dikonfigurasi di Vercel",
+        },
+        { status: 500 },
+      );
+    }
+
+    const upstream = new URL(BASE_URL + targetPath);
+
+    for (const [key, value] of searchParams.entries()) {
+      if (key !== "path") upstream.searchParams.set(key, value);
+    }
+
+    const lang = searchParams.get("lang") || "id";
+    upstream.searchParams.set("lang", lang);
+
+    if (targetPath === "/api/v2/video") {
+      const id = searchParams.get("id") || "";
+      const requestedChapterId = searchParams.get("chapterId") || "";
+
+      if (!id || !requestedChapterId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Parameter id dan chapterId wajib diisi",
+          },
+          { status: 400 },
+        );
+      }
+
+      const chapterId = await resolveChapterId(
+        id,
+        requestedChapterId,
+        lang,
+        apiKey,
+      );
+
+      upstream.searchParams.set("category_p", "meloshort");
+      upstream.searchParams.set("id", id);
+      upstream.searchParams.set("chapterId", chapterId);
+    } else {
       upstream.searchParams.set("category_p", "meloshort");
     }
-    if (!upstream.searchParams.has("lang")) {
-      upstream.searchParams.set("lang", "id");
-    }
 
-    const key = process.env.QUICKPLAY_API_KEY;
+    const response = await signAndFetch(upstream, apiKey);
+    const body = await response.text();
 
-    if (!key) {
-      return NextResponse.json({
-        success: false,
-        error: "QUICKPLAY_API_KEY belum dikonfigurasi di Vercel"
-      }, { status: 500 });
-    }
-
-    const ts = Date.now().toString();
-    const fullPath = upstream.pathname + upstream.search;
-
-    const signature = crypto
-      .createHmac("sha256", key)
-      .update(`GET:${fullPath}:${ts}`)
-      .digest("hex");
-
-    const response = await fetch(upstream.toString(), {
-      method: "GET",
-      headers: {
-        "X-Timestamp": ts,
-        "X-Signature": signature,
-        "Accept": "application/json"
-      }
-    });
-
-    const text = await response.text();
-
-    return new NextResponse(text, {
+    return new NextResponse(body, {
       status: response.status,
       headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "s-maxage=60, stale-while-revalidate=300"
-      }
+        "Content-Type":
+          response.headers.get("content-type") ||
+          "application/json; charset=utf-8",
+        "Cache-Control":
+          targetPath === "/api/v2/video"
+            ? "no-store"
+            : "s-maxage=60, stale-while-revalidate=300",
+      },
     });
-
-  } catch (error: any) {
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "QuickPlay request gagal",
+      },
+      { status: 500 },
+    );
   }
 }
