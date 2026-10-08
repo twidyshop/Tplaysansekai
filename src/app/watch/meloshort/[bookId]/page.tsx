@@ -182,7 +182,7 @@ export default function MeloShortWatchPage() {
 
     const proxyUrl =
       "/api/meloshort/stream?url=" + encodeURIComponent(streamUrl);
-    const isHls = /\\.m3u8(?:$|[?#])/i.test(streamUrl);
+    const isHls = /\.m3u8(?:$|[?#])/i.test(streamUrl);
 
     // MeloShort commonly returns HLS. Chrome/Edge do not play HLS
     // through a plain <video src>, so use hls.js when native HLS is absent.
