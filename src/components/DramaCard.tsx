@@ -4,7 +4,7 @@ import type { Drama } from "@/types/drama";
 interface DramaCardProps {
   drama: Drama;
   index?: number;
-  platform?: "dramabox" | "meloshort" | "iqiyi";
+  platform?: "dramabox" | "meloshort" | "iqiyi" | "stardusttv" | "microdrama";
 }
 
 export function DramaCard({
@@ -13,7 +13,9 @@ export function DramaCard({
   platform = "dramabox",
 }: DramaCardProps) {
   const detailLink =
-    platform === "meloshort"
+    platform === "stardusttv" || platform === "microdrama"
+      ? `/detail/${platform}/${drama.bookId}`
+      : platform === "meloshort"
       ? `/detail/meloshort/${drama.bookId}`
       : platform === "iqiyi"
         ? `/detail/iqiyi/${drama.bookId}?title=${encodeURIComponent(drama.bookName || "")}&cover=${encodeURIComponent(drama.coverWap || drama.cover || "")}&description=${encodeURIComponent(drama.introduction || "")}`
