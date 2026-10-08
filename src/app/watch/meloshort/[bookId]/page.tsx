@@ -1593,10 +1593,11 @@ export default function WatchPage() {
               <button
                 type="button"
                 disabled={currentIndex <= 0}
-                onClick={() =>
-                  currentIndex > 0 &&
-                  playEpisode(currentIndex - 1)
-                }
+                onClick={() => {
+                  if (currentIndex > 0) {
+                    playEpisode(currentIndex - 1);
+                  }
+                }}
               >
                 ← Sebelumnya
               </button>
@@ -1611,11 +1612,11 @@ export default function WatchPage() {
                   currentIndex >=
                   episodes.length - 1
                 }
-                onClick={() =>
-                  currentIndex <
-                    episodes.length - 1 &&
-                  playEpisode(currentIndex + 1)
-                }
+                onClick={() => {
+                  if (currentIndex < episodes.length - 1) {
+                    playEpisode(currentIndex + 1);
+                  }
+                }}
               >
                 Berikutnya →
               </button>
@@ -1680,10 +1681,11 @@ export default function WatchPage() {
               <button
                 type="button"
                 disabled={currentIndex <= 0}
-                onClick={() =>
-                  currentIndex > 0 &&
-                  playEpisode(currentIndex - 1)
-                }
+                onClick={() => {
+                  if (currentIndex > 0) {
+                    playEpisode(currentIndex - 1);
+                  }
+                }}
               >
                 ← Sebelumnya
               </button>
@@ -1715,18 +1717,17 @@ export default function WatchPage() {
 
               return (
                 <button
-                  key={`${String(
+                  key={String(
                     episode.id ??
                       episode.chapter_id ??
                       episode.chapterId ??
                       index
-                  )}-desktop`}
+                  ) + "-desktop"}
                   type="button"
                   className={
-                    "desktopEpisodeItem " +
-                    (index === currentIndex
-                      ? "active"
-                      : "")
+                    index === currentIndex
+                      ? "desktopEpisodeItem active"
+                      : "desktopEpisodeItem"
                   }
                   onClick={() =>
                     playEpisode(index)
