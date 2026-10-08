@@ -31,6 +31,15 @@ function list(value: any): any[] {
     "dramas",
     "books",
     "records",
+    "episodes",
+    "episodeList",
+    "episode_list",
+    "chapters",
+    "chapterList",
+    "chapter_list",
+    "videos",
+    "videoList",
+    "video_list",
   ]) {
     if (Array.isArray(value[key])) return value[key];
 
