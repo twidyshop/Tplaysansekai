@@ -119,8 +119,60 @@ export async function GET(request: NextRequest) {
       upstream.searchParams.set("category_p", "meloshort");
     }
 
-    const response = await signAndFetch(upstream, apiKey);
-    const body = await response.text();
+    let response = await signAndFetch(upstream, apiKey);
+    let body = await response.text();
+
+    // Primary request uses the external chapter ID from /detail.
+    // If QuickPlay returns no streams for that ID, retry once with the
+    // corresponding numeric episode index for MeloShort compatibility.
+    if (targetPath === "/api/v2/video" && response.ok) {
+      try {
+        const parsed = JSON.parse(body);
+        if (Array.isArray(parsed?.data?.streams) && parsed.data.streams.length === 0) {
+          const requestedChapterId = searchParams.get("chapterId") || "";
+          const detailUrl = new URL(BASE_URL + "/api/v2/detail");
+          detailUrl.searchParams.set("category_p", "meloshort");
+          detailUrl.searchParams.set("id", id);
+          detailUrl.searchParams.set("lang", lang);
+
+          const detailResponse = await signAndFetch(detailUrl, apiKey);
+          if (detailResponse.ok) {
+            const detail = await detailResponse.json().catch(() => null);
+            const chapters = detail?.data?.chapters;
+            const chapter = Array.isArray(chapters)
+              ? chapters.find((item: any) => String(item?.id ?? "") === requestedChapterId)
+              : null;
+            const episodeIndex = Number(
+              chapter?.index ?? chapter?.episode ?? chapter?.episode_index ?? 0,
+            );
+
+            if (episodeIndex > 0) {
+              const fallbackUrl = new URL(BASE_URL + "/api/v2/video");
+              fallbackUrl.searchParams.set("category_p", "meloshort");
+              fallbackUrl.searchParams.set("id", id);
+              fallbackUrl.searchParams.set("chapterId", String(episodeIndex));
+              fallbackUrl.searchParams.set("lang", lang);
+
+              const fallbackResponse = await signAndFetch(fallbackUrl, apiKey);
+              const fallbackBody = await fallbackResponse.text();
+
+              if (fallbackResponse.ok) {
+                const fallbackParsed = JSON.parse(fallbackBody);
+                if (
+                  Array.isArray(fallbackParsed?.data?.streams) &&
+                  fallbackParsed.data.streams.length > 0
+                ) {
+                  response = fallbackResponse;
+                  body = fallbackBody;
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Keep the primary response if the compatibility fallback fails.
+      }
+    }
 
     return new NextResponse(body, {
       status: response.status,
