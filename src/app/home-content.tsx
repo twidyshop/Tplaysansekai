@@ -16,6 +16,7 @@ import { FlickReelsHome } from "@/components/FlickReelsHome";
 import { MoboReelsHome } from "@/components/MoboReelsHome";
 import { PineDramaHome } from "@/components/PineDramaHome";
 import { MeloShortHome } from "@/components/MeloShortHome";
+import { QuickPlayHome } from "@/components/QuickPlayHome";
 import { IqiyiHome } from "@/components/IqiyiHome";
 import { WetvHome } from "@/components/WetvHome";
 import { InfiniteDramaSection } from "@/components/InfiniteDramaSection";
@@ -69,7 +70,7 @@ function deepPick(value: any, keys: string[], fallback = "", depth = 0): string 
 
 export default function HomeContent() {
   const {
-    isMeloShort, isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort,
+    isStardustTV, isMicroDrama, isMeloShort, isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort,
     isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels, isMoboReels, isIqiyi, isWetv
   } = usePlatform();
 
@@ -170,6 +171,9 @@ export default function HomeContent() {
 
       {isIqiyi && <div className="container mx-auto px-4 py-6 space-y-8"><IqiyiHome /></div>}
       {isWetv && <div className="container mx-auto px-4 py-6 space-y-8"><WetvHome /></div>}
+
+      {isStardustTV && <div className="container mx-auto px-4 py-6 space-y-8"><QuickPlayHome platform="stardusttv" name="StardustTV" /></div>}
+      {isMicroDrama && <div className="container mx-auto px-4 py-6 space-y-8"><QuickPlayHome platform="microdrama" name="MicroDrama" /></div>}
 
       {isMeloShort && <div className="container mx-auto px-4 py-6 space-y-8"><MeloShortHome /></div>}
       {isPineDrama && <div className="container mx-auto px-4 py-6 space-y-8"><PineDramaHome /></div>}
