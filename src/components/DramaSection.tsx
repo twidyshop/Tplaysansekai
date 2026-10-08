@@ -8,7 +8,7 @@ import type { Drama } from "@/types/drama";
 interface DramaSectionProps {
   title: string;
   dramas: Drama[] | undefined;
-  platform?: "dramabox" | "meloshort";
+  platform?: "dramabox" | "meloshort" | "stardusttv" | "microdrama";
   isLoading: boolean;
   error: boolean;
   onRetry: () => void;
