@@ -169,11 +169,11 @@ export function useStardustTVDetail(id: string) {
 
 export async function getStardustTVStream(
   id: string,
-  episode: string,
+  chapterId: string,
 ) {
   return request("/api/v2/video", {
     id,
-    episode,
+    chapterId,
   });
 }
 
@@ -281,6 +281,8 @@ export function extractStardustEpisodes(value: any): any[] {
             ("episode" in item ||
               "episodeNumber" in item ||
               "episode_index" in item ||
+              "index" in item ||
+              "id" in item ||
               "videoId" in item ||
               "video_id" in item),
         )
