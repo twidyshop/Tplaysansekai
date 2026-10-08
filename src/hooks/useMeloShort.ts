@@ -142,7 +142,7 @@ async function request(path: string, params: Record<string, string> = {}) {
   return json;
 }
 
-export function useMeloShortHome() {
+export function useMeloShortDramas() {
   return useQuery({
     queryKey: ["meloshort", "home", "id"],
     queryFn: async () => {
