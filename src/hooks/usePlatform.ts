@@ -46,7 +46,7 @@ interface PlatformState {
 }
 
 export const usePlatformStore = create<PlatformState>((set) => ({
-  currentPlatform: "iqiyi",
+  currentPlatform: "stardusttv",
   setPlatform: (platform) => set({ currentPlatform: platform }),
 }));
 
