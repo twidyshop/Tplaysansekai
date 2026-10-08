@@ -178,24 +178,55 @@ export async function getMeloShortStream(
 }
 
 export function extractMeloShortStream(value: any): string {
+  const candidates: Array<{ url: string; score: number }> = [];
   const visited = new Set<any>();
 
-  function walk(node: any, depth = 0): string {
-    if (depth > 8 || node == null) return "";
+  function addCandidate(url: string, node: any, key = "") {
+    if (!/^https?:\/\//i.test(url)) return;
 
-    if (typeof node === "string") {
-      return /^https?:\/\//i.test(node) ? node : "";
+    const text = JSON.stringify(node ?? {}).toLowerCase();
+    const keyText = key.toLowerCase();
+
+    // QuickPlay can return separate audio/video streams. The old extractor
+    // picked the first URL, which could be the audio rendition and caused
+    // MeloShort to play sound with a black video area.
+    let score = 0;
+
+    if (/video|visual|avc|h264|h265|hevc|vp8|vp9/.test(text)) score += 100;
+    if (/video|visual/.test(keyText)) score += 80;
+    if (/audio|sound|aac|mp3|opus/.test(text)) score -= 100;
+    if (/audio|sound/.test(keyText)) score -= 80;
+
+    if (/\\.(m3u8|mp4|m4v)(?:$|[?#])/i.test(url)) score += 20;
+    if (/\\.(mp3|aac|m4a|opus|wav)(?:$|[?#])/i.test(url)) score -= 100;
+
+    // Prefer a stream explicitly marked as video over a generic URL.
+    if (
+      node &&
+      typeof node === "object" &&
+      !Array.isArray(node) &&
+      (node.type === "video" ||
+        node.mediaType === "video" ||
+        node.mimeType?.toString().toLowerCase().startsWith("video/"))
+    ) {
+      score += 150;
     }
 
-    if (typeof node !== "object" || visited.has(node)) return "";
+    candidates.push({ url, score });
+  }
+
+  function walk(node: any, depth = 0, key = "") {
+    if (depth > 10 || node == null) return;
+    if (typeof node === "string") {
+      addCandidate(node, node, key);
+      return;
+    }
+    if (typeof node !== "object" || visited.has(node)) return;
     visited.add(node);
 
     if (Array.isArray(node)) {
-      for (const item of node) {
-        const result = walk(item, depth + 1);
-        if (result) return result;
-      }
-      return "";
+      for (const item of node) walk(item, depth + 1, key);
+      return;
     }
 
     const preferredKeys = [
@@ -213,22 +244,22 @@ export function extractMeloShortStream(value: any): string {
       "url",
     ];
 
-    for (const key of preferredKeys) {
-      const value = node[key];
-      if (typeof value === "string" && /^https?:\/\//i.test(value)) {
-        return value;
+    for (const keyName of preferredKeys) {
+      const candidate = node[keyName];
+      if (typeof candidate === "string") {
+        addCandidate(candidate, node, keyName);
       }
     }
 
-    for (const key of Object.keys(node)) {
-      const result = walk(node[key], depth + 1);
-      if (result) return result;
+    for (const [childKey, child] of Object.entries(node)) {
+      walk(child, depth + 1, childKey);
     }
-
-    return "";
   }
 
-  return walk(value);
+  walk(value);
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0]?.url || "";
 }
 
 export function extractMeloShortEpisodes(value: any): any[] {
