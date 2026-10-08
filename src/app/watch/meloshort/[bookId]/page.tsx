@@ -66,7 +66,12 @@ async function loadMeloShortFfmpeg(): Promise<MeloFfmpeg> {
     const wasmURL = await toMeloBlobURL(`${coreBase}/ffmpeg-core.wasm`, "application/wasm");
     const workerLoadURL = await toMeloBlobURL(`${ffmpegBase}/814.ffmpeg.js`, "text/javascript");
 
+    ffmpeg.on("log", ({ message }) => {
+      console.log("[MELOSHORT FFMPEG]", message);
+    });
+    console.log("[MELOSHORT FFMPEG] loading core...");
     await ffmpeg.load({ coreURL, wasmURL, workerLoadURL });
+    console.log("[MELOSHORT FFMPEG] core loaded");
     return ffmpeg;
   })().catch((error) => {
     meloshortFfmpegPromise = null;
@@ -120,6 +125,8 @@ async function transcodeMeloShortHlsToMp4(
   const ffmpeg = await loadMeloShortFfmpeg();
   await ffmpeg.writeFile("meloshort.ts", input);
   onProgress?.("Mengonversi HEVC → H.264...");
+  console.log("[MELOSHORT FFMPEG] input bytes:", input.byteLength);
+  console.log("[MELOSHORT FFMPEG] starting transcode...");
 
   const exitCode = await ffmpeg.exec([
     "-i", "meloshort.ts",
@@ -133,12 +140,14 @@ async function transcodeMeloShortHlsToMp4(
     "meloshort.mp4",
   ]);
 
+  console.log("[MELOSHORT FFMPEG] transcode exit code:", exitCode);
   if (exitCode !== 0) {
     throw new Error("FFmpeg gagal mengonversi video HEVC MeloShort.");
   }
 
   const output = await ffmpeg.readFile("meloshort.mp4");
   const bytes = typeof output === "string" ? new TextEncoder().encode(output) : output;
+  console.log("[MELOSHORT FFMPEG] output bytes:", bytes.byteLength);
   const blobBytes = new Uint8Array(bytes.byteLength);
   blobBytes.set(bytes);
   return URL.createObjectURL(new Blob([blobBytes.buffer], { type: "video/mp4" }));
