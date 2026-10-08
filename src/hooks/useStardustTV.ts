@@ -232,7 +232,67 @@ export function extractStardustStream(value: any): string {
 }
 
 export function extractStardustEpisodes(value: any): any[] {
-  return list(value);
+  if (!value || typeof value !== "object") return [];
+
+  const preferredKeys = [
+    "episodes",
+    "episodeList",
+    "episode_list",
+    "chapters",
+    "chapterList",
+    "chapter_list",
+    "videos",
+    "videoList",
+    "video_list",
+  ];
+
+  function find(node: any, depth = 0): any[] {
+    if (depth > 10 || node == null || typeof node !== "object") {
+      return [];
+    }
+
+    if (Array.isArray(node)) {
+      return node;
+    }
+
+    for (const key of preferredKeys) {
+      const candidate = node[key];
+
+      if (Array.isArray(candidate) && candidate.length > 0) {
+        return candidate;
+      }
+
+      const nested = find(candidate, depth + 1);
+      if (nested.length > 0) {
+        return nested;
+      }
+    }
+
+    for (const key of Object.keys(node)) {
+      if (preferredKeys.includes(key)) continue;
+
+      const nested = find(node[key], depth + 1);
+      if (
+        nested.length > 0 &&
+        nested.some(
+          (item) =>
+            item &&
+            typeof item === "object" &&
+            ("episode" in item ||
+              "episodeNumber" in item ||
+              "episode_index" in item ||
+              "videoId" in item ||
+              "video_id" in item),
+        )
+      ) {
+        return nested;
+      }
+    }
+
+    return [];
+  }
+
+  return find(value);
 }
 
 export function extractStardustText(
