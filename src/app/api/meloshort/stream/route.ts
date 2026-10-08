@@ -129,8 +129,12 @@ function isPlaylistUrl(url: string) {
   return /\.m3u8(?:$|\?)/i.test(url);
 }
 
-function isTsSegment(url: string) {
-  return /\.ts(?:$|\?)/i.test(url);
+function isTsSegment(url: string, contentType = "") {
+  const type = contentType.toLowerCase();
+  return (
+    /\.ts(?:$|\?)/i.test(url) ||
+    type.includes("text/vnd.trolltech.linguist")
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -286,7 +290,7 @@ export async function GET(req: NextRequest) {
     // Shortswave's MPEG-TS segments are sometimes returned with the
     // incorrect text/vnd.trolltech.linguist MIME type. Preserve the bytes
     // and Range response, but expose the segment as MPEG-TS to hls.js.
-    const responseContentType = isTsSegment(streamUrl)
+    const responseContentType = isTsSegment(streamUrl, contentType)
       ? "video/mp2t"
       : contentType || "application/octet-stream";
 
