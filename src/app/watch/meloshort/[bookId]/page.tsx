@@ -618,7 +618,13 @@ export default function WatchPage() {
 
         if (!mountedRef.current) return;
 
-        setLoading(true);
+        // Normal HLS.js buffer refills should not flash the loader.
+        if (
+          video.currentTime <= 0 &&
+          video.paused
+        ) {
+          setLoading(true);
+        }
       };
 
       video.oncanplay = () => {
@@ -1583,10 +1589,47 @@ export default function WatchPage() {
           </button>
 
           {/* =================================================
+              MOBILE EPISODE CONTROLS
+          ================================================== */}
+
+          <div className="mobileEpisodeControls">
+            <button
+              type="button"
+              disabled={currentIndex <= 0}
+              onClick={() => {
+                if (currentIndex > 0) {
+                  playEpisode(currentIndex - 1);
+                }
+              }}
+            >
+              ‹ Sebelumnya
+            </button>
+
+            <button
+              type="button"
+              disabled={
+                currentIndex >=
+                episodes.length - 1
+              }
+              onClick={() => {
+                if (
+                  currentIndex <
+                  episodes.length - 1
+                ) {
+                  playEpisode(currentIndex + 1);
+                }
+              }}
+            >
+              Selanjutnya ›
+            </button>
+          </div>
+
+          {/* =================================================
               LOADING
           ================================================== */}
 
           {loading &&
+            !playing &&
             !error && (
               <div className="loadingOverlay">
                 <div className="spinner" />
@@ -1710,8 +1753,8 @@ export default function WatchPage() {
           >
             <div className="drawerHeader">
               <div>
-                <strong>
-                  Episode
+                <strong className="drawerTitle">
+                  {dramaMetadataRef.current.title || "Drama"}
                 </strong>
 
                 <small>
@@ -2005,7 +2048,122 @@ export default function WatchPage() {
           background: #fff;
         }
 
-        .episodeButton b { display: none; }\n        .mobileEpisodeControls { position: absolute; left: 50%; bottom: 52px; z-index: 20; transform: translateX(-50%); display: none; align-items: center; gap: 8px; white-space: nowrap; pointer-events: none; }\n        .mobileEpisodeControls button, .mobileEpisodeControls span { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: rgba(0,0,0,.72); color: #fff; padding: 0 12px; font-size: 11px; font-weight: 700; pointer-events: auto; }\n        .mobileEpisodeControls button:disabled { opacity: .3; }\n        .desktopEpisodeBar { flex: 0 0 auto; width: 100%; max-height: 150px; overflow: hidden; padding: 10px 14px 12px; background: #0b0e14; border-top: 1px solid rgba(255,255,255,.08); }\n        .desktopEpisodeHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }\n        .desktopEpisodeHeader strong { display: block; font-size: 12px; font-weight: 800; }\n        .desktopEpisodeHeader span { display: block; margin-top: 2px; color: rgba(255,255,255,.45); font-size: 10px; }\n        .desktopNav { display: flex; gap: 6px; flex-shrink: 0; }\n        .desktopNav button { border: 1px solid rgba(255,255,255,.1); border-radius: 8px; background: rgba(255,255,255,.05); color: rgba(255,255,255,.75); padding: 7px 10px; font-size: 10px; font-weight: 700; cursor: pointer; }\n        .desktopNav button:last-child { background: #fff; color: #000; }\n        .desktopNav button:disabled { opacity: .3; }\n        .desktopEpisodeList { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }\n        .desktopEpisodeItem { flex: 0 0 auto; min-width: 38px; height: 34px; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; background: rgba(255,255,255,.05); color: rgba(255,255,255,.65); font-size: 11px; font-weight: 800; cursor: pointer; }\n        .desktopEpisodeItem.active { border-color: rgba(255,255,255,.55); background: #fff; color: #000; }\n\n        .loadingOverlay {
+        .mobileEpisodeControls {
+          position: absolute;
+          left: 50%;
+          bottom: 14px;
+          z-index: 20;
+          transform: translateX(-50%);
+          display: none;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: calc(100% - 24px);
+          pointer-events: none;
+        }
+
+        .mobileEpisodeControls button {
+          min-height: 34px;
+          border: 1px solid rgba(255,255,255,.18);
+          border-radius: 8px;
+          background: rgba(0,0,0,.72);
+          color: #fff;
+          padding: 0 12px;
+          font-size: 11px;
+          font-weight: 700;
+          pointer-events: auto;
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
+
+        .mobileEpisodeControls button:disabled {
+          opacity: .28;
+        }
+
+        .desktopEpisodeBar {
+          flex: 0 0 auto;
+          width: 100%;
+          max-height: 150px;
+          overflow: hidden;
+          padding: 10px 14px 12px;
+          background: #0b0e14;
+          border-top: 1px solid rgba(255,255,255,.08);
+        }
+
+        .desktopEpisodeHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .desktopEpisodeHeader strong {
+          display: block;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .desktopEpisodeHeader span {
+          display: block;
+          margin-top: 2px;
+          color: rgba(255,255,255,.45);
+          font-size: 10px;
+        }
+
+        .desktopNav {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+
+        .desktopNav button {
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 8px;
+          background: rgba(255,255,255,.05);
+          color: rgba(255,255,255,.75);
+          padding: 7px 10px;
+          font-size: 10px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .desktopNav button:last-child {
+          background: #fff;
+          color: #000;
+        }
+
+        .desktopNav button:disabled {
+          opacity: .3;
+        }
+
+        .desktopEpisodeList {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+
+        .desktopEpisodeItem {
+          flex: 0 0 auto;
+          min-width: 38px;
+          height: 34px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 8px;
+          background: rgba(255,255,255,.05);
+          color: rgba(255,255,255,.65);
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .desktopEpisodeItem.active {
+          border-color: rgba(255,255,255,.55);
+          background: #fff;
+          color: #000;
+        }
+
+        .loadingOverlay {
           position: absolute;
           inset: 0;
 
@@ -2197,7 +2355,12 @@ export default function WatchPage() {
         .drawerHeader strong {
           display: block;
 
-          font-size: 17px;
+          max-width: 250px;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+
+          font-size: 15px;
           font-weight: 800;
         }
 
@@ -2347,6 +2510,14 @@ export default function WatchPage() {
         }
 
         @media (max-width: 600px) {
+          .desktopEpisodeBar {
+            display: none;
+          }
+
+          .mobileEpisodeControls {
+            display: flex;
+          }
+
           .topHeader {
             flex-basis: 54px;
             height: 54px;
@@ -2398,6 +2569,3 @@ export default function WatchPage() {
           }
         }
       `}</style>
-    </main>
-  );
-}
