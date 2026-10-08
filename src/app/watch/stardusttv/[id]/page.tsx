@@ -30,11 +30,62 @@ export default function StardustTVWatchPage() {
   const detailQuery = useStardustTVDetail(id);
 
   const detail = detailQuery.data;
-  const title = extractStardustText(
-    detail,
-    ["title", "bookName", "book_name", "dramaName", "name"],
-    "StardustTV",
-  );
+
+  // Detail response StardustTV can contain generic/category titles such as
+  // "Drama Pilihan" before the actual drama object. Prefer the real title
+  // from the main data object and ignore known generic labels.
+  const getStardustHistoryTitle = (value: any): string => {
+    const genericTitles = new Set([
+      "drama pilihan",
+      "stardusttv",
+      "untitled",
+      "drama",
+    ]);
+
+    const titleKeys = [
+      "title",
+      "bookName",
+      "book_name",
+      "dramaName",
+      "drama_name",
+      "name",
+    ];
+
+    const candidates: string[] = [];
+
+    const collect = (node: any, depth = 0) => {
+      if (!node || typeof node !== "object" || depth > 5) return;
+
+      if (Array.isArray(node)) {
+        for (const item of node) collect(item, depth + 1);
+        return;
+      }
+
+      for (const key of titleKeys) {
+        const value = node[key];
+        if (typeof value === "string" && value.trim()) {
+          candidates.push(value.trim());
+        }
+      }
+
+      // Search the main payload first, then nested objects.
+      for (const key of ["data", "detail", "book", "drama", "result"]) {
+        if (node[key] && typeof node[key] === "object") {
+          collect(node[key], depth + 1);
+        }
+      }
+    };
+
+    collect(value);
+
+    return (
+      candidates.find(
+        (candidate) => !genericTitles.has(candidate.toLowerCase()),
+      ) || ""
+    );
+  };
+
+  const title = getStardustHistoryTitle(detail);
   const cover = extractStardustText(
     detail,
     [
@@ -133,7 +184,7 @@ export default function StardustTVWatchPage() {
   }, [streamUrl]);
 
   useEffect(() => {
-    if (!id || !title || title === "StardustTV" || episodes.length === 0) {
+    if (!id || !title || episodes.length === 0) {
       return;
     }
 
