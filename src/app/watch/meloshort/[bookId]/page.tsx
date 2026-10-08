@@ -139,7 +139,9 @@ async function transcodeMeloShortHlsToMp4(
 
   const output = await ffmpeg.readFile("meloshort.mp4");
   const bytes = typeof output === "string" ? new TextEncoder().encode(output) : output;
-  return URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+  const blobBytes = new Uint8Array(bytes.byteLength);
+  blobBytes.set(bytes);
+  return URL.createObjectURL(new Blob([blobBytes.buffer], { type: "video/mp4" }));
 }
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 
