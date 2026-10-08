@@ -1,1 +1,1 @@
-"use client";import QuickPlayWatchPage from "@/components/QuickPlayWatchPage";export default function Page(){return <QuickPlayWatchPage platform="microdrama" name="MicroDrama"/>
+"use client";import QuickPlayWatchPage from "@/components/QuickPlayWatchPage";export default function Page(){return <QuickPlayWatchPage platform="microdrama" name="MicroDrama"/>}
