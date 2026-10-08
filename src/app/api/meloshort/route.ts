@@ -91,6 +91,8 @@ export async function GET(request: NextRequest) {
     const lang = searchParams.get("lang") || "id";
     upstream.searchParams.set("lang", lang);
 
+    const id = searchParams.get("id") || "";
+
     if (targetPath === "/api/v2/video") {
       const id = searchParams.get("id") || "";
       const requestedChapterId = searchParams.get("chapterId") || "";
