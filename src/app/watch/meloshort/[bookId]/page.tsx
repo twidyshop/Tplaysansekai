@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import Hls from "hls.js";
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 
 import {
@@ -176,11 +177,51 @@ export default function MeloShortWatchPage() {
   }, [id, selectedEpisode, selectedChapterId]);
 
   useEffect(() => {
-    if (!videoRef.current || !streamUrl) return;
+    const video = videoRef.current;
+    if (!video || !streamUrl) return;
 
-    videoRef.current.src =
+    const proxyUrl =
       "/api/meloshort/stream?url=" + encodeURIComponent(streamUrl);
-    videoRef.current.load();
+    const isHls = /\\.m3u8(?:$|[?#])/i.test(streamUrl);
+
+    // MeloShort commonly returns HLS. Chrome/Edge do not play HLS
+    // through a plain <video src>, so use hls.js when native HLS is absent.
+    let hls: Hls | null = null;
+
+    if (isHls && !video.canPlayType("application/vnd.apple.mpegurl")) {
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+        });
+        hls.loadSource(proxyUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            setError(
+              "Video MeloShort gagal dimuat: " +
+                (data.details || "HLS error"),
+            );
+          }
+        });
+      } else {
+        video.src = proxyUrl;
+        video.load();
+      }
+    } else {
+      video.src = proxyUrl;
+      video.load();
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy();
+      }
+      video.removeAttribute("src");
+      video.load();
+    };
   }, [streamUrl]);
 
   useEffect(() => {
