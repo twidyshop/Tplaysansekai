@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const targetPath =
-      searchParams.get("path") || "/api/v2/homeDrama";
+      searchParams.get("path") || "/api/v2/home";
 
     const upstream = new URL(BASE_URL + targetPath);
 
