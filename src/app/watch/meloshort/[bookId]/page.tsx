@@ -250,17 +250,16 @@ export default function MeloShortWatchPage() {
       }
     };
 
-    // Safari/iOS can play HEVC HLS natively. Chrome/Windows uses hls.js first;
-    // if MSE rejects HEVC, it falls back to client-side H.264 transcoding.
+    // MeloShort delivers HEVC inside MPEG-TS. Native Safari reports this source
+    // as audio-only, so Apple browsers use the same deterministic H.264 fallback.
+    // Desktop Chromium still uses hls.js only to detect the HEVC MSE failure.
     const isAppleBrowser =
       /Mobi|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
       /Macintosh/i.test(navigator.userAgent);
 
     if (isAppleBrowser) {
-      video.src = proxyUrl;
-      video.load();
-      void video.play().catch(() => {});
-    } else if (/\.m3u8(?:$|[?#])/i.test(streamUrl) && Hls.isSupported()) {
+      void playWithFfmpegFallback();
+    } else if (/\\.m3u8(?:$|[?#])/i.test(streamUrl) && Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
