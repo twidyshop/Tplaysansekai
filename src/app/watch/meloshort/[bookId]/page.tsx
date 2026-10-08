@@ -2393,3 +2393,77 @@ export default function WatchPage() {
           );
 
           color: #fff;
+          font-size: 25px;
+          line-height: 1;
+          cursor: pointer;
+        }
+
+        .episodeList {
+          flex: 1;
+          overflow-y: auto;
+          padding: 10px;
+          overscroll-behavior: contain;
+        }
+
+        .episodeItem {
+          width: 100%;
+          min-height: 52px;
+          display: flex;
+          align-items: center;
+          margin-bottom: 4px;
+          padding: 8px 10px;
+          border: 0;
+          border-radius: 10px;
+          background: transparent;
+          color: rgba(255,255,255,.72);
+          text-align: left;
+          cursor: pointer;
+          transition: background .15s ease, color .15s ease;
+        }
+
+        .episodeItem:hover { background: rgba(255,255,255,.05); }
+        .episodeItem.active { background: rgba(255,255,255,.1); color: #fff; }
+
+        .episodeNumber {
+          flex: 0 0 42px;
+          font-size: 12px;
+          font-weight: 800;
+          color: rgba(255,255,255,.4);
+        }
+
+        .episodeItem.active .episodeNumber { color: #fff; }
+
+        .episodeName {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .playingDot {
+          margin-left: 8px;
+          font-size: 9px;
+          color: #fff;
+        }
+
+        @media (max-width: 600px) {
+          .topHeader { flex-basis: 54px; height: 54px; padding: 0 14px; }
+          .brand { font-size: 18px; }
+          .brandIcon { width: 25px; height: 25px; border-radius: 7px; }
+          .homeButton { font-size: 12px; }
+          .episodeButton { top: 10px; right: 10px; width: 39px; height: 39px; border-radius: 10px; }
+          .episodeButton span { width: 16px; }
+          .episodeDrawer { width: 90vw; }
+        }
+
+        @media (max-width: 360px) {
+          .topHeader { padding: 0 12px; }
+          .episodeDrawer { width: 94vw; }
+        }
+      `}</style>
+    </main>
+  );
+}
