@@ -137,7 +137,7 @@ export function useStardustTVHome() {
   return useQuery({
     queryKey: ["stardusttv", "home", "id"],
     queryFn: async () => {
-      const response = await request("/api/v2/homeDrama");
+      const response = await request("/api/v2/home");
 
       return list(response)
         .map(mapDrama)
@@ -152,7 +152,7 @@ export function useStardustTVDetail(id: string) {
   return useQuery({
     queryKey: ["stardusttv", "detail", id],
     enabled: Boolean(id),
-    queryFn: () => request("/api/v2/detailDrama", { id }),
+    queryFn: () => request("/api/v2/detail", { id }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -162,7 +162,7 @@ export async function getStardustTVStream(
   id: string,
   episode: string,
 ) {
-  return request("/api/v2/videoStream", {
+  return request("/api/v2/video", {
     id,
     episode,
   });
