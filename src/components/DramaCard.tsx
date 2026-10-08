@@ -4,7 +4,7 @@ import type { Drama } from "@/types/drama";
 interface DramaCardProps {
   drama: Drama;
   index?: number;
-  platform?: "dramabox" | "meloshort" | "iqiyi";
+  platform?: "dramabox" | "meloshort" | "iqiyi" | "stardusttv";
 }
 
 export function DramaCard({
@@ -13,15 +13,25 @@ export function DramaCard({
   platform = "dramabox",
 }: DramaCardProps) {
   const detailLink =
-    platform === "meloshort"
-      ? `/detail/meloshort/${drama.bookId}`
-      : platform === "iqiyi"
-        ? `/detail/iqiyi/${drama.bookId}?title=${encodeURIComponent(drama.bookName || "")}&cover=${encodeURIComponent(drama.coverWap || drama.cover || "")}&description=${encodeURIComponent(drama.introduction || "")}`
-        : `/detail/dramabox/${drama.bookId}`;
+    platform === "stardusttv"
+      ? "/detail/stardusttv/" + drama.bookId
+      : platform === "meloshort"
+        ? "/detail/meloshort/" + drama.bookId
+        : platform === "iqiyi"
+          ? "/detail/iqiyi/" +
+            drama.bookId +
+            "?title=" +
+            encodeURIComponent(drama.bookName || "") +
+            "&cover=" +
+            encodeURIComponent(drama.coverWap || drama.cover || "") +
+            "&description=" +
+            encodeURIComponent(drama.introduction || "")
+          : "/detail/dramabox/" + drama.bookId;
 
   const coverUrl =
     platform === "iqiyi"
-      ? `/api/iqiyi/image?url=${encodeURIComponent(drama.coverWap || drama.cover || "")}`
+      ? "/api/iqiyi/image?url=" +
+        encodeURIComponent(drama.coverWap || drama.cover || "")
       : drama.coverWap || drama.cover || "";
 
   return (
