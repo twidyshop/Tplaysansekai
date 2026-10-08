@@ -1,10 +1,29 @@
 import { create } from "zustand";
 
 export type Platform =
-  | "iqiyi" | "wetv" | "meloshort" | "pinedrama" | "dramabox" | "reelshort" | "shortmax"
-  | "netshort" | "melolo" | "freereels" | "flickreels" | "dramanova" | "goodshort" | string;
+  | "stardusttv"
+  | "iqiyi"
+  | "wetv"
+  | "meloshort"
+  | "pinedrama"
+  | "dramabox"
+  | "reelshort"
+  | "shortmax"
+  | "netshort"
+  | "melolo"
+  | "freereels"
+  | "flickreels"
+  | "dramanova"
+  | "goodshort"
+  | string;
 
 export const PLATFORMS = [
+  {
+    id: "stardusttv",
+    name: "StardustTV",
+    logo: "/stardusttv.svg",
+    apiBase: "/api/stardusttv",
+  },
   { id: "iqiyi", name: "iQIYI", logo: "/iqiyi.svg", apiBase: "/api/iqiyi" },
   { id: "wetv", name: "WeTV", logo: "/wetv.svg", apiBase: "/api/wetv" },
   { id: "meloshort", name: "MeloShort", logo: "/meloshort.png", apiBase: "/api/meloshort" },
@@ -33,10 +52,19 @@ export const usePlatformStore = create<PlatformState>((set) => ({
 
 export function usePlatform() {
   const { currentPlatform, setPlatform } = usePlatformStore();
-  const platformInfo = PLATFORMS.find((p) => p.id === currentPlatform)!;
-  const getPlatformInfo = (platformId: Platform) => PLATFORMS.find((p) => p.id === platformId) || PLATFORMS[0];
+  const platformInfo =
+    PLATFORMS.find((platform) => platform.id === currentPlatform)!;
+
+  const getPlatformInfo = (platformId: Platform) =>
+    PLATFORMS.find((platform) => platform.id === platformId) || PLATFORMS[0];
+
   return {
-    currentPlatform, platformInfo, setPlatform, platforms: PLATFORMS, getPlatformInfo,
+    currentPlatform,
+    platformInfo,
+    setPlatform,
+    platforms: PLATFORMS,
+    getPlatformInfo,
+    isStardustTV: currentPlatform === "stardusttv",
     isIqiyi: currentPlatform === "iqiyi",
     isWetv: currentPlatform === "wetv",
     isMeloShort: currentPlatform === "meloshort",
