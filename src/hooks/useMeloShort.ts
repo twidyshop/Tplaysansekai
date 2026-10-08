@@ -177,7 +177,7 @@ export async function getMeloShortStream(
   });
 }
 
-export function extractStardustStream(value: any): string {
+export function extractMeloShortStream(value: any): string {
   const visited = new Set<any>();
 
   function walk(node: any, depth = 0): string {
@@ -231,7 +231,7 @@ export function extractStardustStream(value: any): string {
   return walk(value);
 }
 
-export function extractStardustEpisodes(value: any): any[] {
+export function extractMeloShortEpisodes(value: any): any[] {
   if (!value || typeof value !== "object") return [];
 
   const preferredKeys = [
@@ -297,7 +297,7 @@ export function extractStardustEpisodes(value: any): any[] {
   return find(value);
 }
 
-export function extractStardustText(
+export function extractMeloShortText(
   value: any,
   keys: string[],
   fallback = "",
@@ -308,7 +308,7 @@ export function extractStardustText(
   if (direct) return direct;
 
   for (const key of Object.keys(value)) {
-    const nested = extractStardustText(value[key], keys, "");
+    const nested = extractMeloShortText(value[key], keys, "");
     if (nested) return nested;
   }
 
