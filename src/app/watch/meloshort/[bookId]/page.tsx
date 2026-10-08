@@ -1503,10 +1503,10 @@ export default function WatchPage() {
         </Link>
 
         <Link
-          href="/"
+          href={"/detail/meloshort/" + encodeURIComponent(bookId)}
           className="homeButton"
         >
-          Home
+          Detail
         </Link>
       </header>
 
@@ -1580,7 +1580,47 @@ export default function WatchPage() {
             <span />
             <span />
             <span />
+            <b>
+              Ep {getEpisodeNumber(
+                episodes[currentIndex],
+                currentIndex
+              )}
+            </b>
           </button>
+
+          {episodes.length > 0 && (
+            <div className="mobileEpisodeControls">
+              <button
+                type="button"
+                disabled={currentIndex <= 0}
+                onClick={() =>
+                  currentIndex > 0 &&
+                  playEpisode(currentIndex - 1)
+                }
+              >
+                ← Sebelumnya
+              </button>
+
+              <span>
+                {currentIndex + 1} / {episodes.length}
+              </span>
+
+              <button
+                type="button"
+                disabled={
+                  currentIndex >=
+                  episodes.length - 1
+                }
+                onClick={() =>
+                  currentIndex <
+                    episodes.length - 1 &&
+                  playEpisode(currentIndex + 1)
+                }
+              >
+                Berikutnya →
+              </button>
+            </div>
+          )}
 
           {/* =================================================
               LOADING
@@ -1621,8 +1661,88 @@ export default function WatchPage() {
       </section>
 
       {/* =====================================================
-          EPISODE DRAWER
+          DESKTOP EPISODE BAR
       ====================================================== */}
+
+      {episodes.length > 0 && (
+        <section className="desktopEpisodeBar">
+          <div className="desktopEpisodeHeader">
+            <div>
+              <strong>
+                {dramaMetadataRef.current.title || "Episode"}
+              </strong>
+              <span>
+                Episode {currentIndex + 1} / {episodes.length}
+              </span>
+            </div>
+
+            <div className="desktopNav">
+              <button
+                type="button"
+                disabled={currentIndex <= 0}
+                onClick={() =>
+                  currentIndex > 0 &&
+                  playEpisode(currentIndex - 1)
+                }
+              >
+                ← Sebelumnya
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  currentIndex >=
+                  episodes.length - 1
+                }
+                onClick={() =>
+                  currentIndex <
+                    episodes.length - 1 &&
+                  playEpisode(currentIndex + 1)
+                }
+              >
+                Berikutnya →
+              </button>
+            </div>
+          </div>
+
+          <div className="desktopEpisodeList">
+            {episodes.map((episode, index) => {
+              const number =
+                getEpisodeNumber(
+                  episode,
+                  index
+                );
+
+              return (
+                <button
+                  key={`${String(
+                    episode.id ??
+                      episode.chapter_id ??
+                      episode.chapterId ??
+                      index
+                  )}-desktop`}
+                  type="button"
+                  className={
+                    "desktopEpisodeItem " +
+                    (index === currentIndex
+                      ? "active"
+                      : "")
+                  }
+                  onClick={() =>
+                    playEpisode(index)
+                  }
+                >
+                  {number}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* =====================================================
+          EPISODE DRAWER
+      ====================================================== */
 
       {drawerOpen && (
         <div
@@ -1890,7 +2010,7 @@ export default function WatchPage() {
 
           gap: 5px;
 
-          padding: 0;
+          padding: 0 8px;
 
           border: 1px solid
             rgba(
@@ -1932,6 +2052,135 @@ export default function WatchPage() {
           border-radius: 99px;
 
           background: #fff;
+        }
+
+        .episodeButton b {
+          display: none;
+        }
+
+        .mobileEpisodeControls {
+          position: absolute;
+          left: 50%;
+          bottom: 52px;
+          z-index: 20;
+          transform: translateX(-50%);
+          display: none;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+          pointer-events: none;
+        }
+
+        .mobileEpisodeControls button,
+        .mobileEpisodeControls span {
+          min-height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(255,255,255,.18);
+          border-radius: 999px;
+          background: rgba(0,0,0,.72);
+          color: #fff;
+          padding: 0 12px;
+          font-size: 11px;
+          font-weight: 700;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          pointer-events: auto;
+        }
+
+        .mobileEpisodeControls button:disabled {
+          opacity: .3;
+          cursor: not-allowed;
+        }
+
+        .desktopEpisodeBar {
+          flex: 0 0 auto;
+          width: 100%;
+          max-height: 150px;
+          overflow: hidden;
+          padding: 10px 14px 12px;
+          background: #0b0e14;
+          border-top: 1px solid rgba(255,255,255,.08);
+        }
+
+        .desktopEpisodeHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .desktopEpisodeHeader strong {
+          display: block;
+          font-size: 12px;
+          font-weight: 800;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 48vw;
+        }
+
+        .desktopEpisodeHeader span {
+          display: block;
+          margin-top: 2px;
+          color: rgba(255,255,255,.45);
+          font-size: 10px;
+        }
+
+        .desktopNav {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+
+        .desktopNav button {
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 8px;
+          background: rgba(255,255,255,.05);
+          color: rgba(255,255,255,.75);
+          padding: 7px 10px;
+          font-size: 10px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .desktopNav button:last-child {
+          background: #fff;
+          color: #000;
+        }
+
+        .desktopNav button:disabled {
+          opacity: .3;
+          cursor: not-allowed;
+        }
+
+        .desktopEpisodeList {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scrollbar-width: thin;
+        }
+
+        .desktopEpisodeItem {
+          flex: 0 0 auto;
+          min-width: 38px;
+          height: 34px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 8px;
+          background: rgba(255,255,255,.05);
+          color: rgba(255,255,255,.65);
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .desktopEpisodeItem.active {
+          border-color: rgba(255,255,255,.55);
+          background: #fff;
+          color: #000;
         }
 
         .loadingOverlay {
@@ -2298,6 +2547,10 @@ export default function WatchPage() {
             font-size: 12px;
           }
 
+          .mobileEpisodeControls {
+            display: flex;
+          }
+
           .episodeButton {
             top: 10px;
             right: 10px;
@@ -2310,6 +2563,17 @@ export default function WatchPage() {
 
           .episodeButton span {
             width: 16px;
+          }
+
+          .episodeButton b {
+            display: block;
+            margin-left: 2px;
+            font-size: 9px;
+            line-height: 1;
+          }
+
+          .desktopEpisodeBar {
+            display: none;
           }
 
           .episodeDrawer {
