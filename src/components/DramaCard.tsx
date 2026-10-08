@@ -32,7 +32,10 @@ export function DramaCard({
     platform === "iqiyi"
       ? "/api/iqiyi/image?url=" +
         encodeURIComponent(drama.coverWap || drama.cover || "")
-      : drama.coverWap || drama.cover || "";
+      : platform === "stardusttv"
+        ? "/api/stardusttv/image?url=" +
+          encodeURIComponent(drama.coverWap || drama.cover || "")
+        : drama.coverWap || drama.cover || "";
 
   return (
     <UnifiedMediaCard
