@@ -1,353 +1,316 @@
+"use client";
+
 import { useQuery } from "@tanstack/react-query";
+import type { Drama } from "@/types/drama";
 
-function cleanText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+function text(value: unknown): string {
+  return typeof value === "string"
+    ? value.trim()
+    : value == null
+      ? ""
+      : String(value).trim();
 }
 
-/**
- * Menentukan apakah sebuah judul merupakan judul Indonesia.
- *
- * MeloShort/QuickPlay dengan lang=id ternyata masih mengembalikan
- * campuran judul Indonesia, Inggris, dan Arab.
- *
- * Karena response tidak menyediakan languageCode per item,
- * kita filter berdasarkan karakter judul.
- */
-function isIndonesianTitle(title: string): boolean {
-  const text = cleanText(title);
-
-  if (!text) return false;
-
-  // Arab -> bukan Indonesia
-  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text)) {
-    return false;
+function pick(value: any, keys: string[], fallback = ""): string {
+  for (const key of keys) {
+    const result = text(value?.[key]);
+    if (result) return result;
   }
-
-  // CJK -> bukan Indonesia
-  if (/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]/.test(text)) {
-    return false;
-  }
-
-  /*
-   * Judul MeloShort berbahasa Indonesia umumnya menggunakan
-   * karakter Latin dan mengandung kata-kata Indonesia.
-   *
-   * Kita beri prioritas tinggi untuk kata Indonesia umum.
-   */
-  const lower = text.toLowerCase();
-
-  const indonesianWords = [
-    "cinta",
-    "dalam",
-    "mencari",
-    "ketika",
-    "wajah",
-    "suami",
-    "istri",
-    "menikah",
-    "pernikahan",
-    "sebelum",
-    "setelah",
-    "balas",
-    "dendam",
-    "si",
-    "kecil",
-    "sejati",
-    "palsu",
-    "palsu",
-    "ternyata",
-    "miliarder",
-    "hati",
-    "air mata",
-    "cinta",
-    "kasih",
-    "keluarga",
-    "rahasia",
-    "takdir",
-    "nasib",
-    "pengantin",
-    "anak",
-    "ayah",
-    "ibu",
-    "bos",
-    "presiden",
-    "kehidupan",
-    "hidup",
-    "bahagia",
-    "terjebak",
-    "terlahir",
-    "kembali",
-    "pengganti",
-    "jodoh",
-    "cemburu",
-    "cinta sejati",
-    "cerita",
-    "gadis",
-    "wanita",
-    "pria",
-    "lelaki",
-  ];
-
-  if (indonesianWords.some((word) => lower.includes(word))) {
-    return true;
-  }
-
-  /*
-   * Kalau tidak mengandung kata Indonesia yang umum,
-   * kita tetap menerima judul Latin yang punya karakter khas
-   * bahasa Indonesia.
-   *
-   * Namun judul Inggris murni seperti:
-   * "Solely Mine"
-   * "Bound to the Reaper"
-   * "The Mermaid Baby Worth Millions"
-   * akan ditolak.
-   */
-  const englishWords = [
-    "the",
-    "a ",
-    "an ",
-    "and ",
-    "or ",
-    "to ",
-    "by ",
-    "with ",
-    "of ",
-    "mine",
-    "worth",
-    "million",
-    "millions",
-    "reaper",
-    "dragon",
-    "shadow",
-    "duke",
-    "baby",
-    "mafia",
-    "stepdad",
-    "heiress",
-    "impostor",
-    "trapped",
-    "wedding",
-    "scheme",
-    "solely",
-    "blood",
-    "holy",
-    "nanny",
-    "vampire",
-    "bond",
-    "deadly",
-    "love",
-    "revenge",
-    "reborn",
-    "broken",
-    "heart",
-    "tycoon",
-    "daughter",
-    "wife",
-    "husband",
-    "queen",
-    "king",
-    "secret",
-  ];
-
-  if (englishWords.some((word) => lower.includes(word))) {
-    return false;
-  }
-
-  /*
-   * Untuk keamanan, judul yang hanya terdiri dari huruf Latin
-   * tetap boleh masuk jika bukan jelas-jelas Inggris/Arab.
-   *
-   * Ini menangani judul Indonesia yang tidak mengandung kata
-   * dari daftar di atas.
-   */
-  return /^[A-Za-zÀ-ÿ0-9\s.,!?'"“”‘’:&()\-…]+$/.test(text);
+  return fallback;
 }
 
-function pickCover(item: any): string {
-  return (
-    cleanText(item?.cover) ||
-    cleanText(item?.coverWap) ||
-    cleanText(item?.cover_url) ||
-    cleanText(item?.coverUrl) ||
-    cleanText(item?.book_pic) ||
-    cleanText(item?.bookPic) ||
-    cleanText(item?.cover_pic) ||
-    cleanText(item?.image) ||
-    ""
+function list(value: any): any[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+
+  for (const key of [
+    "data",
+    "list",
+    "items",
+    "results",
+    "dramas",
+    "books",
+    "records",
+    "episodes",
+    "episodeList",
+    "episode_list",
+    "chapters",
+    "chapterList",
+    "chapter_list",
+    "videos",
+    "videoList",
+    "video_list",
+  ]) {
+    if (Array.isArray(value[key])) return value[key];
+
+    const nested = list(value[key]);
+    if (nested.length) return nested;
+  }
+
+  return [];
+}
+
+function mapDrama(item: any): Drama {
+  const bookId = pick(item, [
+    "id",
+    "bookId",
+    "book_id",
+    "dramaId",
+    "drama_id",
+    "videoId",
+  ]);
+
+  const bookName = pick(item, [
+    "title",
+    "bookName",
+    "book_name",
+    "dramaName",
+    "name",
+  ], "Untitled");
+
+  const cover = pick(item, [
+    "cover",
+    "coverUrl",
+    "cover_url",
+    "poster",
+    "posterUrl",
+    "image",
+    "thumbnail",
+    "book_pic",
+  ]);
+
+  const chapterCount = Number(
+    item?.chapterCount ??
+      item?.chapter_count ??
+      item?.episodeCount ??
+      item?.episode_count ??
+      item?.totalEpisodes ??
+      item?.total_episodes ??
+      0,
   );
+
+  return {
+    bookId,
+    bookName,
+    cover,
+    coverWap: cover,
+    chapterCount: Number.isFinite(chapterCount) ? chapterCount : 0,
+    introduction: pick(item, [
+      "synopsis",
+      "introduction",
+      "description",
+      "desc",
+      "summary",
+    ]),
+    tags: [],
+    inLibrary: Boolean(item?.inLibrary ?? false),
+  };
 }
 
-function pickTags(item: any): string[] {
-  const source =
-    item?.tags ??
-    item?.genres ??
-    item?.tagNames ??
-    item?.book_theme ??
-    [];
+async function request(path: string, params: Record<string, string> = {}) {
+  const query = new URLSearchParams({
+    path,
+    category_p: "meloshort",
+    lang: "id",
+    ...params,
+  });
 
-  if (!Array.isArray(source)) return [];
+  const response = await fetch("/api/meloshort?" + query.toString(), {
+    cache: "no-store",
+  });
 
-  return source
-    .map((tag: any) => {
-      if (typeof tag === "string") return tag.trim();
+  const raw = await response.text();
 
-      return (
-        cleanText(tag?.tagName) ||
-        cleanText(tag?.name) ||
-        cleanText(tag?.title) ||
-        cleanText(tag?.value)
-      );
-    })
-    .filter(Boolean);
+  let json: any;
+
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      "Respons MeloShort bukan JSON (HTTP " + response.status + ")",
+    );
+  }
+
+  if (!response.ok || json?.success === false) {
+    throw new Error(
+      json?.error ||
+        json?.message ||
+        "QuickPlay HTTP " + response.status,
+    );
+  }
+
+  return json;
 }
 
-export function useMeloShortDramas() {
+export function useMeloShortHome() {
   return useQuery({
-    queryKey: ["meloshort-dramas", "id"],
-
+    queryKey: ["meloshort", "home", "id"],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        path: "/api/v2/home",
-        category_p: "meloshort",
-        lang: "id",
-      });
+      const response = await request("/api/v2/home");
 
-      const res = await fetch(`/api/meloshort?${params.toString()}`, {
-        cache: "no-store",
-      });
-
-      const raw = await res.text();
-
-      let json: any;
-
-      try {
-        json = JSON.parse(raw);
-      } catch {
-        throw new Error(
-          `Respons MeloShort bukan JSON (HTTP ${res.status})`
-        );
-      }
-
-      if (!res.ok || json?.success === false) {
-        throw new Error(
-          `MeloShort: ${
-            json?.error ||
-            json?.message ||
-            `HTTP ${res.status} dari QuickPlay API`
-          }`
-        );
-      }
-
-      const list = Array.isArray(json?.data)
-        ? json.data
-        : [];
-
-      /*
-       * ==========================================================
-       * FILTER BAHASA
-       * ==========================================================
-       *
-       * API lang=id masih memberikan campuran bahasa.
-       * Jadi kita hanya memasukkan judul yang terdeteksi
-       * sebagai judul Indonesia/Latin non-Inggris.
-       */
-      const indonesianList = list.filter((item: any) => {
-        const title = cleanText(
-          item?.title ??
-            item?.bookName ??
-            item?.book_name ??
-            item?.name ??
-            ""
-        );
-
-        return isIndonesianTitle(title);
-      });
-
-      return indonesianList
-        .map((item: any) => {
-          const bookId = String(
-            item?.id ??
-              item?.bookId ??
-              item?.book_id ??
-              item?.quickplay_id ??
-              item?.quickplayId ??
-              ""
-          ).trim();
-
-          const bookName = cleanText(
-            item?.title ??
-              item?.bookName ??
-              item?.book_name ??
-              item?.name ??
-              "Untitled"
-          );
-
-          const introduction = cleanText(
-            item?.synopsis ??
-              item?.introduction ??
-              item?.description ??
-              item?.desc ??
-              item?.summary ??
-              ""
-          );
-
-          const cover = pickCover(item);
-
-          const chapterCount = Number(
-            item?.chapters ??
-              item?.chapterCount ??
-              item?.chapter_count ??
-              item?.total_episodes ??
-              item?.totalEpisodes ??
-              item?.episodeCount ??
-              item?.episode_count ??
-              0
-          );
-
-          const tags = pickTags(item);
-
-          return {
-            id: bookId,
-            bookId,
-
-            title: bookName,
-            bookName,
-
-            cover,
-            image: cover,
-
-            description: introduction,
-            introduction,
-
-            tags,
-
-            author: cleanText(item?.author),
-
-            status: cleanText(item?.status),
-
-            views:
-              item?.views ??
-              item?.viewCount ??
-              item?.view_count ??
-              "",
-
-            chapters: chapterCount,
-            chapterCount,
-
-            inLibrary: Boolean(item?.inLibrary ?? false),
-          };
-        })
-        .filter(
-          (item: any) =>
-            item.bookId &&
-            item.bookName &&
-            item.bookName !== "Untitled"
-        );
+      return list(response)
+        .map(mapDrama)
+        .filter((item) => item.bookId && item.bookName !== "Untitled");
     },
-
-    staleTime: 1000 * 60 * 5,
-
+    staleTime: 5 * 60 * 1000,
     retry: 2,
   });
+}
+
+export function useMeloShortDetail(id: string) {
+  return useQuery({
+    queryKey: ["meloshort", "detail", id],
+    enabled: Boolean(id),
+    queryFn: () => request("/api/v2/detail", { id }),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export async function getMeloShortStream(
+  id: string,
+  chapterId: string,
+) {
+  return request("/api/v2/video", {
+    id,
+    chapterId,
+  });
+}
+
+export function extractStardustStream(value: any): string {
+  const visited = new Set<any>();
+
+  function walk(node: any, depth = 0): string {
+    if (depth > 8 || node == null) return "";
+
+    if (typeof node === "string") {
+      return /^https?:\/\//i.test(node) ? node : "";
+    }
+
+    if (typeof node !== "object" || visited.has(node)) return "";
+    visited.add(node);
+
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const result = walk(item, depth + 1);
+        if (result) return result;
+      }
+      return "";
+    }
+
+    const preferredKeys = [
+      "videoUrl",
+      "video_url",
+      "playUrl",
+      "play_url",
+      "streamUrl",
+      "stream_url",
+      "m3u8",
+      "m3u8Url",
+      "hls",
+      "hlsUrl",
+      "mp4",
+      "url",
+    ];
+
+    for (const key of preferredKeys) {
+      const value = node[key];
+      if (typeof value === "string" && /^https?:\/\//i.test(value)) {
+        return value;
+      }
+    }
+
+    for (const key of Object.keys(node)) {
+      const result = walk(node[key], depth + 1);
+      if (result) return result;
+    }
+
+    return "";
+  }
+
+  return walk(value);
+}
+
+export function extractStardustEpisodes(value: any): any[] {
+  if (!value || typeof value !== "object") return [];
+
+  const preferredKeys = [
+    "episodes",
+    "episodeList",
+    "episode_list",
+    "chapters",
+    "chapterList",
+    "chapter_list",
+    "videos",
+    "videoList",
+    "video_list",
+  ];
+
+  function find(node: any, depth = 0): any[] {
+    if (depth > 10 || node == null || typeof node !== "object") {
+      return [];
+    }
+
+    if (Array.isArray(node)) {
+      return node;
+    }
+
+    for (const key of preferredKeys) {
+      const candidate = node[key];
+
+      if (Array.isArray(candidate) && candidate.length > 0) {
+        return candidate;
+      }
+
+      const nested = find(candidate, depth + 1);
+      if (nested.length > 0) {
+        return nested;
+      }
+    }
+
+    for (const key of Object.keys(node)) {
+      if (preferredKeys.includes(key)) continue;
+
+      const nested = find(node[key], depth + 1);
+      if (
+        nested.length > 0 &&
+        nested.some(
+          (item) =>
+            item &&
+            typeof item === "object" &&
+            ("episode" in item ||
+              "episodeNumber" in item ||
+              "episode_index" in item ||
+              "index" in item ||
+              "id" in item ||
+              "videoId" in item ||
+              "video_id" in item),
+        )
+      ) {
+        return nested;
+      }
+    }
+
+    return [];
+  }
+
+  return find(value);
+}
+
+export function extractStardustText(
+  value: any,
+  keys: string[],
+  fallback = "",
+): string {
+  if (!value || typeof value !== "object") return fallback;
+
+  const direct = pick(value, keys);
+  if (direct) return direct;
+
+  for (const key of Object.keys(value)) {
+    const nested = extractStardustText(value[key], keys, "");
+    if (nested) return nested;
+  }
+
+  return fallback;
 }
