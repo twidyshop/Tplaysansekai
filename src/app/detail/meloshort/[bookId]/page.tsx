@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useMeloShortDetail, extractStardustEpisodes, extractStardustText } from "@/hooks/useMeloShort";
+import { useMeloShortDetail, extractMeloShortEpisodes, extractMeloShortText } from "@/hooks/useMeloShort";
 
 export default function MeloShortDetailPage() {
   const params = useParams();
@@ -11,12 +11,12 @@ export default function MeloShortDetailPage() {
   const detailQuery = useMeloShortDetail(id);
 
   const detail = detailQuery.data;
-  const title = extractStardustText(
+  const title = extractMeloShortText(
     detail,
     ["title", "bookName", "book_name", "dramaName", "name"],
     "MeloShort",
   );
-  const cover = extractStardustText(
+  const cover = extractMeloShortText(
     detail,
     [
       "cover",
@@ -30,12 +30,12 @@ export default function MeloShortDetailPage() {
     ],
     "",
   );
-  const description = extractStardustText(
+  const description = extractMeloShortText(
     detail,
     ["synopsis", "introduction", "description", "desc", "summary"],
     "",
   );
-  const episodes = extractStardustEpisodes(detail);
+  const episodes = extractMeloShortEpisodes(detail);
 
   return (
     <main className="min-h-screen bg-[#0a0e27] text-white">
