@@ -1,10 +1,12 @@
 import { create } from "zustand";
 
 export type Platform =
-  | "iqiyi" | "wetv" | "meloshort" | "pinedrama" | "dramabox" | "reelshort" | "shortmax"
+  | "stardusttv" | "microdrama" | "iqiyi" | "wetv" | "meloshort" | "pinedrama" | "dramabox" | "reelshort" | "shortmax"
   | "netshort" | "melolo" | "freereels" | "flickreels" | "dramanova" | "goodshort" | string;
 
 export const PLATFORMS = [
+  { id: "stardusttv", name: "StardustTV", logo: "/stardusttv.svg", apiBase: "/api/stardusttv" },
+  { id: "microdrama", name: "MicroDrama", logo: "/microdrama.svg", apiBase: "/api/microdrama" },
   { id: "iqiyi", name: "iQIYI", logo: "/iqiyi.svg", apiBase: "/api/iqiyi" },
   { id: "wetv", name: "WeTV", logo: "/wetv.svg", apiBase: "/api/wetv" },
   { id: "meloshort", name: "MeloShort", logo: "/meloshort.png", apiBase: "/api/meloshort" },
@@ -37,6 +39,8 @@ export function usePlatform() {
   const getPlatformInfo = (platformId: Platform) => PLATFORMS.find((p) => p.id === platformId) || PLATFORMS[0];
   return {
     currentPlatform, platformInfo, setPlatform, platforms: PLATFORMS, getPlatformInfo,
+    isStardustTV: currentPlatform === "stardusttv",
+    isMicroDrama: currentPlatform === "microdrama",
     isIqiyi: currentPlatform === "iqiyi",
     isWetv: currentPlatform === "wetv",
     isMeloShort: currentPlatform === "meloshort",
