@@ -4,6 +4,143 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Hls from "hls.js";
+
+type MeloFfmpeg = {
+  loaded: boolean;
+  on: (event: "log", callback: (data: { message: string }) => void) => void;
+  load: (config: { coreURL: string; wasmURL: string; workerLoadURL: string }) => Promise<boolean>;
+  writeFile: (path: string, data: Uint8Array) => Promise<boolean>;
+  exec: (args: string[], timeout?: number) => Promise<number>;
+  readFile: (path: string) => Promise<Uint8Array | string>;
+  deleteFile: (path: string) => Promise<boolean>;
+  terminate: () => void;
+};
+
+declare global {
+  interface Window {
+    FFmpegWASM?: { FFmpeg: new () => MeloFfmpeg };
+  }
+}
+
+let meloshortFfmpegPromise: Promise<MeloFfmpeg> | null = null;
+
+async function toMeloBlobURL(url: string, type: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Gagal mengambil FFmpeg resource (${response.status}).`);
+  const blob = await response.blob();
+  return URL.createObjectURL(new Blob([blob], { type }));
+}
+
+async function loadMeloShortFfmpeg(): Promise<MeloFfmpeg> {
+  if (meloshortFfmpegPromise) return meloshortFfmpegPromise;
+
+  meloshortFfmpegPromise = (async () => {
+    const ffmpegBase = "https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd";
+    const coreBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+
+    if (!window.FFmpegWASM?.FFmpeg) {
+      const sourceResponse = await fetch(`${ffmpegBase}/ffmpeg.js`);
+      if (!sourceResponse.ok) throw new Error("Gagal memuat FFmpeg player.");
+      let source = await sourceResponse.text();
+      source = source.replace("new URL(e.p+e.u(814),e.b)", "r.workerLoadURL");
+
+      const moduleUrl = URL.createObjectURL(
+        new Blob([source], { type: "text/javascript" })
+      );
+
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = moduleUrl;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("FFmpeg UMD gagal dimuat."));
+        document.head.appendChild(script);
+      });
+    }
+
+    if (!window.FFmpegWASM?.FFmpeg) {
+      throw new Error("FFmpeg player tidak tersedia di browser.");
+    }
+
+    const ffmpeg = new window.FFmpegWASM.FFmpeg();
+    const coreURL = await toMeloBlobURL(`${coreBase}/ffmpeg-core.js`, "text/javascript");
+    const wasmURL = await toMeloBlobURL(`${coreBase}/ffmpeg-core.wasm`, "application/wasm");
+    const workerLoadURL = await toMeloBlobURL(`${ffmpegBase}/814.ffmpeg.js`, "text/javascript");
+
+    await ffmpeg.load({ coreURL, wasmURL, workerLoadURL });
+    return ffmpeg;
+  })().catch((error) => {
+    meloshortFfmpegPromise = null;
+    throw error;
+  });
+
+  return meloshortFfmpegPromise;
+}
+
+async function transcodeMeloShortHlsToMp4(
+  hlsUrl: string,
+  onProgress?: (message: string) => void
+) {
+  const proxyUrl = "/api/meloshort/stream?url=" + encodeURIComponent(hlsUrl);
+  const playlistResponse = await fetch(proxyUrl, { cache: "no-store" });
+  if (!playlistResponse.ok) {
+    throw new Error(`Playlist MeloShort gagal diambil (${playlistResponse.status}).`);
+  }
+
+  const playlist = await playlistResponse.text();
+  const segmentUrls = playlist
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+
+  if (!segmentUrls.length) {
+    throw new Error("Playlist MeloShort tidak memiliki segment video.");
+  }
+
+  onProgress?.(`Mengambil video MeloShort (0/${segmentUrls.length})...`);
+
+  const segments: Uint8Array[] = [];
+  for (let index = 0; index < segmentUrls.length; index += 1) {
+    const response = await fetch(segmentUrls[index], { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Segment video gagal diambil (${response.status}).`);
+    }
+    segments.push(new Uint8Array(await response.arrayBuffer()));
+    onProgress?.(`Mengambil video MeloShort (${index + 1}/${segmentUrls.length})...`);
+  }
+
+  const totalSize = segments.reduce((sum, segment) => sum + segment.byteLength, 0);
+  const input = new Uint8Array(totalSize);
+  let offset = 0;
+  for (const segment of segments) {
+    input.set(segment, offset);
+    offset += segment.byteLength;
+  }
+
+  onProgress?.("Menyiapkan decoder HEVC...");
+  const ffmpeg = await loadMeloShortFfmpeg();
+  await ffmpeg.writeFile("meloshort.ts", input);
+  onProgress?.("Mengonversi HEVC → H.264...");
+
+  const exitCode = await ffmpeg.exec([
+    "-i", "meloshort.ts",
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-crf", "28",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-movflags", "+faststart",
+    "meloshort.mp4",
+  ]);
+
+  if (exitCode !== 0) {
+    throw new Error("FFmpeg gagal mengonversi video HEVC MeloShort.");
+  }
+
+  const output = await ffmpeg.readFile("meloshort.mp4");
+  const bytes = typeof output === "string" ? new TextEncoder().encode(output) : output;
+  return URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+}
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 
 import {
@@ -82,11 +219,46 @@ export default function MeloShortWatchPage() {
 
     const proxyUrl = "/api/meloshort/stream?url=" + encodeURIComponent(streamUrl);
     let hls: Hls | null = null;
+    let cancelled = false;
+    let generatedUrl = "";
 
-    // MeloShort returns a valid single-variant MPEG-TS media playlist.
-    // Do not force/select an hls.js "video level": there is no master
-    // playlist here and the playlist itself already contains audio+video.
-    if (/\.m3u8(?:$|[?#])/i.test(streamUrl) && Hls.isSupported()) {
+    const playWithFfmpegFallback = async () => {
+      try {
+        setError("MeloShort memakai HEVC. Menyiapkan player kompatibel...");
+        generatedUrl = await transcodeMeloShortHlsToMp4(streamUrl, (message) => {
+          if (!cancelled) setError(message);
+        });
+        if (cancelled) {
+          URL.revokeObjectURL(generatedUrl);
+          return;
+        }
+        setError("");
+        video.src = generatedUrl;
+        video.load();
+        await video.play().catch(() => {});
+      } catch (fallbackError) {
+        if (!cancelled) {
+          console.error("[MELOSHORT FFMPEG FALLBACK]", fallbackError);
+          setError(
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : "Video MeloShort gagal dikonversi ke format yang didukung browser."
+          );
+        }
+      }
+    };
+
+    // Safari/iOS can play HEVC HLS natively. Chrome/Windows uses hls.js first;
+    // if MSE rejects HEVC, it falls back to client-side H.264 transcoding.
+    const isAppleBrowser =
+      /Mobi|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      /Macintosh/i.test(navigator.userAgent);
+
+    if (isAppleBrowser) {
+      video.src = proxyUrl;
+      video.load();
+      void video.play().catch(() => {});
+    } else if (/\.m3u8(?:$|[?#])/i.test(streamUrl) && Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -101,17 +273,22 @@ export default function MeloShortWatchPage() {
         fragLoadingMaxRetry: 3,
       });
 
-      const onMediaAttached = () => {
-        hls?.startLoad(0);
-      };
-
-      hls.on(Hls.Events.MEDIA_ATTACHED, onMediaAttached);
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls?.startLoad(0));
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         void video.play().catch(() => {});
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.error("[MELOSHORT HLS ERROR]", data);
-        if (data.fatal) {
+        if (
+          data.fatal &&
+          (data.details === "bufferAddCodecError" ||
+            data.details === "bufferAppendError" ||
+            data.type === Hls.ErrorTypes.MEDIA_ERROR)
+        ) {
+          hls?.destroy();
+          hls = null;
+          void playWithFfmpegFallback();
+        } else if (data.fatal) {
           setError("Video MeloShort gagal dimuat: " + (data.details || "HLS error"));
         }
       });
@@ -119,14 +296,15 @@ export default function MeloShortWatchPage() {
       hls.attachMedia(video);
       hls.loadSource(proxyUrl);
     } else {
-      // Safari can play this HLS playlist natively; for non-HLS fallback
-      // let the browser handle the direct proxied media URL.
       video.src = proxyUrl;
       video.load();
     }
 
     return () => {
+      cancelled = true;
       hls?.destroy();
+      hls = null;
+      if (generatedUrl) URL.revokeObjectURL(generatedUrl);
       video.removeAttribute("src");
       video.load();
     };
