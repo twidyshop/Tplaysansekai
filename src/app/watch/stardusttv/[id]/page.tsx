@@ -19,6 +19,7 @@ export default function StardustTVWatchPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [selectedEpisode, setSelectedEpisode] = useState(1);
+  const [selectedChapterId, setSelectedChapterId] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [error, setError] = useState("");
 
@@ -44,9 +45,20 @@ export default function StardustTVWatchPage() {
         firstEpisode?.index ??
         1,
     );
+    const firstChapterId = String(
+      firstEpisode?.id ??
+        firstEpisode?.chapterId ??
+        firstEpisode?.chapter_id ??
+        firstEpisode?.videoId ??
+        firstEpisode?.video_id ??
+        "",
+    );
 
     if (Number.isFinite(firstNumber) && firstNumber > 0) {
       setSelectedEpisode(firstNumber);
+    }
+    if (firstChapterId) {
+      setSelectedChapterId(firstChapterId);
     }
   }, [episodes]);
 
@@ -58,9 +70,11 @@ export default function StardustTVWatchPage() {
       setStreamUrl("");
 
       try {
+        if (!selectedChapterId) return;
+
         const response = await getStardustTVStream(
           id,
-          String(selectedEpisode),
+          selectedChapterId,
         );
 
         const source = extractStardustStream(response);
@@ -90,7 +104,7 @@ export default function StardustTVWatchPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, selectedEpisode]);
+  }, [id, selectedEpisode, selectedChapterId]);
 
   useEffect(() => {
     if (!videoRef.current || !streamUrl) return;
@@ -152,7 +166,18 @@ export default function StardustTVWatchPage() {
                   <button
                     key={String(episode?.id ?? number) + "-" + index}
                     type="button"
-                    onClick={() => setSelectedEpisode(number)}
+                    onClick={() => {
+                      setSelectedEpisode(number);
+                      const chapterId = String(
+                        episode?.id ??
+                          episode?.chapterId ??
+                          episode?.chapter_id ??
+                          episode?.videoId ??
+                          episode?.video_id ??
+                          "",
+                      );
+                      setSelectedChapterId(chapterId);
+                    }}
                     className={
                       "rounded-lg border px-3 py-2 text-xs font-semibold " +
                       (number === selectedEpisode
