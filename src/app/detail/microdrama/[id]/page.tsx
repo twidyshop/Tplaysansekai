@@ -1,0 +1,1 @@
+"use client";import QuickPlayDetailPage from "@/components/QuickPlayDetailPage";export default function Page(){return <QuickPlayDetailPage platform="microdrama" name="MicroDrama"/>}
