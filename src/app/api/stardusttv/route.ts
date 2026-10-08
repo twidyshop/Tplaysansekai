@@ -26,60 +26,23 @@ function signAndFetch(
   });
 }
 
-function buildVideoCandidates(
+function buildVideoUrl(
   base: URL,
   searchParams: URLSearchParams,
-): URL[] {
+): URL | null {
   const id = searchParams.get("id") || "";
-  const episode =
-    searchParams.get("episode") ||
-    searchParams.get("ep") ||
-    searchParams.get("episode_index") ||
-    "1";
+  const chapterId = searchParams.get("chapterId") || "";
 
-  const candidates: Array<Record<string, string>> = [
-    { id, episode },
-    { bookId: id, episode },
-    { book_id: id, episode },
-    { dramaId: id, episode },
-    { drama_id: id, episode },
-    { videoId: id, episode },
-    { video_id: id, episode },
-    { id, ep: episode },
-    { id, episode_index: episode },
-    { id, episodeNumber: episode },
-    { book_id: id, episode_index: episode },
-    { video_id: id, episode_index: episode },
-  ];
+  if (!id || !chapterId) return null;
 
-  return candidates
-    .filter((candidate) =>
-      Object.values(candidate).every((value) => Boolean(value)),
-    )
-    .map((candidate) => {
-      const url = new URL(base.toString());
+  const url = new URL(base.toString());
 
-      for (const [key, value] of searchParams.entries()) {
-        if (
-          key !== "path" &&
-          key !== "id" &&
-          key !== "episode" &&
-          key !== "ep" &&
-          key !== "episode_index"
-        ) {
-          url.searchParams.set(key, value);
-        }
-      }
+  url.searchParams.set("category_p", "stardusttv");
+  url.searchParams.set("id", id);
+  url.searchParams.set("chapterId", chapterId);
+  url.searchParams.set("lang", searchParams.get("lang") || "id");
 
-      for (const [key, value] of Object.entries(candidate)) {
-        url.searchParams.set(key, value);
-      }
-
-      url.searchParams.set("category_p", "stardusttv");
-      url.searchParams.set("lang", searchParams.get("lang") || "id");
-
-      return url;
-    });
+  return url;
 }
 
 export async function GET(request: NextRequest) {
@@ -112,27 +75,19 @@ export async function GET(request: NextRequest) {
     let response: Response;
 
     if (targetPath === "/api/v2/video") {
-      const candidates = buildVideoCandidates(
-        upstreamBase,
-        searchParams,
-      );
+      const videoUrl = buildVideoUrl(upstreamBase, searchParams);
 
-      if (candidates.length === 0) {
+      if (!videoUrl) {
         return NextResponse.json(
           {
             success: false,
-            error: "Parameter id dan episode wajib diisi",
+            error: "Parameter id dan chapterId wajib diisi",
           },
           { status: 400 },
         );
       }
 
-      response = await signAndFetch(candidates[0], apiKey);
-
-      for (let index = 1; index < candidates.length; index += 1) {
-        if (response.ok) break;
-        response = await signAndFetch(candidates[index], apiKey);
-      }
+      response = await signAndFetch(videoUrl, apiKey);
     } else {
       for (const [key, value] of searchParams.entries()) {
         if (key !== "path") {
