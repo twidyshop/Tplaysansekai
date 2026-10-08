@@ -1,0 +1,11 @@
+"use client";
+import {useEffect,useRef,useState} from "react";
+import {useParams} from "next/navigation";
+import Link from "next/link";
+import {getQuickPlayDetail,getQuickPlayStream,extractStream,type QuickPlayPlatform} from "@/hooks/useQuickPlay";
+export default function QuickPlayWatchPage({platform,name}:{platform:QuickPlayPlatform;name:string}){
+ const p=useParams();const id=String(p.id||"");const video=useRef<HTMLVideoElement>(null);const [episodes,setEpisodes]=useState<any[]>([]);const [current,setCurrent]=useState(0);const [error,setError]=useState("");
+ useEffect(()=>{let stop=false;(async()=>{try{const raw=await getQuickPlayDetail(platform,id);const d=raw?.data&&typeof raw.data==="object"?raw.data:raw;const eps=Array.isArray(d?.episodes)?d.episodes:Array.isArray(d?.chapters)?d.chapters:Array.isArray(d?.episodeList)?d.episodeList:[];if(!eps.length)throw new Error("Episode tidak ditemukan.");if(!stop){setEpisodes(eps);play(0,eps);}}catch(e:any){if(!stop)setError(e?.message||"Gagal memuat drama.");}})();return()=>{stop=true;video.current?.pause();};},[id,platform]);
+ async function play(index:number,list=episodes){const ep=list[index];if(!ep)return;setCurrent(index);setError("");try{const epId=String(ep?.id??ep?.episodeId??ep?.episode_id??ep?.chapterId??ep?.chapter_id??ep?.episode??index+1);const raw=await getQuickPlayStream(platform,id,epId);const info=extractStream(raw);if(!info.url)throw new Error("URL video tidak ditemukan dari QuickPlay.");const src="/api/"+platform+"/stream?url="+encodeURIComponent(info.url);if(video.current){video.current.src=src;video.current.load();await video.current.play().catch(()=>{});}}catch(e:any){setError(e?.message||"Gagal memutar episode.");}}
+ return <main className="fixed inset-0 bg-black text-white flex flex-col"><header className="h-14 shrink-0 border-b border-white/10 flex items-center justify-between px-4"><Link href="/">▶ TPLAY</Link><Link href="/">Home</Link></header><section className="relative flex-1 flex items-center justify-center"><video ref={video} controls playsInline className="w-full h-full object-contain bg-black" onEnded={()=>current+1<episodes.length&&play(current+1)}/>{error&&<div className="absolute inset-0 flex items-center justify-center bg-black/70 p-5"><p>{error}</p></div>}<button onClick={()=>{}} className="hidden"/></section></main>;
+}
