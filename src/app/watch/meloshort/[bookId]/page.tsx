@@ -32,9 +32,6 @@ export default function MeloShortWatchPage() {
 
   const detail = detailQuery.data;
 
-  // Detail response MeloShort can contain generic/category titles such as
-  // "Drama Pilihan" before the actual drama object. Prefer the real title
-  // from the main data object and ignore known generic labels.
   const getStardustHistoryTitle = (value: any): string => {
     const genericTitles = new Set([
       "drama pilihan",
@@ -69,7 +66,6 @@ export default function MeloShortWatchPage() {
         }
       }
 
-      // Search the main payload first, then nested objects.
       for (const key of ["data", "detail", "book", "drama", "result"]) {
         if (node[key] && typeof node[key] === "object") {
           collect(node[key], depth + 1);
@@ -184,8 +180,6 @@ export default function MeloShortWatchPage() {
       "/api/meloshort/stream?url=" + encodeURIComponent(streamUrl);
     const isHls = /\.m3u8(?:$|[?#])/i.test(streamUrl);
 
-    // MeloShort commonly returns HLS. Chrome/Edge do not play HLS
-    // through a plain <video src>, so use hls.js when native HLS is absent.
     let hls: Hls | null = null;
 
     if (isHls && !video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -194,9 +188,28 @@ export default function MeloShortWatchPage() {
           enableWorker: true,
           lowLatencyMode: false,
           backBufferLength: 90,
+          capLevelToPlayerSize: false,
         });
-        hls.loadSource(proxyUrl);
+
+        // Attach the media element before loading the playlist.
         hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+          // MeloShort's API reports this stream as 1280x720. If the HLS
+          // manifest also exposes an audio-only rendition, do not let hls.js
+          // auto-select that level.
+          const videoLevel = data.levels.findIndex(
+            (level) => Number(level.height || 0) > 0 && Number(level.width || 0) > 0,
+          );
+
+          if (videoLevel >= 0) {
+            hls!.currentLevel = videoLevel;
+          }
+
+          void video.play().catch(() => {
+            // Browser autoplay policy may require a user gesture.
+          });
+        });
 
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) {
@@ -206,6 +219,8 @@ export default function MeloShortWatchPage() {
             );
           }
         });
+
+        hls.loadSource(proxyUrl);
       } else {
         video.src = proxyUrl;
         video.load();
@@ -315,7 +330,6 @@ export default function MeloShortWatchPage() {
 
           {episodes.length > 0 && (
             <>
-              {/* Mobile episode picker inside the player */}
               <button
                 type="button"
                 onClick={() => setEpisodeMenuOpen((open) => !open)}
@@ -330,7 +344,6 @@ export default function MeloShortWatchPage() {
                 <span>Ep {selectedEpisode}</span>
               </button>
 
-              {/* Mobile previous / next episode controls */}
               <div className="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center gap-3 md:hidden">
                 <button
                   type="button"
@@ -359,7 +372,6 @@ export default function MeloShortWatchPage() {
                 </button>
               </div>
 
-              {/* Mobile episode drawer */}
               {episodeMenuOpen && (
                 <div className="absolute inset-x-3 top-14 z-30 max-h-[65%] overflow-y-auto rounded-2xl border border-white/10 bg-[#0a0e27]/95 p-3 shadow-2xl backdrop-blur-xl md:hidden">
                   <div className="mb-2 flex items-center justify-between px-1">
@@ -416,7 +428,6 @@ export default function MeloShortWatchPage() {
           </div>
         )}
 
-        {/* Desktop episode list stays outside the player */}
         {episodes.length > 0 && (
           <div className="hidden max-h-32 overflow-y-auto border-t border-white/10 bg-[#0a0e27] p-3 md:block">
             <div className="mb-2 flex items-center justify-between gap-3">
