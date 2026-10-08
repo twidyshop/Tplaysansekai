@@ -34,9 +34,15 @@ const makeHistoryId = (platform: string, id: string) => {
 
   // Hindari ID berulang seperti stardusttv:stardusttv:19962
   const prefix = normalizedPlatform + ":";
-  return rawId.toLowerCase().startsWith(prefix)
-    ? rawId
-    : prefix + rawId;
+  let cleanId = rawId;
+
+  // Collapse legacy IDs that were accidentally prefixed more than once,
+  // e.g. stardusttv:stardusttv:19962 -> 19962.
+  while (cleanId.toLowerCase().startsWith(prefix)) {
+    cleanId = cleanId.slice(prefix.length);
+  }
+
+  return prefix + cleanId;
 };
 
 export const useWatchHistoryStore = create<WatchHistoryStore>((set, get) => ({
@@ -127,19 +133,44 @@ export function useWatchHistory() {
                 };
               });
 
-            // Deduplicate old history entries after normalizing their IDs.
-            const deduped = items.filter(
-              (item, index, array) =>
-                array.findIndex((other) => other.id === item.id) === index,
-            );
+            // Deduplicate after normalizing IDs. If a legacy generic
+            // StardustTV entry exists, prefer the newer entry with a real
+            // title/episode instead of keeping "Drama Pilihan".
+            const byId = new Map<string, WatchHistoryItem>();
 
-            useWatchHistoryStore.setState({
-              items: deduped.slice(0, MAX_HISTORY),
-            });
+            for (const item of items) {
+              const existing = byId.get(item.id);
+              const genericStardustTitle =
+                item.platform.toLowerCase() === "stardusttv" &&
+                ["drama pilihan", "stardusttv", "untitled", "drama"].includes(
+                  item.title.toLowerCase(),
+                );
+
+              if (!existing) {
+                byId.set(item.id, item);
+                continue;
+              }
+
+              const existingGenericStardust =
+                existing.platform.toLowerCase() === "stardusttv" &&
+                ["drama pilihan", "stardusttv", "untitled", "drama"].includes(
+                  existing.title.toLowerCase(),
+                );
+
+              if (existingGenericStardust && !genericStardustTitle) {
+                byId.set(item.id, item);
+              }
+            }
+
+            const deduped = Array.from(byId.values())
+              .sort((a, b) => b.timestamp - a.timestamp)
+              .slice(0, MAX_HISTORY);
+
+            useWatchHistoryStore.setState({ items: deduped });
 
             localStorage.setItem(
               STORAGE_KEY,
-              JSON.stringify(deduped.slice(0, MAX_HISTORY)),
+              JSON.stringify(deduped),
             );
           }
         } catch (e) {
