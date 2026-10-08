@@ -10,8 +10,6 @@ export interface WatchHistoryItem {
   platform: string;
   timestamp: number;
   url: string;
-
-  // Informasi episode
   episode?: number;
   totalEpisodes?: number;
 }
@@ -27,37 +25,41 @@ interface WatchHistoryStore {
 const STORAGE_KEY = "tplay_watch_history";
 const MAX_HISTORY = 20;
 
+const normalizePlatform = (platform: string) =>
+  String(platform || "").trim().toLowerCase();
+
+const makeHistoryId = (platform: string, id: string) => {
+  const normalizedPlatform = normalizePlatform(platform);
+  const rawId = String(id || "").trim();
+
+  // Hindari ID berulang seperti stardusttv:stardusttv:19962
+  const prefix = normalizedPlatform + ":";
+  return rawId.toLowerCase().startsWith(prefix)
+    ? rawId
+    : prefix + rawId;
+};
+
 export const useWatchHistoryStore = create<WatchHistoryStore>((set, get) => ({
   items: [],
 
   addItem: (item: WatchHistoryItem) => {
     const current = get().items;
-
-    /*
-     * ID dibuat berdasarkan platform + drama ID.
-     * Jadi drama dengan ID sama dari platform berbeda
-     * tidak akan saling menimpa.
-     */
-    const historyId = `${item.platform.toLowerCase()}:${item.id}`;
+    const historyId = makeHistoryId(item.platform, item.id);
 
     const normalizedItem: WatchHistoryItem = {
       ...item,
       id: historyId,
+      title: String(item.title || "").trim(),
+      image: String(item.image || ""),
+      platform: String(item.platform || "").trim(),
+      url: String(item.url || "#"),
       timestamp: Date.now(),
     };
 
-    const filtered = current.filter((i) => {
-      /*
-       * History lama mungkin masih menggunakan ID biasa.
-       * Kita cocokkan berdasarkan ID baru maupun kombinasi platform + ID.
-       */
-      const existingHistoryId = `${i.platform.toLowerCase()}:${i.id}`;
-
-      return (
-        i.id !== historyId &&
-        existingHistoryId !== historyId
-      );
-    });
+    const filtered = current.filter(
+      (existing) =>
+        makeHistoryId(existing.platform, existing.id) !== historyId,
+    );
 
     const updated = [normalizedItem, ...filtered].slice(0, MAX_HISTORY);
 
@@ -70,7 +72,6 @@ export const useWatchHistoryStore = create<WatchHistoryStore>((set, get) => ({
 
   removeItem: (id: string) => {
     const updated = get().items.filter((i) => i.id !== id);
-
     set({ items: updated });
 
     if (typeof window !== "undefined") {
@@ -102,32 +103,44 @@ export function useWatchHistory() {
           const parsed = JSON.parse(saved);
 
           if (Array.isArray(parsed)) {
-            /*
-             * Normalisasi history lama supaya tidak error
-             * setelah field episode ditambahkan.
-             */
             const items: WatchHistoryItem[] = parsed
               .filter((item: any) => item && item.id)
-              .map((item: any) => ({
-                id: String(item.id),
-                title: String(item.title || "Drama Pilihan"),
-                image: String(item.image || ""),
-                platform: String(item.platform || ""),
-                timestamp: Number(item.timestamp || Date.now()),
-                url: String(item.url || "#"),
+              .map((item: any) => {
+                const platform = String(item.platform || "").trim();
+                const id = makeHistoryId(platform, String(item.id));
 
-                episode:
-                  typeof item.episode === "number"
-                    ? item.episode
-                    : undefined,
+                return {
+                  id,
+                  title: String(item.title || "").trim(),
+                  image: String(item.image || ""),
+                  platform,
+                  timestamp: Number(item.timestamp || Date.now()),
+                  url: String(item.url || "#"),
+                  episode:
+                    typeof item.episode === "number"
+                      ? item.episode
+                      : undefined,
+                  totalEpisodes:
+                    typeof item.totalEpisodes === "number"
+                      ? item.totalEpisodes
+                      : undefined,
+                };
+              });
 
-                totalEpisodes:
-                  typeof item.totalEpisodes === "number"
-                    ? item.totalEpisodes
-                    : undefined,
-              }));
+            // Deduplicate old history entries after normalizing their IDs.
+            const deduped = items.filter(
+              (item, index, array) =>
+                array.findIndex((other) => other.id === item.id) === index,
+            );
 
-            useWatchHistoryStore.setState({ items });
+            useWatchHistoryStore.setState({
+              items: deduped.slice(0, MAX_HISTORY),
+            });
+
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify(deduped.slice(0, MAX_HISTORY)),
+            );
           }
         } catch (e) {
           console.error("Failed to load watch history:", e);
