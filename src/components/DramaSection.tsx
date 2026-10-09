@@ -12,6 +12,9 @@ interface DramaSectionProps {
   isLoading: boolean;
   error: boolean;
   onRetry: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function DramaSection({
@@ -21,6 +24,9 @@ export function DramaSection({
   isLoading,
   error,
   onRetry,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: DramaSectionProps) {
   return (
     <section className="space-y-4">
@@ -74,6 +80,19 @@ export function DramaSection({
           </div>
         )}
       </div>
+
+      {hasMore && onLoadMore && !isLoading && !error && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="rounded-full border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+          >
+            {isLoadingMore ? "Memuat..." : "Lihat lebih banyak"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
