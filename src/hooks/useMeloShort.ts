@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 function cleanText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -203,14 +203,17 @@ function pickTags(item: any): string[] {
 }
 
 export function useMeloShortDramas() {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["meloshort-dramas", "id"],
+    initialPageParam: 1,
 
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({
         path: "/api/v2/home",
         category_p: "meloshort",
         lang: "id",
+        page: String(pageParam),
+        limit: "20",
       });
 
       const res = await fetch(`/api/meloshort?${params.toString()}`, {
@@ -264,7 +267,7 @@ export function useMeloShortDramas() {
         return isIndonesianTitle(title);
       });
 
-      return indonesianList
+      const dramas = indonesianList
         .map((item: any) => {
           const bookId = String(
             item?.id ??
@@ -344,10 +347,25 @@ export function useMeloShortDramas() {
             item.bookName &&
             item.bookName !== "Untitled"
         );
+
+      return { dramas, rawCount: list.length, page: pageParam };
     },
 
-    staleTime: 1000 * 60 * 5,
+    getNextPageParam: (lastPage: { rawCount: number; page: number }) =>
+      lastPage.rawCount >= 20 ? lastPage.page + 1 : undefined,
 
+    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
+
+  const seen = new Set<string>();
+  const dramas = query.data?.pages.flatMap((page: any) =>
+    page.dramas.filter((drama: any) => {
+      if (seen.has(drama.bookId)) return false;
+      seen.add(drama.bookId);
+      return true;
+    }),
+  );
+
+  return { ...query, data: dramas };
 }
