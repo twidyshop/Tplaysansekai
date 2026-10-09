@@ -9,6 +9,9 @@ export function StardustTVHome() {
     isLoading,
     error,
     refetch,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
   } = useStardustTVHome();
 
   return (
@@ -19,6 +22,9 @@ export function StardustTVHome() {
       isLoading={isLoading}
       error={Boolean(error)}
       onRetry={() => refetch()}
+      hasMore={Boolean(hasNextPage)}
+      isLoadingMore={isFetchingNextPage}
+      onLoadMore={() => fetchNextPage()}
     />
   );
 }
