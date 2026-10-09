@@ -4,7 +4,15 @@ import { useMeloShortDramas } from "@/hooks/useMeloShort";
 import { DramaSection } from "@/components/DramaSection";
 
 export function MeloShortHome() {
-  const { data: dramas, isLoading, error, refetch } = useMeloShortDramas();
+  const {
+    data: dramas,
+    isLoading,
+    error,
+    refetch,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useMeloShortDramas();
 
   return (
     <DramaSection
@@ -14,6 +22,9 @@ export function MeloShortHome() {
       isLoading={isLoading}
       error={!!error}
       onRetry={() => refetch()}
+      hasMore={Boolean(hasNextPage)}
+      isLoadingMore={isFetchingNextPage}
+      onLoadMore={() => fetchNextPage()}
     />
   );
 }
