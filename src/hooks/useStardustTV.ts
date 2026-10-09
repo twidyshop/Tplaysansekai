@@ -144,10 +144,10 @@ async function request(path: string, params: Record<string, string> = {}) {
 
 export function useStardustTVHome() {
   const query = useInfiniteQuery({
-    queryKey: ["stardusttv", "discover", "id"],
+    queryKey: ["stardusttv", "home", "id"],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      const response = await request("/api/v2/discover", {
+      const response = await request("/api/v2/home", {
         page: String(pageParam),
         limit: "20",
       });
@@ -156,14 +156,23 @@ export function useStardustTVHome() {
         dramas: items
           .map(mapDrama)
           .filter((item) => item.bookId && item.bookName !== "Untitled"),
-        hasMore: typeof response.hasMore === "boolean"
-          ? response.hasMore
-          : items.length >= 20,
         page: pageParam,
       };
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? lastPage.page + 1 : undefined,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.dramas.length === 0) return undefined;
+
+      const previousIds = new Set(
+        allPages
+          .slice(0, -1)
+          .flatMap((page) => page.dramas.map((drama) => drama.bookId)),
+      );
+      const hasNewDrama = lastPage.dramas.some(
+        (drama) => !previousIds.has(drama.bookId),
+      );
+
+      return hasNewDrama ? lastPage.page + 1 : undefined;
+    },
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });
