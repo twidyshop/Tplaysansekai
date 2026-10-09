@@ -144,10 +144,10 @@ async function request(path: string, params: Record<string, string> = {}) {
 
 export function useStardustTVHome() {
   const query = useInfiniteQuery({
-    queryKey: ["stardusttv", "home", "id"],
+    queryKey: ["stardusttv", "discover", "id"],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      const response = await request("/api/v2/home", {
+      const response = await request("/api/v2/discover", {
         page: String(pageParam),
         limit: "20",
       });
@@ -156,12 +156,14 @@ export function useStardustTVHome() {
         dramas: items
           .map(mapDrama)
           .filter((item) => item.bookId && item.bookName !== "Untitled"),
-        rawCount: items.length,
+        hasMore: typeof response.hasMore === "boolean"
+          ? response.hasMore
+          : items.length >= 20,
         page: pageParam,
       };
     },
     getNextPageParam: (lastPage) =>
-      lastPage.rawCount >= 20 ? lastPage.page + 1 : undefined,
+      lastPage.hasMore ? lastPage.page + 1 : undefined,
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });
