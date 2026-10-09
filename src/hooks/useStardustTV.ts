@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Drama } from "@/types/drama";
 
 function text(value: unknown): string {
@@ -143,18 +143,39 @@ async function request(path: string, params: Record<string, string> = {}) {
 }
 
 export function useStardustTVHome() {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["stardusttv", "home", "id"],
-    queryFn: async () => {
-      const response = await request("/api/v2/home");
-
-      return list(response)
-        .map(mapDrama)
-        .filter((item) => item.bookId && item.bookName !== "Untitled");
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const response = await request("/api/v2/home", {
+        page: String(pageParam),
+        limit: "20",
+      });
+      const items = list(response);
+      return {
+        dramas: items
+          .map(mapDrama)
+          .filter((item) => item.bookId && item.bookName !== "Untitled"),
+        rawCount: items.length,
+        page: pageParam,
+      };
     },
+    getNextPageParam: (lastPage) =>
+      lastPage.rawCount >= 20 ? lastPage.page + 1 : undefined,
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });
+
+  const seen = new Set<string>();
+  const dramas = query.data?.pages.flatMap((page) =>
+    page.dramas.filter((drama) => {
+      if (seen.has(drama.bookId)) return false;
+      seen.add(drama.bookId);
+      return true;
+    }),
+  );
+
+  return { ...query, data: dramas };
 }
 
 export function useStardustTVDetail(id: string) {
