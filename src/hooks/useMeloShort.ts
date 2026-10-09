@@ -204,12 +204,12 @@ function pickTags(item: any): string[] {
 
 export function useMeloShortDramas() {
   const query = useInfiniteQuery({
-    queryKey: ["meloshort-dramas", "id"],
+    queryKey: ["meloshort-discover", "id"],
     initialPageParam: 1,
 
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({
-        path: "/api/v2/home",
+        path: "/api/v2/discover",
         category_p: "meloshort",
         lang: "id",
         page: String(pageParam),
@@ -348,11 +348,11 @@ export function useMeloShortDramas() {
             item.bookName !== "Untitled"
         );
 
-      return { dramas, rawCount: list.length, page: pageParam };
+      return { dramas, hasMore: typeof json?.hasMore === "boolean" ? json.hasMore : list.length >= 20, page: pageParam };
     },
 
-    getNextPageParam: (lastPage: { rawCount: number; page: number }) =>
-      lastPage.rawCount >= 20 ? lastPage.page + 1 : undefined,
+    getNextPageParam: (lastPage: { hasMore: boolean; page: number }) =>
+      lastPage.hasMore ? lastPage.page + 1 : undefined,
 
     staleTime: 1000 * 60 * 5,
     retry: 2,
