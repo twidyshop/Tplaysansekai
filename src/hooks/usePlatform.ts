@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type Platform =
+  | "dramaboxv2"
   | "stardusttv"
   | "iqiyi"
   | "wetv"
@@ -18,6 +19,7 @@ export type Platform =
   | string;
 
 export const PLATFORMS = [
+  { id: "dramaboxv2", name: "DramaBox V2", logo: "/dramabox.webp", apiBase: "/api/dramaboxv2" },
   {
     id: "stardusttv",
     name: "StardustTV",
@@ -64,6 +66,7 @@ export function usePlatform() {
     setPlatform,
     platforms: PLATFORMS,
     getPlatformInfo,
+    isDramaBoxV2: currentPlatform === "dramaboxv2",
     isStardustTV: currentPlatform === "stardusttv",
     isIqiyi: currentPlatform === "iqiyi",
     isWetv: currentPlatform === "wetv",
