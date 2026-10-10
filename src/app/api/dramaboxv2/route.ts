@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const revalidate = 300;
+export const maxDuration = 60;
 
 const BASE = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
 const ACTIONS = new Set(["home", "latest", "trending", "hotrank", "recommended", "browse", "categories", "foryou", "populersearch", "search", "detail", "episodes", "play", "hls", "languages"]);
@@ -55,15 +56,17 @@ export async function GET(request: Request) {
   if (category && action === "browse") target.searchParams.set("category", category);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ["play", "hls"].includes(action) ? 25000 : 15000);
+  const timeout = setTimeout(() => controller.abort(), ["play", "hls"].includes(action) ? 45000 : 30000);
   try {
+    console.log(`[DramaBox V2] ${action} -> ${target.pathname}${target.search}`);
     const response = await fetch(target.toString(), {
       headers: { "X-API-Key": key, Accept: "application/json", "User-Agent": "TPLAY+/1.0" },
-      cache: ["play", "hls"].includes(action) ? "no-store" : "force-cache",
+      cache: "no-store",
       signal: controller.signal,
     });
     const raw = await response.text();
     clearTimeout(timeout);
+    console.log(`[DramaBox V2] ${action} <- ${response.status} (${raw.length} bytes)`);
     let data: any;
     try { data = JSON.parse(raw); } catch {
       return NextResponse.json({ error: "Hoshiyomi DramaBox V2 mengembalikan response non-JSON.", status: response.status }, { status: response.ok ? 502 : response.status });
@@ -74,6 +77,8 @@ export async function GET(request: Request) {
     return NextResponse.json(data, { status: response.status, headers: { "Cache-Control": ["play", "hls"].includes(action) ? "no-store" : "public, s-maxage=300, stale-while-revalidate=3600" } });
   } catch (error) {
     clearTimeout(timeout);
-    return NextResponse.json({ error: error instanceof Error && error.name === "AbortError" ? "Hoshiyomi DramaBox V2 timeout." : "Gagal menghubungi Hoshiyomi DramaBox V2." }, { status: 502 });
+    const message = error instanceof Error ? error.message : "Unknown upstream error";
+    console.error(`[DramaBox V2] ${action} failed:`, message);
+    return NextResponse.json({ error: error instanceof Error && error.name === "AbortError" ? "Hoshiyomi DramaBox V2 timeout." : `Gagal menghubungi Hoshiyomi DramaBox V2: ${message}` }, { status: 502 });
   }
 }
