@@ -55,17 +55,13 @@ export async function GET(request: Request) {
   const category = params.get("category") || params.get("categoryId");
   if (category && action === "browse") target.searchParams.set("category", category);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ["play", "hls"].includes(action) ? 45000 : 30000);
   try {
     console.log(`[DramaBox V2] ${action} -> ${target.pathname}${target.search}`);
     const response = await fetch(target.toString(), {
       headers: { "X-API-Key": key, Accept: "application/json", "User-Agent": "TPLAY+/1.0" },
       cache: "no-store",
-      signal: controller.signal,
     });
     const raw = await response.text();
-    clearTimeout(timeout);
     console.log(`[DramaBox V2] ${action} <- ${response.status} (${raw.length} bytes)`);
     let data: any;
     try { data = JSON.parse(raw); } catch {
@@ -76,8 +72,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(data, { status: response.status, headers: { "Cache-Control": ["play", "hls"].includes(action) ? "no-store" : "public, s-maxage=300, stale-while-revalidate=3600" } });
   } catch (error) {
-    clearTimeout(timeout);
-    const message = error instanceof Error ? error.message : "Unknown upstream error";
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     console.error(`[DramaBox V2] ${action} failed:`, message);
     return NextResponse.json({ error: error instanceof Error && error.name === "AbortError" ? "Hoshiyomi DramaBox V2 timeout." : `Gagal menghubungi Hoshiyomi DramaBox V2: ${message}` }, { status: 502 });
   }
