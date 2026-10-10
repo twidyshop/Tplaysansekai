@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const revalidate = 300;
-export const maxDuration = 60;
 
 const BASE = process.env.HOSHIYOMI_API_BASE_URL || "https://api.hoshiyomi.my.id";
 const ACTIONS = new Set(["home", "latest", "trending", "hotrank", "recommended", "browse", "categories", "foryou", "populersearch", "search", "detail", "episodes", "play", "hls", "languages"]);
