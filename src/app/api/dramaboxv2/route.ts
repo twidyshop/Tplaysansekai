@@ -68,15 +68,26 @@ export async function GET(request: Request) {
 
   try {
     console.log(`[DramaBox V2] ${action} -> ${target.pathname}${target.search}`);
-    const response = await fetch(target.toString(), {
+    const fetchOptions: RequestInit & { next?: { revalidate: number } } = {
       headers: {
         "X-API-Key": key,
         Accept: "application/json",
         "User-Agent": "TPLAY+/1.0",
       },
       signal: controller.signal,
-      ...(isPlayback ? { cache: "no-store" as const } : { next: { revalidate: 300 } }),
-    });
+      ...(isPlayback || action === "detail" || action === "episodes"
+        ? { cache: "no-store" as const }
+        : { next: { revalidate: 300 } }),
+    };
+
+    // Hoshiyomi occasionally returns transient gateway errors. Retry once, within the same overall timeout.
+    let response: Response;
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(target.toString(), fetchOptions);
+      if (![502, 503, 504].includes(response.status) || attempt >= 1) break;
+      console.warn(`[DramaBox V2] ${action} upstream HTTP ${response.status}; retrying once`);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
     const raw = await response.text();
     console.log(`[DramaBox V2] ${action} <- ${response.status} (${raw.length} bytes)`);
 
