@@ -17,6 +17,7 @@ import { MoboReelsHome } from "@/components/MoboReelsHome";
 import { PineDramaHome } from "@/components/PineDramaHome";
 import { MeloShortHome } from "@/components/MeloShortHome";
 import { StardustTVHome } from "@/components/StardustTVHome";
+import { DramaBoxV2Home } from "@/components/DramaBoxV2Home";
 import { IqiyiHome } from "@/components/IqiyiHome";
 import { WetvHome } from "@/components/WetvHome";
 import { InfiniteDramaSection } from "@/components/InfiniteDramaSection";
@@ -70,7 +71,7 @@ function deepPick(value: any, keys: string[], fallback = "", depth = 0): string 
 
 export default function HomeContent() {
   const {
-    isStardustTV, isMeloShort, isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort,
+    isDramaBoxV2, isStardustTV, isMeloShort, isPineDrama, isDramaBox, isReelShort, isShortMax, isNetShort,
     isMelolo, isFreeReels, isDramaNova, isGoodShort, isFlickReels, isMoboReels, isIqiyi, isWetv
   } = usePlatform();
 
@@ -169,6 +170,7 @@ export default function HomeContent() {
         <div className="container mx-auto"><PlatformSelector /></div>
       </div>
 
+      {isDramaBoxV2 && <div className="container mx-auto space-y-8 px-4 py-6"><DramaBoxV2Home /></div>}
       {isStardustTV && <div className="container mx-auto space-y-8 px-4 py-6"><StardustTVHome /></div>}
 
       {isIqiyi && <div className="container mx-auto px-4 py-6 space-y-8"><IqiyiHome /></div>}
