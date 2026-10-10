@@ -63,7 +63,8 @@ export async function GET(request: Request) {
 
   const isPlayback = PLAYBACK_ACTIONS.has(action);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), isPlayback ? 45000 : 20000);
+  const timeoutMs = isPlayback ? 45000 : 55000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     console.log(`[DramaBox V2] ${action} -> ${target.pathname}${target.search}`);
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
     const timedOut = controller.signal.aborted;
     console.error(`[DramaBox V2] ${action} ${timedOut ? "timed out" : "failed"}:`, message);
     return NextResponse.json(
-      { error: timedOut ? `Hoshiyomi DramaBox V2 ${action} timeout setelah ${isPlayback ? 45 : 20} detik.` : `Gagal menghubungi Hoshiyomi DramaBox V2: ${message}` },
+      { error: timedOut ? `Hoshiyomi DramaBox V2 ${action} timeout setelah ${Math.round(timeoutMs / 1000)} detik.` : `Gagal menghubungi Hoshiyomi DramaBox V2: ${message}` },
       { status: timedOut ? 504 : 502 },
     );
   } finally {
