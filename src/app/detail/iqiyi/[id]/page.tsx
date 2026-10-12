@@ -72,8 +72,7 @@ export default function IqiyiDetailPage(){
   const episodes=number(detail,["episodes","episodeCount","totalEpisodes","chapterCount","total_episode","episode_count","album_episode_count"])||Number(deepText(data,["episodes","episodeCount","totalEpisodes","chapterCount"],String(quickEpisodes)))||quickEpisodes;
 
   return <main className="min-h-screen bg-[#0a0e27] text-white">
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center px-4"><button onClick={()=>router.back()} className="text-sm text-white/70 hover:text-white">‹&nbsp; Kembali</button></div></header>
-    <div className="container mx-auto max-w-5xl px-4 py-8">
+    <div className="container mx-auto max-w-5xl px-4 pt-24 pb-8">
       <div className="grid grid-cols-1 gap-7 md:grid-cols-[280px_1fr]">
         <div className="mx-auto w-full max-w-[280px]"><div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">{cover?<img src={"/api/iqiyi/image?url="+encodeURIComponent(cover)} alt={title} className="h-full w-full object-cover" referrerPolicy="no-referrer"/>:<div className="flex h-full items-center justify-center text-white/30">No Image</div>}</div></div>
         <section className="flex min-w-0 flex-col">
