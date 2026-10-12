@@ -374,8 +374,8 @@ export default function IqiyiWatchPage(){
     <div className="container mx-auto max-w-6xl px-4 py-5">
       <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
         <div ref={playerHost} className="absolute inset-0" />
-        <button type="button" aria-label="Ketuk dua kali untuk mundur 10 detik" onClick={()=>handleSeekTap(-1)} className="absolute inset-y-0 left-0 z-10 w-[30%] touch-manipulation bg-transparent focus:outline-none" />
-        <button type="button" aria-label="Ketuk dua kali untuk maju 10 detik" onClick={()=>handleSeekTap(1)} className="absolute inset-y-0 right-0 z-10 w-[30%] touch-manipulation bg-transparent focus:outline-none" />
+        <button type="button" aria-label="Ketuk dua kali untuk mundur 10 detik" onClick={()=>handleSeekTap(-1)} className="absolute top-0 bottom-12 left-0 z-10 w-[30%] touch-manipulation bg-transparent focus:outline-none" />
+        <button type="button" aria-label="Ketuk dua kali untuk maju 10 detik" onClick={()=>handleSeekTap(1)} className="absolute top-0 bottom-12 right-0 z-10 w-[30%] touch-manipulation bg-transparent focus:outline-none" />
         {seekFeedback&&<div className={"pointer-events-none absolute inset-y-0 z-20 flex items-center "+(seekFeedback.startsWith("+")?"right-[12%]":"left-[12%]")}>
           <div className="rounded-full bg-black/65 px-4 py-3 text-lg font-bold text-white shadow-lg">{seekFeedback.startsWith("+")?"⏩ ":"⏪ "}{seekFeedback}</div>
         </div>}
