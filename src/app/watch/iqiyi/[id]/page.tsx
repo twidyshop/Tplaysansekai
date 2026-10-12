@@ -298,6 +298,16 @@ export default function IqiyiWatchPage(){
       });
       player.current=instance;
 
+      // Keep Video.js controls (especially CC/subtitles) above the transparent
+      // double-tap seek zones, which otherwise can intercept taps on the CC button.
+      const controlStyleId='tplay-iqiyi-controlbar-layer';
+      if(!document.getElementById(controlStyleId)){
+        const controlStyle=document.createElement('style');
+        controlStyle.id=controlStyleId;
+        controlStyle.textContent='.video-js .vjs-control-bar{z-index:30!important}.video-js .vjs-text-track-settings{z-index:40!important}.video-js .vjs-menu{z-index:40!important}';
+        document.head.appendChild(controlStyle);
+      }
+
       void fetch('/api/iqiyi/subtitle?id='+encodeURIComponent(dramaId)
         +'&episode='+encodeURIComponent(String(selected))
         +(albumId?'&albumId='+encodeURIComponent(albumId):''))
