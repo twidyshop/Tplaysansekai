@@ -45,7 +45,8 @@ function findStream(v:any):string{
 export default function IqiyiWatchPage(){
   const {id}=useParams(),router=useRouter(),search=new URLSearchParams(typeof window!=="undefined"?window.location.search:""),dramaId=String(id||""),albumId=search.get("albumId")||"";
   const playerHost=useRef<HTMLDivElement|null>(null),player=useRef<any>(null);
-  const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false),[castReady,setCastReady]=useState(false),[castSource,setCastSource]=useState("");
+  const lastSeekTap=useRef<{direction:number;time:number}|null>(null),seekFeedbackTimer=useRef<number|null>(null);
+  const [selected,setSelected]=useState(1),[source,setSource]=useState(""),[error,setError]=useState(""),[playing,setPlaying]=useState(false),[castReady,setCastReady]=useState(false),[castSource,setCastSource]=useState(""),[seekFeedback,setSeekFeedback]=useState("");
   const addHistory=useWatchHistoryStore((state)=>state.addItem);
   const detailQuery=useIqiyiDetail(dramaId,albumId);
   const episodesQuery=useIqiyiEpisodes(dramaId,albumId);
@@ -159,6 +160,27 @@ export default function IqiyiWatchPage(){
 
   const play=useCallback((n:number)=>{
     setSelected(n);setSource("");setError("");setPlaying(false);
+  },[]);
+
+  const handleSeekTap=useCallback((direction:-1|1)=>{
+    const now=Date.now();
+    const previous=lastSeekTap.current;
+    if(previous&&previous.direction===direction&&now-previous.time<320){
+      lastSeekTap.current=null;
+      const instance=player.current;
+      if(!instance) return;
+      try{
+        const current=Number(instance.currentTime())||0;
+        const duration=Number(instance.duration());
+        const target=Math.max(0,Math.min(Number.isFinite(duration)&&duration>0?duration:current+10,current+direction*10));
+        instance.currentTime(target);
+        setSeekFeedback(direction===1?"+10s":"−10s");
+        if(seekFeedbackTimer.current!==null) window.clearTimeout(seekFeedbackTimer.current);
+        seekFeedbackTimer.current=window.setTimeout(()=>setSeekFeedback(""),650);
+      }catch{}
+    }else{
+      lastSeekTap.current={direction,time:now};
+    }
   },[]);
 
   useEffect(()=>{
@@ -350,7 +372,14 @@ export default function IqiyiWatchPage(){
   return <main className="min-h-screen bg-[#0a0e27] text-white">
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0e27]/90 backdrop-blur-xl"><div className="container mx-auto flex h-14 items-center justify-between px-4"><button onClick={()=>router.back()} className="text-sm text-white/70">‹&nbsp; Kembali</button><Link href={"/detail/iqiyi/"+encodeURIComponent(dramaId)} className="text-sm text-white/70">Detail</Link></div></header>
     <div className="container mx-auto max-w-6xl px-4 py-5">
-      <div ref={playerHost} className="aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black" />{castReady&&castSource&&<button type="button" onClick={()=>void castCurrentVideo()} className="mt-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10">📺 Cast ke Android TV</button>}
+      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
+        <div ref={playerHost} className="absolute inset-0" />
+        <button type="button" aria-label="Ketuk dua kali untuk mundur 10 detik" onClick={()=>handleSeekTap(-1)} className="absolute inset-y-0 left-0 z-10 w-[30%] touch-manipulation bg-transparent focus:outline-none" />
+        <button type="button" aria-label="Ketuk dua kali untuk maju 10 detik" onClick={()=>handleSeekTap(1)} className="absolute inset-y-0 right-0 z-10 w-[30%] touch-manipulation bg-transparent focus:outline-none" />
+        {seekFeedback&&<div className={"pointer-events-none absolute inset-y-0 z-20 flex items-center "+(seekFeedback.startsWith("+")?"right-[12%]":"left-[12%]")}>
+          <div className="rounded-full bg-black/65 px-4 py-3 text-lg font-bold text-white shadow-lg">{seekFeedback.startsWith("+")?"⏩ ":"⏪ "}{seekFeedback}</div>
+        </div>}
+      </div>{castReady&&castSource&&<button type="button" onClick={()=>void castCurrentVideo()} className="mt-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10">📺 Cast ke Android TV</button>}
       <h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-1 text-sm text-white/45">Episode {selected}{playing?" • Playing":""}</p>
       {playLoading&&<div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Menyiapkan video iQIYI...</div>}{error&&<div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>}{episodeError&&<div className="mt-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 text-sm text-yellow-200">Episode belum berhasil dimuat. Player tetap bisa dicoba.</div>}
       {loading?<p className="mt-6 text-sm text-white/45">Memuat episode...</p>:<section className="mt-7" data-total-episodes={episodes.length}><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Episode</h2>{next&&<button onClick={()=>void play(next.number)} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black">Episode berikutnya</button>}</div><div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">{episodes.map(x=><button key={x.id+"-"+x.number} onClick={()=>void play(x.number)} className={"rounded-lg border px-3 py-2 text-sm font-semibold "+(x.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75")}>{x.number}</button>)}</div></section>}
