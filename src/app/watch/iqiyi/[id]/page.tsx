@@ -294,7 +294,6 @@ export default function IqiyiWatchPage(){
           remainingTimeDisplay:true,
           playbackRateMenuButton:true,
           subsCapsButton:true,
-          skipButtons:{backward:10,forward:10},
         },
       });
       player.current=instance;
