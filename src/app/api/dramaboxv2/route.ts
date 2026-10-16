@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
   const isPlayback = PLAYBACK_ACTIONS.has(action);
   const controller = new AbortController();
-  const timeoutMs = isPlayback ? 45000 : 55000;
+  const timeoutMs = isPlayback ? 45000 : 20000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
@@ -75,18 +75,19 @@ export async function GET(request: Request) {
         "User-Agent": "TPLAY+/1.0",
       },
       signal: controller.signal,
-      ...(isPlayback || action === "detail" || action === "episodes"
+      // Cache successful metadata responses, including per-ID detail and episode lists.
+      // Playback URLs are intentionally never cached.
+      ...(isPlayback
         ? { cache: "no-store" as const }
-        : { next: { revalidate: 300 } }),
+        : { next: { revalidate: action === "detail" || action === "episodes" ? 600 : 300 } }),
     };
 
-    // Hoshiyomi occasionally returns transient gateway errors. Retry once, within the same overall timeout.
-    let response: Response;
-    for (let attempt = 0; ; attempt++) {
-      response = await fetch(target.toString(), fetchOptions);
-      if (![502, 503, 504].includes(response.status) || attempt >= 1) break;
+    // Do not retry gateway timeouts: repeating an already-timed-out upstream call
+    // adds latency and load. Retry only brief 502/503 errors once.
+    let response = await fetch(target.toString(), fetchOptions);
+    if ([502, 503].includes(response.status)) {
       console.warn(`[DramaBox V2] ${action} upstream HTTP ${response.status}; retrying once`);
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      response = await fetch(target.toString(), fetchOptions);
     }
     const raw = await response.text();
     console.log(`[DramaBox V2] ${action} <- ${response.status} (${raw.length} bytes)`);
