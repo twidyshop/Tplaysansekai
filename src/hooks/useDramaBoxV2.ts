@@ -3,6 +3,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Drama } from "@/types/drama";
 
+export type DramaBoxV2Feed = "trending" | "latest" | "hotrank" | "foryou" | "recommended" | "browse";
+
 function items(value: any, depth = 0): any[] {
   if (depth > 8 || value == null) return [];
   if (Array.isArray(value)) return value;
@@ -45,12 +47,15 @@ async function request(action: string, params: Record<string, string> = {}) {
   if (!response.ok) throw new Error(json?.error || "Gagal memuat DramaBox V2.");
   return json;
 }
-export function useDramaBoxV2Home() {
+export function useDramaBoxV2Home(feed: DramaBoxV2Feed = "trending") {
   const query = useInfiniteQuery({
-    queryKey: ["dramaboxv2", "home"],
+    queryKey: ["dramaboxv2", "home", feed],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      const data = await request("trending", { page: String(pageParam) });
+      const params: Record<string, string> = { page: String(pageParam) };
+      if (feed === "latest") params.pageSize = "50";
+      if (feed === "hotrank") params.type = "1";
+      const data = await request(feed, params);
       const dramas = items(data).map(mapDrama).filter(x => x.bookId && x.bookName !== "Untitled");
       return { dramas, page: pageParam };
     },
