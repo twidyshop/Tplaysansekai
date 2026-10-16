@@ -64,15 +64,15 @@ export function useDramaBoxV2Home(feed: DramaBoxV2Feed = "trending") {
       const seen = new Set(all.slice(0, -1).flatMap(p => p.dramas.map(d => d.bookId)));
       return last.dramas.some(d => !seen.has(d.bookId)) ? last.page + 1 : undefined;
     },
-    staleTime: 300000,
-    retry: 1,
+    staleTime: 600000,
+    retry: false,
   });
   const seen = new Set<string>();
   const dramas = query.data?.pages.flatMap(p => p.dramas.filter(d => !seen.has(d.bookId) && !!seen.add(d.bookId)));
   return { ...query, data: dramas };
 }
 export function useDramaBoxV2Detail(id: string) {
-  return useQuery({ queryKey: ["dramaboxv2", "detail", id], enabled: !!id, queryFn: () => request("detail", { id }), staleTime: 300000, retry: 1 });
+  return useQuery({ queryKey: ["dramaboxv2", "detail", id], enabled: !!id, queryFn: () => request("detail", { id }), staleTime: 600000, retry: false });
 }
 export function useDramaBoxV2Episodes(id: string) {
   return useQuery({ queryKey: ["dramaboxv2", "episodes", id], enabled: !!id, queryFn: () => request("episodes", { id }), staleTime: 300000, retry: 1 });
