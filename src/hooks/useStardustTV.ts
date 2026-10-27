@@ -153,7 +153,7 @@ export function useStardustTVHome() {
     queryKey: ["stardusttv", "home", "id"],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      const response = await request("/api/v2/discover", {
+      const response = await request("/api/v2/home", {
         page: String(pageParam),
         limit: "20",
       });
@@ -163,7 +163,7 @@ export function useStardustTVHome() {
           .map(mapDrama)
           .filter((item) => item.bookId && item.bookName !== "Untitled"),
         page: pageParam,
-        hasMore: typeof response?.hasMore === "boolean" ? response.hasMore : items.length >= 20,
+        hasMore: typeof response?.hasMore === "boolean" ? response.hasMore : items.length > 0,
       };
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -178,7 +178,7 @@ export function useStardustTVHome() {
         (drama) => !previousIds.has(drama.bookId),
       );
 
-      return hasNewDrama && lastPage.hasMore ? lastPage.page + 1 : undefined;
+      return hasNewDrama ? lastPage.page + 1 : undefined;
     },
     staleTime: 5 * 60 * 1000,
     retry: 2,
