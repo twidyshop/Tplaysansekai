@@ -216,19 +216,67 @@ export async function getStardustTVStream(
   });
 }
 
-export function extractStardustStream(value: any): string {
-  const visited = new Set<any>();
+export type StardustSubtitle = {
+  url: string;
+  language: string;
+  label: string;
+  format: string;
+};
 
-  function walk(node: any, depth = 0): string {
-    if (depth > 8 || node == null) return "";
+export function extractStardustSubtitles(value: any): StardustSubtitle[] {
+  const found: StardustSubtitle[] = [];
+  const seen = new Set<string>();
+  const subtitleKeys = ["subtitles", "subtitleList", "subtitle_list", "subtitleTracks", "subtitle_tracks", "captions", "textTracks", "text_tracks"];
+  const urlKeys = ["url", "subtitleUrl", "subtitle_url", "fileUrl", "file_url", "src", "uri", "link", "vtt", "webvtt"];
+  const languageKeys = ["language", "lang", "languageCode", "language_code", "langCode", "lang_code", "locale"];
 
-    if (typeof node === "string") {
-      return /^https?:\/\//i.test(node) ? node : "";
+  function walk(node: any, depth = 0) {
+    if (!node || typeof node !== "object" || depth > 9) return;
+    if (Array.isArray(node)) {
+      node.forEach((item) => walk(item, depth + 1));
+      return;
     }
 
-    if (typeof node !== "object" || visited.has(node)) return "";
-    visited.add(node);
+    for (const key of subtitleKeys) {
+      const entries = node[key];
+      if (Array.isArray(entries)) {
+        for (const entry of entries) {
+          if (!entry || typeof entry !== "object") continue;
+          const url = pick(entry, urlKeys);
+          if (!/^https?:\/\//i.test(url)) continue;
+          const language = pick(entry, languageKeys, "und");
+          const label = pick(entry, ["label", "name", "title", "languageName", "language_name"], language);
+          const format = pick(entry, ["format", "type", "mimeType", "mime_type"], url.split("?")[0].split(".").pop() || "vtt");
+          const key = url + "|" + language;
+          if (!seen.has(key)) {
+            seen.add(key);
+            found.push({ url, language, label, format });
+          }
+        }
+      } else if (entries && typeof entries === "object") {
+        walk(entries, depth + 1);
+      }
+    }
 
+    for (const key of Object.keys(node)) {
+      if (!subtitleKeys.includes(key)) walk(node[key], depth + 1);
+    }
+  }
+
+  walk(value);
+  return found;
+}
+
+export function extractStardustStream(value: any): string {
+  const visited = new Set<any>();
+  const preferredKeys = [
+    "videoUrl", "video_url", "playUrl", "play_url", "streamUrl", "stream_url",
+    "m3u8", "m3u8Url", "hls", "hlsUrl", "mp4", "url",
+  ];
+
+  function walk(node: any, depth = 0): string {
+    if (depth > 8 || node == null || typeof node !== "object" || visited.has(node)) return "";
+    visited.add(node);
     if (Array.isArray(node)) {
       for (const item of node) {
         const result = walk(item, depth + 1);
@@ -237,33 +285,21 @@ export function extractStardustStream(value: any): string {
       return "";
     }
 
-    const preferredKeys = [
-      "videoUrl",
-      "video_url",
-      "playUrl",
-      "play_url",
-      "streamUrl",
-      "stream_url",
-      "m3u8",
-      "m3u8Url",
-      "hls",
-      "hlsUrl",
-      "mp4",
-      "url",
-    ];
-
+    // Only inspect stream-shaped objects. Do not accidentally select a
+    // subtitle URL as the video source when the API returns both.
     for (const key of preferredKeys) {
-      const value = node[key];
-      if (typeof value === "string" && /^https?:\/\//i.test(value)) {
-        return value;
+      const candidate = node[key];
+      if (typeof candidate === "string" && /^https?:\/\//i.test(candidate) &&
+          !/subtitle|caption|\.vtt(?:$|\?)|\.srt(?:$|\?)|\.ass(?:$|\?)/i.test(candidate)) {
+        return candidate;
       }
     }
 
     for (const key of Object.keys(node)) {
+      if (["subtitles", "subtitleList", "subtitle_list", "subtitleTracks", "subtitle_tracks", "captions", "textTracks", "text_tracks"].includes(key)) continue;
       const result = walk(node[key], depth + 1);
       if (result) return result;
     }
-
     return "";
   }
 
