@@ -354,8 +354,7 @@ export default function StardustTVWatchPage() {
             className="h-full w-full object-contain"
           />
 
-          {subtitleTracks.length > 0 && (
-            <div className="absolute left-3 top-3 z-20">
+          <div className="absolute left-3 top-3 z-20">
               <button
                 type="button"
                 onClick={() => setSubtitleMenuOpen((open) => !open)}
@@ -367,7 +366,9 @@ export default function StardustTVWatchPage() {
               {subtitleMenuOpen && (
                 <div className="mt-2 min-w-44 overflow-hidden rounded-xl border border-white/10 bg-[#0a0e27]/95 p-1 shadow-xl backdrop-blur-xl">
                   <button type="button" onClick={() => selectSubtitle(-1)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle < 0 ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>Nonaktif</button>
-                  {subtitleTracks.map((track) => (
+                  {subtitleTracks.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-white/55">Subtitle soft-sub tidak tersedia atau belum terbaca dari sumber video ini.</p>
+                  ) : subtitleTracks.map((track) => (
                     <button key={track.id} type="button" onClick={() => selectSubtitle(track.id)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle === track.id ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>
                       {track.name}{track.lang && track.lang !== track.name ? " · " + track.lang : ""}
                     </button>
@@ -375,7 +376,6 @@ export default function StardustTVWatchPage() {
                 </div>
               )}
             </div>
-          )}
 
           {episodes.length > 0 && (
             <>
