@@ -79,6 +79,11 @@ function mapDrama(item: any): Drama {
     "book_pic",
   ]);
 
+  const rawTags = item?.genres ?? item?.tags ?? item?.labels ?? item?.typeTwoNames ?? [];
+  const tags = Array.isArray(rawTags)
+    ? rawTags.map((tag: any) => typeof tag === "string" ? tag.trim() : pick(tag, ["name", "genreName", "tagName", "title"])).filter(Boolean)
+    : typeof rawTags === "string" ? rawTags.split(/[,，|]/).map((tag) => tag.trim()).filter(Boolean) : [];
+
   const chapterCount = Number(
     item?.chapterCount ??
       item?.chapter_count ??
@@ -102,7 +107,8 @@ function mapDrama(item: any): Drama {
       "desc",
       "summary",
     ]),
-    tags: [],
+    tags,
+    tagNames: tags,
     inLibrary: Boolean(item?.inLibrary ?? false),
   };
 }
@@ -147,7 +153,7 @@ export function useStardustTVHome() {
     queryKey: ["stardusttv", "home", "id"],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      const response = await request("/api/v2/home", {
+      const response = await request("/api/v2/discover", {
         page: String(pageParam),
         limit: "20",
       });
@@ -157,10 +163,11 @@ export function useStardustTVHome() {
           .map(mapDrama)
           .filter((item) => item.bookId && item.bookName !== "Untitled"),
         page: pageParam,
+        hasMore: typeof response?.hasMore === "boolean" ? response.hasMore : items.length >= 20,
       };
     },
     getNextPageParam: (lastPage, allPages) => {
-      if (lastPage.dramas.length === 0) return undefined;
+      if (lastPage.dramas.length === 0 || lastPage.hasMore === false) return undefined;
 
       const previousIds = new Set(
         allPages
@@ -171,7 +178,7 @@ export function useStardustTVHome() {
         (drama) => !previousIds.has(drama.bookId),
       );
 
-      return hasNewDrama ? lastPage.page + 1 : undefined;
+      return hasNewDrama && lastPage.hasMore ? lastPage.page + 1 : undefined;
     },
     staleTime: 5 * 60 * 1000,
     retry: 2,
