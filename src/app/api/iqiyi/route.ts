@@ -111,7 +111,7 @@ export async function GET(request: Request) {
 
   const isPlay = action === "play";
   const controller = new AbortController();
-  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 20000 : action === "drama" || action === "kdrama" ? 25000 : 10000;
+  const timeoutMs = action === "play" ? 25000 : action === "episodes" ? 12000 : action === "drama" || action === "kdrama" ? 25000 : 10000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
