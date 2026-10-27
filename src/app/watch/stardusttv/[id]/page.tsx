@@ -269,6 +269,9 @@ export default function StardustTVWatchPage() {
             ref={videoRef}
             controls
             playsInline
+            onEnded={() => {
+              if (nextEpisode) playEpisode(nextEpisode, selectedIndex + 1);
+            }}
             className="h-full w-full object-contain"
           />
 
@@ -278,7 +281,7 @@ export default function StardustTVWatchPage() {
               <button
                 type="button"
                 onClick={() => setEpisodeMenuOpen((open) => !open)}
-                className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md md:hidden"
+                className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md"
                 aria-label="Buka daftar episode"
               >
                 {episodeMenuOpen ? (
@@ -289,38 +292,9 @@ export default function StardustTVWatchPage() {
                 <span>Ep {selectedEpisode}</span>
               </button>
 
-              {/* Mobile previous / next episode controls */}
-              <div className="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center gap-3 md:hidden">
-                <button
-                  type="button"
-                  disabled={!previousEpisode}
-                  onClick={() =>
-                    previousEpisode &&
-                    playEpisode(previousEpisode, selectedIndex - 1)
-                  }
-                  className="pointer-events-auto flex h-10 items-center gap-1 rounded-full border border-white/20 bg-black/70 px-4 text-xs font-semibold text-white backdrop-blur-md disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Sebelumnya
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!nextEpisode}
-                  onClick={() =>
-                    nextEpisode &&
-                    playEpisode(nextEpisode, selectedIndex + 1)
-                  }
-                  className="pointer-events-auto flex h-10 items-center gap-1 rounded-full border border-white/20 bg-black/70 px-4 text-xs font-semibold text-white backdrop-blur-md disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  Berikutnya
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-
               {/* Mobile episode drawer */}
               {episodeMenuOpen && (
-                <div className="absolute inset-x-3 top-14 z-30 max-h-[65%] overflow-y-auto rounded-2xl border border-white/10 bg-[#0a0e27]/95 p-3 shadow-2xl backdrop-blur-xl md:hidden">
+                <div className="absolute inset-x-3 top-14 z-30 max-h-[65%] overflow-y-auto rounded-2xl border border-white/10 bg-[#0a0e27]/95 p-3 shadow-2xl backdrop-blur-xl">
                   <div className="mb-2 flex items-center justify-between px-1">
                     <div>
                       <p className="text-sm font-bold">Daftar Episode</p>
@@ -375,60 +349,19 @@ export default function StardustTVWatchPage() {
           </div>
         )}
 
-        {/* Desktop episode list stays outside the player */}
         {episodes.length > 0 && (
-          <div className="hidden max-h-32 overflow-y-auto border-t border-white/10 bg-[#0a0e27] p-3 md:block">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-xs font-semibold text-white/50">
-                {title} · Episode
+          <div className="shrink-0 border-t border-white/10 bg-[#0a0e27] px-3 py-3">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-2">
+              <button type="button" disabled={!previousEpisode} onClick={() => previousEpisode && playEpisode(previousEpisode, selectedIndex - 1)} className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 disabled:opacity-30">
+                <ChevronLeft className="h-4 w-4" /> Sebelumnya
+              </button>
+              <div className="min-w-0 flex-1 text-center">
+                <p className="truncate text-sm font-bold">{title || "StardustTV"}</p>
+                <p className="mt-1 text-xs text-white/45">Episode {selectedEpisode} dari {episodes.length}</p>
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={!previousEpisode}
-                  onClick={() =>
-                    previousEpisode &&
-                    playEpisode(previousEpisode, selectedIndex - 1)
-                  }
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70 disabled:opacity-30"
-                >
-                  ← Sebelumnya
-                </button>
-                <button
-                  type="button"
-                  disabled={!nextEpisode}
-                  onClick={() =>
-                    nextEpisode &&
-                    playEpisode(nextEpisode, selectedIndex + 1)
-                  }
-                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-30"
-                >
-                  Berikutnya →
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {episodes.map((episode: any, index: number) => {
-                const number = episodeNumber(episode, index);
-
-                return (
-                  <button
-                    key={String(episode?.id ?? number) + "-" + index}
-                    type="button"
-                    onClick={() => playEpisode(episode, index)}
-                    className={
-                      "rounded-lg border px-3 py-2 text-xs font-semibold " +
-                      (number === selectedEpisode
-                        ? "border-purple-400 bg-purple-600 text-white"
-                        : "border-white/10 bg-white/5 text-white/70")
-                    }
-                  >
-                    {number}
-                  </button>
-                );
-              })}
+              <button type="button" disabled={!nextEpisode} onClick={() => nextEpisode && playEpisode(nextEpisode, selectedIndex + 1)} className="flex shrink-0 items-center gap-1 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-30">
+                Selanjutnya <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
         )}
