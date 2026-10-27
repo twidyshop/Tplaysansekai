@@ -156,6 +156,7 @@ const SNAPSHOT_KEY = "tplay-iqiyi-trending-id-v2";
 
 export function IqiyiHome() {
   const [snapshot, setSnapshot] = useState<any[]>([]);
+  const [activeFeed, setActiveFeed] = useState("trending");
   useEffect(() => {
     try {
       const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -282,45 +283,44 @@ export function IqiyiHome() {
     );
   }
 
+  const feeds = [
+    { id: "trending", label: "Trending", title: "Trending", data: trendingItems, loading: trending.isLoading },
+    { id: "foryou", label: "Untukmu", title: "Untukmu", data: foryouItems, loading: foryou.isLoading },
+    { id: "drama", label: "Drama", title: "Drama", data: dramaItems, loading: drama.isLoading || drama.isFetchingNextPage, onMore: () => drama.fetchNextPage(), hasMore: !!drama.hasNextPage },
+    { id: "kdrama", label: "K-Drama", title: "K-Drama", data: kdramaItems, loading: kdrama.isLoading || kdrama.isFetchingNextPage, onMore: () => kdrama.fetchNextPage(), hasMore: !!kdrama.hasNextPage },
+    { id: "movie", label: "Movie", title: "Movie", data: movieItems, loading: movie.isLoading || movie.isFetchingNextPage, onMore: () => movie.fetchNextPage(), hasMore: !!movie.hasNextPage },
+    { id: "anime", label: "Anime", title: "Anime", data: animeItems, loading: anime.isLoading || anime.isFetchingNextPage, onMore: () => anime.fetchNextPage(), hasMore: !!anime.hasNextPage },
+    { id: "variety", label: "Variety", title: "Variety", data: varietyItems, loading: variety.isLoading || variety.isFetchingNextPage, onMore: () => variety.fetchNextPage(), hasMore: !!variety.hasNextPage },
+  ];
+  const active = feeds.find((feed) => feed.id === activeFeed) ?? feeds[0];
+
   return (
-    <div className="space-y-10">
-                <Section title="Trending" data={trendingItems} loading={false} />
-          <Section title="Untukmu" data={foryouItems} loading={foryou.isLoading} />
-          <Section
-            title="Drama"
-            data={dramaItems}
-            loading={drama.isLoading || drama.isFetchingNextPage}
-            onMore={() => drama.fetchNextPage()}
-            hasMore={!!drama.hasNextPage}
-          />
-          <Section
-            title="K-Drama"
-            data={kdramaItems}
-            loading={kdrama.isLoading || kdrama.isFetchingNextPage}
-            onMore={() => kdrama.fetchNextPage()}
-            hasMore={!!kdrama.hasNextPage}
-          />
-          <Section
-            title="Movie"
-            data={movieItems}
-            loading={movie.isLoading || movie.isFetchingNextPage}
-            onMore={() => movie.fetchNextPage()}
-            hasMore={!!movie.hasNextPage}
-          />
-          <Section
-            title="Anime"
-            data={animeItems}
-            loading={anime.isLoading || anime.isFetchingNextPage}
-            onMore={() => anime.fetchNextPage()}
-            hasMore={!!anime.hasNextPage}
-          />
-          <Section
-            title="Variety"
-            data={varietyItems}
-            loading={variety.isLoading || variety.isFetchingNextPage}
-            onMore={() => variety.fetchNextPage()}
-            hasMore={!!variety.hasNextPage}
-          />
+    <div className="space-y-5">
+      <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Kategori iQIYI">
+        {feeds.map((feed) => (
+          <button
+            key={feed.id}
+            type="button"
+            role="tab"
+            aria-selected={activeFeed === feed.id}
+            onClick={() => setActiveFeed(feed.id)}
+            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+              activeFeed === feed.id
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-white/15 bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+            }`}
+          >
+            {feed.label}
+          </button>
+        ))}
+      </div>
+      <Section
+        title={active.title}
+        data={active.data}
+        loading={active.loading}
+        onMore={active.onMore}
+        hasMore={active.hasMore}
+      />
     </div>
   );
 }
