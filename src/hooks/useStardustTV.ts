@@ -163,11 +163,11 @@ export function useStardustTVHome() {
           .map(mapDrama)
           .filter((item) => item.bookId && item.bookName !== "Untitled"),
         page: pageParam,
-        hasMore: typeof response?.hasMore === "boolean" ? response.hasMore : items.length > 0,
+        hasMore: items.length > 0,
       };
     },
     getNextPageParam: (lastPage, allPages) => {
-      if (lastPage.dramas.length === 0 || lastPage.hasMore === false) return undefined;
+      if (lastPage.dramas.length === 0) return undefined;
 
       const previousIds = new Set(
         allPages
