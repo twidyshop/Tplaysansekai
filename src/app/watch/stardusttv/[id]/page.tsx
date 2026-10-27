@@ -176,11 +176,35 @@ export default function StardustTVWatchPage() {
   }, [id, selectedEpisode, selectedChapterId]);
 
   useEffect(() => {
-    if (!videoRef.current || !streamUrl) return;
+    const video = videoRef.current;
+    if (!video || !streamUrl) return;
 
-    videoRef.current.src =
-      "/api/stardusttv/stream?url=" + encodeURIComponent(streamUrl);
-    videoRef.current.load();
+    video.autoplay = true;
+    video.src = "/api/stardusttv/stream?url=" + encodeURIComponent(streamUrl);
+    video.load();
+
+    // Try playback again when the newly selected episode becomes playable.
+    // A source change alone only loads the next episode; it does not start it.
+    let disposed = false;
+    const attemptAutoplay = () => {
+      if (disposed || video !== videoRef.current) return;
+      const result = video.play();
+      if (result && typeof result.catch === "function") {
+        result.catch(() => {
+          // Some browsers block unmuted autoplay. Keep controls available so
+          // the viewer can start playback manually if the browser enforces it.
+        });
+      }
+    };
+    video.addEventListener("loadedmetadata", attemptAutoplay);
+    video.addEventListener("canplay", attemptAutoplay);
+    attemptAutoplay();
+
+    return () => {
+      disposed = true;
+      video.removeEventListener("loadedmetadata", attemptAutoplay);
+      video.removeEventListener("canplay", attemptAutoplay);
+    };
   }, [streamUrl]);
 
   useEffect(() => {
@@ -269,6 +293,7 @@ export default function StardustTVWatchPage() {
             ref={videoRef}
             controls
             playsInline
+            autoPlay
             onEnded={() => {
               if (nextEpisode) playEpisode(nextEpisode, selectedIndex + 1);
             }}
