@@ -9,6 +9,7 @@ import Hls from "hls.js";
 import {
   extractStardustEpisodes,
   extractStardustStream,
+  extractStardustSubtitles,
   extractStardustText,
   getStardustTVStream,
   useStardustTVDetail,
@@ -22,8 +23,9 @@ export default function StardustTVWatchPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [subtitleTracks, setSubtitleTracks] = useState<Array<{ id: number; name: string; lang: string }>>([]);
+  const [sidecarSubtitles, setSidecarSubtitles] = useState<Array<{ url: string; language: string; label: string; format: string }>>([]);
   const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
-  const [selectedSubtitle, setSelectedSubtitle] = useState(-1);
+  const [selectedSubtitle, setSelectedSubtitle] = useState("off");
 
   const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [selectedChapterId, setSelectedChapterId] = useState("");
@@ -152,6 +154,8 @@ export default function StardustTVWatchPage() {
 
         const response = await getStardustTVStream(id, selectedChapterId);
         const source = extractStardustStream(response);
+        const sidecarTracks = extractStardustSubtitles(response);
+        if (!cancelled) setSidecarSubtitles(sidecarTracks);
 
         if (!source) {
           throw new Error("URL video StardustTV tidak ditemukan.");
@@ -187,7 +191,7 @@ export default function StardustTVWatchPage() {
     const proxiedUrl = "/api/stardusttv/stream?url=" + encodeURIComponent(streamUrl);
     let disposed = false;
     setSubtitleTracks([]);
-    setSelectedSubtitle(-1);
+    setSelectedSubtitle("off");
     setSubtitleMenuOpen(false);
     hlsRef.current?.destroy();
     hlsRef.current = null;
@@ -207,7 +211,7 @@ export default function StardustTVWatchPage() {
       }));
       setSubtitleTracks(mapped);
       const active = tracks.findIndex((track) => track.mode === "showing");
-      setSelectedSubtitle(active);
+      setSelectedSubtitle(active >= 0 ? "native:" + active : "off");
     };
 
     // HLS.js exposes soft-subtitle renditions on browsers that do not play
@@ -224,7 +228,7 @@ export default function StardustTVWatchPage() {
         })));
       });
       hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => {
-        if (!disposed) setSelectedSubtitle(data.id);
+        if (!disposed) setSelectedSubtitle(data.id >= 0 ? "hls:" + data.id : "off");
       });
       hls.on(Hls.Events.MANIFEST_PARSED, attemptAutoplay);
       hls.loadSource(proxiedUrl);
@@ -246,17 +250,29 @@ export default function StardustTVWatchPage() {
     };
   }, [streamUrl]);
 
-  const selectSubtitle = (trackId: number) => {
+  const selectSubtitle = (trackKey: string) => {
     const video = videoRef.current;
     const hls = hlsRef.current;
-    if (hls) {
+
+    if (trackKey === "off") {
+      if (hls) hls.subtitleTrack = -1;
+      if (video) Array.from(video.textTracks || []).forEach((track) => { track.mode = "disabled"; });
+      setSelectedSubtitle("off");
+      setSubtitleMenuOpen(false);
+      return;
+    }
+
+    if (trackKey.startsWith("hls:") && hls) {
+      const trackId = Number(trackKey.slice(4));
       hls.subtitleTrack = trackId;
-      setSelectedSubtitle(trackId);
+      if (video) Array.from(video.textTracks || []).forEach((track) => { track.mode = "disabled"; });
+      setSelectedSubtitle(trackKey);
     } else if (video) {
-      Array.from(video.textTracks || []).forEach((track, index) => {
-        track.mode = index === trackId ? "showing" : "disabled";
-      });
-      setSelectedSubtitle(trackId);
+      const wanted = trackKey.startsWith("sidecar:") ? Number(trackKey.slice(8)) : Number(trackKey.slice(7));
+      const nativeTracks = Array.from(video.textTracks || []);
+      nativeTracks.forEach((track, index) => { track.mode = index === wanted ? "showing" : "disabled"; });
+      if (hls) hls.subtitleTrack = -1;
+      setSelectedSubtitle(trackKey);
     }
     setSubtitleMenuOpen(false);
   };
@@ -352,27 +368,60 @@ export default function StardustTVWatchPage() {
               if (nextEpisode) playEpisode(nextEpisode, selectedIndex + 1);
             }}
             className="h-full w-full object-contain"
-          />
+          >
+            {sidecarSubtitles.map((track, index) => (
+              <track
+                key={track.url}
+                kind="subtitles"
+                srcLang={track.language}
+                label={track.label || track.language || `Subtitle ${index + 1}`}
+                src={"/api/stardusttv/stream?url=" + encodeURIComponent(track.url)}
+                onLoad={() => {
+                  const video = videoRef.current;
+                  if (!video) return;
+                  const nativeTracks = Array.from(video.textTracks || []);
+                  const mapped = nativeTracks.map((nativeTrack, trackIndex) => ({
+                    id: trackIndex,
+                    name: nativeTrack.label || nativeTrack.language || `Subtitle ${trackIndex + 1}`,
+                    lang: nativeTrack.language || "",
+                  }));
+                  setSubtitleTracks(mapped);
+                }}
+              />
+            ))}
+          </video>
 
           <div className="absolute left-3 top-3 z-20">
               <button
                 type="button"
                 onClick={() => setSubtitleMenuOpen((open) => !open)}
                 aria-label="Pilih subtitle"
-                className={"flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold backdrop-blur-md " + (selectedSubtitle >= 0 ? "border-purple-400 bg-purple-600/90 text-white" : "border-white/20 bg-black/70 text-white")}
+                className={"flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold backdrop-blur-md " + (selectedSubtitle !== "off" ? "border-purple-400 bg-purple-600/90 text-white" : "border-white/20 bg-black/70 text-white")}
               >
                 <Captions className="h-4 w-4" /> CC
               </button>
               {subtitleMenuOpen && (
                 <div className="mt-2 min-w-44 overflow-hidden rounded-xl border border-white/10 bg-[#0a0e27]/95 p-1 shadow-xl backdrop-blur-xl">
-                  <button type="button" onClick={() => selectSubtitle(-1)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle < 0 ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>Nonaktif</button>
-                  {subtitleTracks.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-white/55">Subtitle soft-sub tidak tersedia atau belum terbaca dari sumber video ini.</p>
-                  ) : subtitleTracks.map((track) => (
-                    <button key={track.id} type="button" onClick={() => selectSubtitle(track.id)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle === track.id ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>
-                      {track.name}{track.lang && track.lang !== track.name ? " · " + track.lang : ""}
-                    </button>
-                  ))}
+                  <button type="button" onClick={() => selectSubtitle("off")} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle === "off" ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>Nonaktif</button>
+                  {sidecarSubtitles.map((track, index) => {
+                    const key = "sidecar:" + index;
+                    return (
+                      <button key={key + track.url} type="button" onClick={() => selectSubtitle(key)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle === key ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>
+                        {track.label || track.language || `Subtitle ${index + 1}`}
+                      </button>
+                    );
+                  })}
+                  {subtitleTracks.map((track) => {
+                    const key = "hls:" + track.id;
+                    return (
+                      <button key={key} type="button" onClick={() => selectSubtitle(key)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle === key ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>
+                        {track.name}{track.lang && track.lang !== track.name ? " · " + track.lang : ""}
+                      </button>
+                    );
+                  })}
+                  {sidecarSubtitles.length === 0 && subtitleTracks.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-white/55">Sumber video tidak mengembalikan track subtitle soft-sub.</p>
+                  )}
                 </div>
               )}
             </div>
