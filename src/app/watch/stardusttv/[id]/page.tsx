@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Captions, Menu, X } from "lucide-react";
+import Hls from "hls.js";
 
 import {
   extractStardustEpisodes,
@@ -19,6 +20,10 @@ export default function StardustTVWatchPage() {
   const id = String(params.id || "");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const [subtitleTracks, setSubtitleTracks] = useState<Array<{ id: number; name: string; lang: string }>>([]);
+  const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
+  const [selectedSubtitle, setSelectedSubtitle] = useState(-1);
 
   const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [selectedChapterId, setSelectedChapterId] = useState("");
@@ -179,33 +184,82 @@ export default function StardustTVWatchPage() {
     const video = videoRef.current;
     if (!video || !streamUrl) return;
 
-    video.autoplay = true;
-    video.src = "/api/stardusttv/stream?url=" + encodeURIComponent(streamUrl);
-    video.load();
-
-    // Try playback again when the newly selected episode becomes playable.
-    // A source change alone only loads the next episode; it does not start it.
+    const proxiedUrl = "/api/stardusttv/stream?url=" + encodeURIComponent(streamUrl);
     let disposed = false;
+    setSubtitleTracks([]);
+    setSelectedSubtitle(-1);
+    setSubtitleMenuOpen(false);
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+
     const attemptAutoplay = () => {
       if (disposed || video !== videoRef.current) return;
       const result = video.play();
-      if (result && typeof result.catch === "function") {
-        result.catch(() => {
-          // Some browsers block unmuted autoplay. Keep controls available so
-          // the viewer can start playback manually if the browser enforces it.
-        });
-      }
+      if (result && typeof result.catch === "function") result.catch(() => {});
     };
-    video.addEventListener("loadedmetadata", attemptAutoplay);
-    video.addEventListener("canplay", attemptAutoplay);
-    attemptAutoplay();
+
+    const readNativeTracks = () => {
+      const tracks = Array.from(video.textTracks || []);
+      const mapped = tracks.map((track, index) => ({
+        id: index,
+        name: track.label || track.language || `Subtitle ${index + 1}`,
+        lang: track.language || "",
+      }));
+      setSubtitleTracks(mapped);
+      const active = tracks.findIndex((track) => track.mode === "showing");
+      setSelectedSubtitle(active);
+    };
+
+    // HLS.js exposes soft-subtitle renditions on browsers that do not play
+    // HLS natively. Safari/iOS uses its native HLS implementation.
+    if (Hls.isSupported()) {
+      const hls = new Hls({ enableWebVTT: true, enableIMSC1: true });
+      hlsRef.current = hls;
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+        if (disposed) return;
+        setSubtitleTracks(hls.subtitleTracks.map((track, index) => ({
+          id: index,
+          name: track.name || track.lang || `Subtitle ${index + 1}`,
+          lang: track.lang || "",
+        })));
+      });
+      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => {
+        if (!disposed) setSelectedSubtitle(data.id);
+      });
+      hls.on(Hls.Events.MANIFEST_PARSED, attemptAutoplay);
+      hls.loadSource(proxiedUrl);
+      hls.attachMedia(video);
+    } else {
+      video.src = proxiedUrl;
+      video.load();
+      video.addEventListener("loadedmetadata", readNativeTracks);
+      video.addEventListener("canplay", attemptAutoplay);
+      attemptAutoplay();
+    }
 
     return () => {
       disposed = true;
-      video.removeEventListener("loadedmetadata", attemptAutoplay);
+      video.removeEventListener("loadedmetadata", readNativeTracks);
       video.removeEventListener("canplay", attemptAutoplay);
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
     };
   }, [streamUrl]);
+
+  const selectSubtitle = (trackId: number) => {
+    const video = videoRef.current;
+    const hls = hlsRef.current;
+    if (hls) {
+      hls.subtitleTrack = trackId;
+      setSelectedSubtitle(trackId);
+    } else if (video) {
+      Array.from(video.textTracks || []).forEach((track, index) => {
+        track.mode = index === trackId ? "showing" : "disabled";
+      });
+      setSelectedSubtitle(trackId);
+    }
+    setSubtitleMenuOpen(false);
+  };
 
   useEffect(() => {
     if (!id || !title || episodes.length === 0) {
@@ -299,6 +353,29 @@ export default function StardustTVWatchPage() {
             }}
             className="h-full w-full object-contain"
           />
+
+          {subtitleTracks.length > 0 && (
+            <div className="absolute left-3 top-3 z-20">
+              <button
+                type="button"
+                onClick={() => setSubtitleMenuOpen((open) => !open)}
+                aria-label="Pilih subtitle"
+                className={"flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold backdrop-blur-md " + (selectedSubtitle >= 0 ? "border-purple-400 bg-purple-600/90 text-white" : "border-white/20 bg-black/70 text-white")}
+              >
+                <Captions className="h-4 w-4" /> CC
+              </button>
+              {subtitleMenuOpen && (
+                <div className="mt-2 min-w-44 overflow-hidden rounded-xl border border-white/10 bg-[#0a0e27]/95 p-1 shadow-xl backdrop-blur-xl">
+                  <button type="button" onClick={() => selectSubtitle(-1)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle < 0 ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>Nonaktif</button>
+                  {subtitleTracks.map((track) => (
+                    <button key={track.id} type="button" onClick={() => selectSubtitle(track.id)} className={"block w-full rounded-lg px-3 py-2 text-left text-xs " + (selectedSubtitle === track.id ? "bg-purple-600 text-white" : "text-white/75 hover:bg-white/10")}>
+                      {track.name}{track.lang && track.lang !== track.name ? " · " + track.lang : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {episodes.length > 0 && (
             <>
