@@ -56,8 +56,10 @@ export default function IqiyiDetailPage(){
       if(!response.ok) throw new Error(json?.error||"Gagal memuat detail IQIYI");
       return json;
     },
-    enabled:Boolean(id),
-    staleTime:300000,
+    enabled:Boolean(id) && !(quickTitle !== "iQIYI" && quickCover && quickDescription),
+    staleTime:600000,
+    retry:0,
+    refetchOnMount:false,
   });
 
   const detail=unwrap(data);
