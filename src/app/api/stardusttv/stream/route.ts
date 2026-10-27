@@ -43,25 +43,31 @@ export async function GET(request: NextRequest) {
       const playlist = await upstream.text();
       const baseUrl = new URL(target);
 
+      const proxyUrl = (value: string) => {
+        try {
+          const absolute = new URL(value, baseUrl).toString();
+          return "/api/stardusttv/stream?url=" + encodeURIComponent(absolute);
+        } catch {
+          return value;
+        }
+      };
+
       const rewritten = playlist
         .split(/\r?\n/)
         .map((line) => {
           const value = line.trim();
+          if (!value) return line;
 
-          if (!value || value.startsWith("#")) {
-            return line;
-          }
-
-          try {
-            const absolute = new URL(value, baseUrl).toString();
-
-            return (
-              "/api/stardusttv/stream?url=" +
-              encodeURIComponent(absolute)
+          // Subtitle renditions are commonly declared inside an HLS tag as
+          // URI="...". Rewrite those too, not just the media segment lines,
+          // otherwise the subtitle playlist bypasses our same-origin proxy.
+          if (value.startsWith("#")) {
+            return line.replace(/URI="([^"]+)"/g, (_match, uri: string) =>
+              'URI="' + proxyUrl(uri) + '"',
             );
-          } catch {
-            return line;
           }
+
+          return proxyUrl(value);
         })
         .join("\n");
 
