@@ -268,11 +268,21 @@ export default function StardustTVWatchPage() {
       if (video) Array.from(video.textTracks || []).forEach((track) => { track.mode = "disabled"; });
       setSelectedSubtitle(trackKey);
     } else if (video) {
-      const wanted = trackKey.startsWith("sidecar:") ? Number(trackKey.slice(8)) : Number(trackKey.slice(7));
       const nativeTracks = Array.from(video.textTracks || []);
+      let wanted = -1;
+      if (trackKey.startsWith("sidecar:")) {
+        const sidecarIndex = Number(trackKey.slice(8));
+        const sidecar = sidecarSubtitles[sidecarIndex];
+        wanted = nativeTracks.findIndex((track) =>
+          (track.label || "") === (sidecar?.label || "") ||
+          (track.language || "") === (sidecar?.language || ""),
+        );
+      } else if (trackKey.startsWith("native:")) {
+        wanted = Number(trackKey.slice(7));
+      }
       nativeTracks.forEach((track, index) => { track.mode = index === wanted ? "showing" : "disabled"; });
       if (hls) hls.subtitleTrack = -1;
-      setSelectedSubtitle(trackKey);
+      setSelectedSubtitle(wanted >= 0 ? trackKey : "off");
     }
     setSubtitleMenuOpen(false);
   };
@@ -376,17 +386,6 @@ export default function StardustTVWatchPage() {
                 srcLang={track.language}
                 label={track.label || track.language || `Subtitle ${index + 1}`}
                 src={"/api/stardusttv/stream?url=" + encodeURIComponent(track.url)}
-                onLoad={() => {
-                  const video = videoRef.current;
-                  if (!video) return;
-                  const nativeTracks = Array.from(video.textTracks || []);
-                  const mapped = nativeTracks.map((nativeTrack, trackIndex) => ({
-                    id: trackIndex,
-                    name: nativeTrack.label || nativeTrack.language || `Subtitle ${trackIndex + 1}`,
-                    lang: nativeTrack.language || "",
-                  }));
-                  setSubtitleTracks(mapped);
-                }}
               />
             ))}
           </video>
