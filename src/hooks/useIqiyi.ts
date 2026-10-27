@@ -49,7 +49,9 @@ export function useIqiyiEpisodes(id: string, albumId?: string) {
     queryFn: () => fetchJson<IqiyiEpisodesResponse>(`/api/iqiyi?action=episodes&${qs.toString()}`),
     enabled: !!id,
     staleTime: 10 * 60 * 1000,
-    retry: 0,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(700 * (attempt + 1), 1800),
+    refetchOnMount: "always",
   });
 }
 
