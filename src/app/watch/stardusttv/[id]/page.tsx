@@ -385,7 +385,7 @@ export default function StardustTVWatchPage() {
                 kind="subtitles"
                 srcLang={track.language}
                 label={track.label || track.language || `Subtitle ${index + 1}`}
-                src={"/api/stardusttv/stream?url=" + encodeURIComponent(track.url)}
+                src={"/api/stardusttv/stream?url=" + encodeURIComponent(track.url) + (/srt/i.test(track.format) ? "&format=srt" : "")}
               />
             ))}
           </video>
