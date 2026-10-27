@@ -11,7 +11,7 @@ function arr(v:any,depth=0):any[]{
   if(depth>10||v==null||typeof v!=="object") return [];
   if(Array.isArray(v)){
     if(v.length===0) return [];
-    const looksLikeEpisodes=v.some((x:any)=>x&&typeof x==="object"&&["episode","episodeNumber","episode_index","episodeId","episode_id","chapterId","chapter_id","videoId","video_id","playUrl","play_url"].some(k=>x[k]!=null));
+    const looksLikeEpisodes=v.some((x:any)=>x&&typeof x==="object"&&["episode","episodeNumber","episode_index","episodeId","episode_id","chapterId","chapter_id","videoId","video_id","playUrl","play_url","title","name","episodeTitle","videoName"].some(k=>x[k]!=null));
     return looksLikeEpisodes?v:[];
   }
   const preferred=["episodes","episodeList","episode_list","episodeData","episode_data","allepisode","allEpisode","chapters","chapterList","chapter_list","videos","videoList","video_list","list","rows","results","items","data","result"];
@@ -402,7 +402,7 @@ export default function IqiyiWatchPage(){
           <button type="button" onClick={()=>setEpisodeMenuOpen(open=>!open)} aria-label="Buka daftar episode" className="absolute right-3 top-3 z-[70] flex items-center gap-2 rounded-lg border border-white/20 bg-black/90 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur-md">
             {episodeMenuOpen?<X className="h-4 w-4"/>:<Menu className="h-4 w-4"/>} Episode {selected}
           </button>
-          {episodeMenuOpen&&<div className="absolute inset-x-3 top-14 z-[80] max-h-[65%] overflow-y-auto rounded-2xl border border-white/10 bg-[#0a0e27]/[98] p-3 shadow-2xl backdrop-blur-xl">
+          {episodeMenuOpen&&<div className="absolute inset-x-3 top-14 z-[80] max-h-[65%] overflow-y-auto rounded-2xl border border-white/10 bg-[#0a0e27]/95 p-3 shadow-2xl backdrop-blur-xl">
             <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-bold">Daftar Episode</p><p className="text-[11px] text-white/50">{title} · {episodes.length} episode</p></div><button type="button" onClick={()=>setEpisodeMenuOpen(false)} className="rounded-lg p-2 text-white/60 hover:bg-white/10" aria-label="Tutup daftar episode"><X className="h-4 w-4"/></button></div>
             {loading?<p className="py-5 text-center text-sm text-white/60">Memuat daftar episode...</p>:episodes.length>0?<div className="grid grid-cols-5 gap-2 sm:grid-cols-7 md:grid-cols-9">{episodes.map((episode:any)=><button key={episode.id+"-"+episode.number} type="button" onClick={()=>{void play(episode.number);setEpisodeMenuOpen(false);}} className={"rounded-lg border px-2 py-2.5 text-xs font-bold "+(episode.number===selected?"border-emerald-400 bg-emerald-500 text-black":"border-white/10 bg-white/5 text-white/75 hover:bg-white/10")}>{episode.number}</button>)}</div>:<p className="py-5 text-center text-sm text-amber-200">{episodeError||"Daftar episode belum tersedia dari sumber iQIYI."}</p>}
           </div>}
